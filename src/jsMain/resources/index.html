@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>bytewitch</title>
+    <style>
+
+        :root {
+            --accent: #c9748f;
+            --on-accent: #fff;
+            --content-back: #fee5ed;
+            --bplist: #7e74c9;
+            --nsarchive: #74c9c7;
+            --opack: #74c97b;
+            --generic: #c9a074;
+            --rowgap: 0.3rem;
+            --sans: Lato, Roboto, Helvetica, sans-serif;
+            --mono: monospace;
+        }
+
+        html, body {
+            font-family: var(--sans);
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            background: #ccc;
+            background: url("back.jpg") repeat scroll 0% 0%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2, h3 {
+            margin: 0px;
+        }
+
+        h3 {
+            margin-bottom: var(--rowgap);
+        }
+
+        button {
+            border-radius: 0.3rem;
+            color: var(--on-accent);
+            background: var(--accent);
+            border: 0px;
+            padding: 0.4rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.1s ease;
+            transition: background 0.1s ease;
+        }
+
+        button:hover {
+            color: var(--accent);
+            background: var(--on-accent);
+        }
+
+        .header {
+            display: flex;
+            flex-direction: row;
+            gap: 1rem;
+            align-self: center;
+            align-items: center;
+        }
+
+        .header > img {
+            height: 4rem;
+        }
+
+        .legend {
+            display: flex;
+            flex-direction: row;
+            gap: 0.5rem;
+            color: #fff;
+            font-size: 0.75rem;
+        }
+
+        .parsebuttons {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .parsebuttons > div {
+            flex-grow: 1;
+        }
+
+        .container {
+            box-sizing: border-box;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 0.5rem;
+            float: right;
+            display: flex;
+            flex-direction: column;
+            background: var(--content-back);
+            max-width: 100%;
+        }
+
+        .container > textarea {
+            font-family: monospace;
+            max-width: 100%;
+            width: 800px;
+            height: 250px;
+            max-height: 20vh;
+        }
+
+        .container > span {
+            padding-top:  0.5rem;
+            padding-bottom:  0.5rem;
+        }
+
+        .container > button {
+            padding-top:  0.25rem;
+            padding-bottom:  0.25rem;
+            margin-top:  0.5rem;
+        }
+
+        .invisible {
+            display: none;
+        }
+
+        .parsecontent {
+            display: flex;
+            font-family: var(--mono);
+        }
+
+        .roundbox, .legend > div {
+            box-sizing: border-box;
+            border-radius: 0.3rem;
+            padding: var(--rowgap);
+        }
+
+        .protobuf {
+            box-sizing: border-box;
+            background: var(--accent);
+            display: flex;
+            flex-direction: column;
+            gap: var(--rowgap);
+        }
+
+        .protofield {
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.5);
+            display: flex;
+            flex-direction: row;
+            gap: 1rem;
+        }
+
+        .protofield > div {
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: var(--rowgap);
+            align-items: start;
+        }
+
+        .protovalue {
+            box-sizing: border-box;
+            padding: var(--rowgap);
+            border-radius: 0.3rem;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .bplist {
+            background: var(--bplist);
+        }
+
+        .nsarchive {
+            background: var(--nsarchive);
+        }
+
+        .opack {
+            background: var(--opack);
+        }
+
+        .generic {
+            background: var(--generic);
+            display: flex;
+            gap: var(--rowgap);
+            align-items: start;
+            flex-wrap: wrap;
+        }
+
+        .bpvalue {
+            padding: var(--rowgap);
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 0.3rem;
+        }
+
+        .bpdict, .bparray, .bpset, .nsdict, .nsarray, .nsset, .opdict, .oparray {
+            padding: var(--rowgap);
+            border-radius: 0.3rem;
+            background: var(--bplist);
+            display: flex;
+            gap: var(--rowgap);
+            align-items: start;
+        }
+
+        .bpdict, .nsdict, .opdict, .largecollection {
+            flex-direction: column;
+        }
+
+        .bpdict > div, .nsdict > div, .opdict > div {
+            display: flex;
+            flex-direction: row;
+            gap: var(--rowgap);
+            align-items: center;
+        }
+
+        .bpdict > div > span, .nsdict > div > span, .opdict > div > span {
+            font-family: var(--sans);
+        }
+
+        .nsdict, .nsarray, .nsset {
+            background: var(--nsarchive);
+        }
+
+        .opdict, .oparray {
+            background: var(--opack);
+        }
+
+        .stringlit {
+            font-family: var(--mono);
+            whitespace: pre-wrap;
+        }
+
+        .data {
+            word-wrap: anywhere;
+        }
+
+        #output {
+            gap: 1rem;
+        }
+
+        #bytefinder {
+            display: none;
+        }
+
+        #floatview {
+            margin-top: var(--rowgap);
+            font-family: var(--mono);
+            word-wrap: anywhere;
+        }
+
+        #floatview > span {
+            background: var(--accent);
+        }
+    </style>
+</head>
+<body>
+<script src="bytewitch.js"></script>
+
+<div class="container" style="gap: 1rem; align-items: center;">
+    <div class="header">
+        <img src="icon.png">
+        <h1>bytewitch</h1>
+    </div>
+    <div class="legend">
+        <div class="bplist">bplist</div><div class="protobuf">protobuf</div><div class="opack">opack</div><div class="nsarchive">nsarchive</div><div class="generic">generic</div>
+    </div>
+    <textarea id="data"></textarea>
+    <div class="parsebuttons">
+        <span>
+            <input type="checkbox" id="livedecode" checked />
+            <label for="livedecode">live decode</label>
+        </span>
+        <div></div>
+        <button id="decode">decode</button>
+        <button id="tryhard">try harder</button>
+    </div>
+</div>
+
+<div class="container" id="output"><i>no valid decode yet</i></div>
+
+<div class="container" id="bytefinder">
+    <h3>Byte Finder</h3>
+    <i>click parsed elements to highlight source bytes below</i>
+    <div id="floatview"></div>
+</div>
+
+
+</body>
+</html>
