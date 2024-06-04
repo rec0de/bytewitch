@@ -12,8 +12,8 @@ object Utf8Decoder : ByteWitchDecoder {
     override fun confidence(data: ByteArray): Double {
         try {
             val score = looksLikeUtf8String(data)
-            Logger.log(data.decodeToString())
-            Logger.log(score)
+            //Logger.log(data.decodeToString())
+            //Logger.log(score)
             return score
         } catch (e: Exception) {
             return 0.0

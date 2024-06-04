@@ -17,7 +17,7 @@ fun looksLikeUtf8String(data: ByteArray): Double {
 
     val veryWeird = string.any{ it.code == 0xFFFD || (it.code < 32 && it.code !in listOf(9, 10, 13)) || it.category in setOf(CharCategory.PRIVATE_USE, CharCategory.UNASSIGNED) }
     if(veryWeird) {
-        Logger.log("very weird")
+        //Logger.log("very weird")
         return 0.0
     }
 

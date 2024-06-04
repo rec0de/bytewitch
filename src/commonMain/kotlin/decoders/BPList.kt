@@ -447,3 +447,7 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
         return decodeAttempt?.renderHTML() ?: "<div class=\"nsvalue data\" $byteRangeDataTags>0x${value.hex()}</div>"
     }
 }
+
+data class RecursiveBacklink(val index: Int, var value: BPListObject?) : BPListObject() {
+    override fun toString() = "Backlink(not rendering, index $index)"
+}

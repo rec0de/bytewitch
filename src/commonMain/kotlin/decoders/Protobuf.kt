@@ -18,26 +18,37 @@ class ProtobufParser {
         override fun decode(data: ByteArray, sourceOffset: Int) = ProtobufParser().parse(data, sourceOffset)
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-            try {
-                val startOffset = findPlausibleStartOffset(data)
-                val prefix = data.sliceArray(0 until startOffset)
+            var offsetSearchStart = 0
 
-                val parser = ProtobufParser()
-                val result = parser.parse(data.fromIndex(startOffset), startOffset)
+            while(offsetSearchStart < 3) {
+                Logger.log("trying to decode as protobuf with offset search at $offsetSearchStart")
+                try {
+                    val startOffset = findPlausibleStartOffset(data.fromIndex(offsetSearchStart))
+                    val effectiveStartOffset = offsetSearchStart + startOffset
+                    //Logger.log("divined start offset $effectiveStartOffset")
+                    val prefix = data.sliceArray(0 until effectiveStartOffset)
 
-                // parsed protobuf should at least represent 30% of the input bytes
-                if(parser.offset < data.size * 0.3)
-                    return null
+                    val parser = ProtobufParser()
+                    val result = parser.parse(data.fromIndex(effectiveStartOffset), effectiveStartOffset)
 
-                return if(parser.fullyParsed && startOffset == 0) {
-                    result
-                }
-                else {
-                    PartialDecode(prefix, result, data.fromIndex(parser.offset+startOffset), Pair(0, data.size))
-                }
-            } catch (e: Exception) {
-                return null
+                    offsetSearchStart += 1
+
+                    Logger.log("Parsed protobuf accounts for ${((parser.offset.toDouble() / data.size)*100).roundToInt()}% of input bytes")
+
+                    // parsed protobuf should at least represent 30% of the input bytes
+                    if(parser.offset < data.size * 0.3)
+                        continue
+
+                    return if(parser.fullyParsed && effectiveStartOffset == 0) {
+                        result
+                    }
+                    else {
+                        PartialDecode(prefix, result, data.fromIndex(parser.offset+effectiveStartOffset), Pair(0, data.size))
+                    }
+                } catch (e: Exception) { }
             }
+
+            return null
         }
 
         private fun findPlausibleStartOffset(data: ByteArray): Int {
@@ -188,22 +199,22 @@ class ProtobufParser {
 
     private fun guessVarLenValue(data: ProtoLen): ProtoValue {
         // detect nested bplists
-        if(BPListParser.decodesAsValid(data.value))
-            return ProtoBPList(data.value, data.sourceByteRange)
+        //if(BPListParser.decodesAsValid(data.value))
+        //    return ProtoBPList(data.value, data.sourceByteRange)
 
         // try decoding as string
         try {
-            // is 90% of characters are 'common', we assume this is a correctly decoded string
             if(looksLikeUtf8String(data.value) > 0.5)
                 return ProtoString(data.value.decodeToString(), data.sourceByteRange)
         } catch(_: Exception) {}
 
         // try decoding as nested protobuf
         try {
-            val nested = ProtobufParser().parse(data.value, (data.sourceByteRange.second) - data.value.size)
+            val parser = ProtobufParser()
+            val nested = parser.parse(data.value, (data.sourceByteRange.second) - data.value.size)
             // we sometimes get spurious UUIDs that are valid protobufs and get misclassified
             // checking that field ids are in sane ranges should help avoid that
-            if(nested.objs.keys.all { it in 1..99 })
+            if(parser.fullyParsed && nested.objs.keys.all { it in 1..99 })
                 return nested
         } catch (_: Exception) { }
 
@@ -347,6 +358,7 @@ class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byte
                     }
                     is ProtoLen -> {
                         val parseAttempt = ByteWitch.quickDecode(it.value, it.sourceByteRange.second - it.value.size)
+                        Logger.log("ProtoLen parse attempt yielded $parseAttempt")
                         parseAttempt?.renderHTML() ?: "<div class=\"protovalue data\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                     }
                     else -> "<div class=\"protovalue\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"

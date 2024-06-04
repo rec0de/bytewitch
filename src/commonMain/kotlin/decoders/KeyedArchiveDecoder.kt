@@ -54,14 +54,18 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
         return transformSupportedClasses(resolved)
     }
 
-    private fun optionallyResolveObjectReference(thing: BPListObject, objects: BPArray): BPListObject {
+    private fun optionallyResolveObjectReference(thing: BPListObject, objects: BPArray, currentlyResolving: List<Int> = emptyList()): BPListObject {
         return when (thing) {
-            is BPUid -> optionallyResolveObjectReference(
-                objects.values[UInt.fromBytes(thing.value, ByteOrder.BIG).toInt()], objects
-            )
+            is BPUid -> {
+                val id = Int.fromBytes(thing.value, ByteOrder.BIG)
+                if(currentlyResolving.contains(id))
+                    RecursiveBacklink(id, null)
+                else
+                    optionallyResolveObjectReference(objects.values[id], objects, currentlyResolving + id)
+            }
 
-            is BPArray -> BPArray(thing.values.map { optionallyResolveObjectReference(it, objects) })
-            is BPSet -> BPSet(thing.entries, thing.values.map { optionallyResolveObjectReference(it, objects) })
+            is BPArray -> BPArray(thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) })
+            is BPSet -> BPSet(thing.entries, thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) })
             is BPDict -> {
                 // nested keyed archives will be decoded separately
                 if (isKeyedArchive(thing))
@@ -69,8 +73,8 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                 else
                     BPDict(thing.values.map {
                         Pair(
-                            optionallyResolveObjectReference(it.key, objects),
-                            optionallyResolveObjectReference(it.value, objects)
+                            optionallyResolveObjectReference(it.key, objects, currentlyResolving),
+                            optionallyResolveObjectReference(it.value, objects, currentlyResolving)
                         )
                     }.toMap())
             }
@@ -80,6 +84,7 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
     }
 
     private fun transformSupportedClasses(thing: BPListObject): BPListObject {
+        Logger.log(thing.toString())
         // decode nested archives
         if (isKeyedArchive(thing))
             return decode(thing as BPDict)
@@ -132,8 +137,16 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                         }
 
                         "NSData", "NSMutableData" -> {
-                            val bytes = (thing.values[BPAsciiString("NS.data")]!! as BPData)
-                            NSData(bytes.value, bytes.sourceByteRange)
+                            val value = thing.values[BPAsciiString("NS.data")]!!
+
+                            // why do some NSData objects contain an NSDict with a nested keyed archive?
+                            if(isKeyedArchive(value)) {
+                                decode(value as BPDict)
+                            }
+                            else {
+                                val bytes = (value as BPData)
+                                NSData(bytes.value, bytes.sourceByteRange)
+                            }
                         }
 
                         "NSDate" -> {
