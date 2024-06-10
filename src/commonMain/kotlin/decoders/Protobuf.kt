@@ -28,11 +28,11 @@ class ProtobufParser {
                     //Logger.log("divined start offset $effectiveStartOffset")
                     val prefix = data.sliceArray(0 until effectiveStartOffset)
 
-                    val parser = ProtobufParser()
-                    val result = parser.parse(data.fromIndex(effectiveStartOffset), effectiveStartOffset)
-
                     offsetSearchStart += 1
 
+                    val parser = ProtobufParser()
+                    val result = parser.parse(data.fromIndex(effectiveStartOffset), effectiveStartOffset)
+                    
                     Logger.log("Parsed protobuf accounts for ${((parser.offset.toDouble() / data.size)*100).roundToInt()}% of input bytes")
 
                     // parsed protobuf should at least represent 30% of the input bytes
