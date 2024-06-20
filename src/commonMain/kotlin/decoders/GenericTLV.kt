@@ -43,7 +43,7 @@ object GenericTLV : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
-        val params = listOf(0, 1, 2).map { Pair(it, testLengthPrefixAtOffset(data, it)) }.first { it.second != null }
+        val params = listOf(1, 2, 0).map { Pair(it, testLengthPrefixAtOffset(data, it)) }.first { it.second != null }
 
         val typeLength = params.first
         val lengthLength = params.second!!.second

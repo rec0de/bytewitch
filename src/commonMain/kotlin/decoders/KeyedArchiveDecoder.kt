@@ -84,7 +84,6 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
     }
 
     private fun transformSupportedClasses(thing: BPListObject): BPListObject {
-        Logger.log(thing.toString())
         // decode nested archives
         if (isKeyedArchive(thing))
             return decode(thing as BPDict)

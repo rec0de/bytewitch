@@ -1,3 +1,5 @@
+import bitmage.ByteOrder
+import bitmage.fromBytes
 import bitmage.toUnicodeCodepoints
 import kotlin.math.max
 import kotlin.math.min
@@ -11,9 +13,13 @@ expect class Date(timestamp: Long) {
 
 expect fun currentTimestamp(): Long
 
+expect fun dateFromUTCString(string: String): Date
+
 fun looksLikeUtf8String(data: ByteArray): Double {
     val string = data.decodeToString()
     val unusual = string.filter { !it.toString().matches(Regex("[a-zA-Z0-9\\-\\./,;\\(\\)_ \t\r\n<>]")) }
+
+    val lengthBias = max((10-string.length).toDouble()/10, 0.0) * 0.6
 
     val veryWeird = string.any{ it.code == 0xFFFD || (it.code < 32 && it.code !in listOf(9, 10, 13)) || it.category in setOf(CharCategory.PRIVATE_USE, CharCategory.UNASSIGNED) }
     if(veryWeird) {
@@ -87,12 +93,12 @@ fun looksLikeUtf8String(data: ByteArray): Double {
         // no hard science behind this - low share of unusual characters is good
         // if we have lots of unusual chars we might still consider it if most unusual letters are valid unicode letters
         // this likely still misses emoji sequences
-        val score = min((1 - unusualPercentage) + unusualValidLetterPercentage.pow(4) + mixedScriptBias + rarePenalty + nonExclusiveCJKPenalty + emojiExclusiveBonus + validSurrogatePairBonus, 1.0)
+        val score = min((1 - unusualPercentage) + unusualValidLetterPercentage.pow(4) + mixedScriptBias + rarePenalty + nonExclusiveCJKPenalty + emojiExclusiveBonus + validSurrogatePairBonus - lengthBias*1.5, 1.0)
         Logger.log("$string: $score")
         return score
     }
     else
-        return 1 - unusualPercentage
+        return max(1 - unusualPercentage - lengthBias, 0.0)
 }
 
 fun dateFromAppleTimestamp(timestamp: Double): Date {
@@ -104,4 +110,31 @@ fun htmlEscape(string: String): String {
     return string.map { char ->
         if(char in toEscape) "&#${char.code};" else "$char"
     }.joinToString("")
+}
+
+open class ParseCompanion {
+    protected var parseOffset = 0
+
+    protected fun readBytes(bytes: ByteArray, length: Int): ByteArray {
+        val sliced = bytes.sliceArray(parseOffset until parseOffset + length)
+        parseOffset += length
+        return sliced
+    }
+
+    protected fun readLengthPrefixedString(bytes: ByteArray, sizePrefixLen: Int): String? {
+        val len = readInt(bytes, sizePrefixLen)
+        return if(len == 0) null else readString(bytes, len)
+    }
+
+    protected fun readString(bytes: ByteArray, size: Int): String {
+        val str = bytes.sliceArray(parseOffset until parseOffset +size).decodeToString()
+        parseOffset += size
+        return str
+    }
+
+    protected fun readInt(bytes: ByteArray, size: Int): Int {
+        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+        parseOffset += size
+        return int
+    }
 }

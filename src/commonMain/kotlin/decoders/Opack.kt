@@ -35,6 +35,7 @@ class OpackParser {
                     PartialDecode(byteArrayOf(), result, remainder, Pair(0, data.size))
 
             } catch (e: Exception) {
+                Logger.log(e.toString())
                 return null
             }
         }
@@ -66,7 +67,7 @@ class OpackParser {
 
     private fun parse(bytes: ByteArray): OpackObject {
         val typeByte = bytes[parseOffset].toUByte().toUInt()
-        //println("parsing type byte: 0x${typeByte.toString(16)}")
+        //Logger.log("parsing type byte: 0x${typeByte.toString(16)}")
         return when(typeByte) {
             0x01u, 0x02u -> parseAsBool(bytes)
             0x05u -> parseAsUUID(bytes)

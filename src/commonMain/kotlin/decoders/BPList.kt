@@ -78,8 +78,13 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
     fun parse(bytes: ByteArray, sourceOffset: Int): BPListObject {
         val rootObject = parseCodable(bytes, sourceOffset)
-        return if(KeyedArchiveDecoder.isKeyedArchive(rootObject))
-                KeyedArchiveDecoder.decode(rootObject as BPDict)
+        rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+
+        return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
+                val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
+                archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+                archive
+            }
             else
                 rootObject
     }
@@ -130,7 +135,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 // length bits encode int byte size as 2^n
                 val byteLen = 1 shl lengthBits
                 // TODO: does this mess with signs? how does bigint do it?
-                BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(offset, offset+1+byteLen))
+                BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
             }
             // Real
             in 0x20 until 0x30 -> {
@@ -145,12 +150,12 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                     }
                     else -> throw Exception("Got unexpected byte length for real: $byteLen in ${bytes.hex()}")
                 }
-                BPReal(value, Pair(offset, offset+1+byteLen))
+                BPReal(value, Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
             }
             // Date, always 8 bytes long
             0x33 -> {
                 val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.BIG)
-                BPDate(timestamp, Pair(offset, offset+1+8))
+                BPDate(timestamp, Pair(sourceOffset+offset, sourceOffset+offset+1+8))
             }
             // Data
             in 0x40 until 0x50 -> {
@@ -189,7 +194,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+charLen*2))
             }
             // UID, byte length is lengthBits+1
-            in 0x80 until 0x90 -> BPUid(bytes.sliceArray(offset+1 until offset+2+lengthBits), Pair(offset, offset+2+lengthBits))
+            in 0x80 until 0x90 -> BPUid(bytes.sliceArray(offset+1 until offset+2+lengthBits), Pair(sourceOffset+offset, sourceOffset+offset+2+lengthBits))
             // Array
             in 0xa0 until 0xb0 -> {
                 val tmp = getFillAwareLengthAndOffset(bytes, offset)
@@ -201,7 +206,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                     readObjectFromOffsetTableEntry(bytes, objectIndex)
                 }
 
-                BPArray(values, Pair(offset, effectiveOffset+objectRefSize*entries))
+                BPArray(values, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
             }
             // Set
             in 0xc0 until 0xd0 -> {
@@ -214,7 +219,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                     readObjectFromOffsetTableEntry(bytes, objectIndex)
                 }
 
-                BPSet(entries, values, Pair(offset, effectiveOffset+objectRefSize*entries))
+                BPSet(entries, values, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
             }
             // Dict
             in 0xd0 until 0xf0 -> {
@@ -235,7 +240,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
                 }
 
-                BPDict(keys.zip(values).toMap(), Pair(offset, effectiveOffset+objectRefSize*entries))
+                BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
             }
             else -> throw Exception("Unknown object type byte 0b${objectByte.toString(2)}")
         }
@@ -258,8 +263,12 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 }
 
 abstract class BPListObject : ByteWitchResult {
+
+    var rootByteRange: Pair<Int,Int>? = null
+
     override fun renderHTML(): String {
-        return "<div class=\"bplist roundbox\">${renderHtmlValue()}</div>"
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
+        return "<div class=\"bplist roundbox\" $rootRangeTags>${renderHtmlValue()}</div>"
     }
 
     open fun renderHtmlValue(): String {
@@ -391,7 +400,8 @@ data class BPDict(val values: Map<BPListObject, BPListObject>, override val sour
 
 abstract class NSObject : BPListObject() {
     override fun renderHTML(): String {
-        return "<div class=\"nsarchive roundbox\">${renderHtmlValue()}</div>"
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
+        return "<div class=\"nsarchive roundbox\" $rootRangeTags>${renderHtmlValue()}</div>"
     }
 }
 

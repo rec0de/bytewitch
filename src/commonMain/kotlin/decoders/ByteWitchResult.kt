@@ -6,11 +6,13 @@ interface ByteWitchResult {
 
     fun renderHTML(): String
 
+    fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
+
     val sourceByteRange: Pair<Int,Int>?
         get() = null
 
     val byteRangeDataTags: String
-        get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else "data-start=\"${sourceByteRange!!.first}\" data-end=\"${sourceByteRange!!.second}\""
+        get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
 }
 
 class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suffix: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {

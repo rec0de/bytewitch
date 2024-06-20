@@ -28,10 +28,10 @@ class ProtobufParser {
                     //Logger.log("divined start offset $effectiveStartOffset")
                     val prefix = data.sliceArray(0 until effectiveStartOffset)
 
+                    offsetSearchStart += 1
+
                     val parser = ProtobufParser()
                     val result = parser.parse(data.fromIndex(effectiveStartOffset), effectiveStartOffset)
-
-                    offsetSearchStart += 1
 
                     Logger.log("Parsed protobuf accounts for ${((parser.offset.toDouble() / data.size)*100).roundToInt()}% of input bytes")
 
@@ -113,10 +113,22 @@ class ProtobufParser {
         }
 
         override fun confidence(data: ByteArray): Double {
-            val decodesValid = decodesAsValid(data)
-            // short valid protobuf sequences may well be false positives, the longer the sequence the more sure we are
-            // (might factor in plausible field number ranges here in the future)
-            return if(decodesValid) min(data.size.toDouble() / 10, 1.0) else 0.0
+            try {
+                val parser = ProtobufParser()
+                val parsed = parser.parse(data, 0)
+
+                if(!parser.fullyParsed)
+                    return 0.0
+
+                val fieldNumberPenalty = if(parsed.objs.size < 3) -0.4 else 0.0
+                val highFieldPenalty = if(parsed.objs.keys.any { it > 200 }) -0.4 else 0.0
+
+                // short valid protobuf sequences may well be false positives, the longer the sequence the more sure we are
+                // (might factor in plausible field number ranges here in the future)
+                return min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty
+            } catch (e: Exception) {
+                return 0.0
+            }
         }
     }
 
@@ -149,7 +161,7 @@ class ProtobufParser {
                 // abort with partial parse on invalid field tag
                 else -> {
                     // we probably read a garbage varint, so we'll reset the offset to before that
-                    offset = start
+                    offset = start-sourceOffset
                     return ProtoBuf(result, bytes, Pair(sourceOffset, start))
                 }
             }
@@ -163,7 +175,7 @@ class ProtobufParser {
     }
 
     private fun readTag(): Pair<Int, ProtobufField> {
-        val tag = readVarInt().toInt()
+        val tag = readVarInt(expectInt = true).toInt()
         val field = tag shr 3
         val type = when(tag and 0x07) {
             0 -> ProtobufField.VARINT
@@ -191,7 +203,7 @@ class ProtobufParser {
     }
 
     private fun readLen(bytePos: Int): ProtoLen {
-        val length = readVarInt()
+        val length = readVarInt(expectInt = true)
         val data = bytes.sliceArray(offset until offset+length.toInt())
         offset += length.toInt()
         return ProtoLen(data, Pair(bytePos, sourceOffset+offset))
@@ -221,7 +233,7 @@ class ProtobufParser {
         return data
     }
 
-    private fun readVarInt(): Long {
+    private fun readVarInt(expectInt: Boolean = false): Long {
         var continueFlag = true
         val numberBytes = mutableListOf<Int>()
 
@@ -235,6 +247,8 @@ class ProtobufParser {
 
         // little endian
         numberBytes.reverse()
+
+        check(numberBytes.size <= 4 || (!expectInt && numberBytes.size <= 8)){ "overly long varint: ${numberBytes.size} bytes" }
 
         var assembled = 0L
         numberBytes.forEach {
@@ -276,64 +290,6 @@ interface ProtoValue : ByteWitchResult {
 
 class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byteArrayOf(), sourceByteRange: Pair<Int, Int>) : ProtoLen(bytes, sourceByteRange) {
     override fun toString() = "Protobuf($objs)"
-
-    private val strictMode = true
-
-    fun readOptionalSinglet(field: Int) : ProtoValue? {
-        if(strictMode && objs[field] != null && objs[field]!!.size > 1)
-            throw Exception("trying to read singlet from multi-value protobuf field $field: $this")
-        val f = objs[field]
-        return if(f == null) null else f[0]
-    }
-
-    fun readAssertedSinglet(field: Int) : ProtoValue {
-        if(strictMode && objs[field] != null && objs[field]!!.size > 1)
-            throw Exception("trying to read singlet from multi-value protobuf field $field: $this")
-        if(objs[field] == null)
-            throw Exception("asserted read of null protobuf field $field")
-        return objs[field]!![0]
-    }
-
-    fun readBool(field: Int) : Boolean {
-        return (readAssertedSinglet(field) as ProtoVarInt).value.toInt() > 0
-    }
-
-    fun readOptBool(field: Int) : Boolean? {
-        val intValue = readOptShortVarInt(field)
-        return if(intValue == null) null else intValue > 0
-    }
-
-    fun readOptString(field: Int) : String? {
-        val v = readOptionalSinglet(field)
-        // i think empty strings can be parsed ambiguously as empty protobufs
-        if(v != null && v is ProtoBuf && v.objs.isEmpty())
-            return ""
-        return (v as ProtoLen?)?.asString()
-    }
-
-    fun readOptDouble(field: Int) : Double? {
-        return (readOptionalSinglet(field) as ProtoI64?)?.asDouble()
-    }
-
-    fun readOptFloat(field: Int) : Float? {
-        return (readOptionalSinglet(field) as ProtoI32?)?.asFloat()
-    }
-
-    fun readOptPB(field: Int) : ProtoBuf? {
-        return (readOptionalSinglet(field) as ProtoLen?)?.asProtoBuf()
-    }
-
-    fun readShortVarInt(field: Int) = readLongVarInt(field).toInt()
-
-    fun readOptShortVarInt(field: Int) = (readOptionalSinglet(field) as ProtoVarInt?)?.value?.toInt()
-
-    fun readLongVarInt(field: Int) = (readAssertedSinglet(field) as ProtoVarInt).value
-
-    fun readOptLongVarInt(field: Int) = (readOptionalSinglet(field) as ProtoVarInt?)?.value
-
-    fun readMulti(field: Int): List<ProtoValue> {
-        return objs[field] ?: emptyList()
-    }
 
     override fun asProtoBuf() = this
 
