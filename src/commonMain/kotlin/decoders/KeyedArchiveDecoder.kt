@@ -16,7 +16,7 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
             false
     }
 
-    override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val parsed = BPListParser.decode(data, sourceOffset) as BPDict
         return decode(parsed)
     }
@@ -64,8 +64,8 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                     optionallyResolveObjectReference(objects.values[id], objects, currentlyResolving + id)
             }
 
-            is BPArray -> BPArray(thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) })
-            is BPSet -> BPSet(thing.entries, thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) })
+            is BPArray -> BPArray(thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) }, null)
+            is BPSet -> BPSet(thing.entries, thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) }, null)
             is BPDict -> {
                 // nested keyed archives will be decoded separately
                 if (isKeyedArchive(thing))
@@ -76,7 +76,7 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                             optionallyResolveObjectReference(it.key, objects, currentlyResolving),
                             optionallyResolveObjectReference(it.value, objects, currentlyResolving)
                         )
-                    }.toMap())
+                    }.toMap(), null)
             }
 
             else -> thing
@@ -91,12 +91,12 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
         return when (thing) {
             is BPArray -> {
                 val transformedValues = thing.values.map { transformSupportedClasses(it) }
-                BPArray(transformedValues)
+                BPArray(transformedValues, thing.sourceByteRange)
             }
 
             is BPSet -> {
                 val transformedValues = thing.values.map { transformSupportedClasses(it) }
-                BPSet(thing.entries, transformedValues)
+                BPSet(thing.entries, transformedValues, thing.sourceByteRange)
             }
 
             is BPDict -> {
@@ -166,7 +166,7 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                                     transformSupportedClasses(it.value)
                                 )
                             }
-                            BPDict(entries.associate { it })
+                            BPDict(entries.associate { it }, thing.sourceByteRange)
                         }
                     }
                 } else {
@@ -175,7 +175,7 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                             transformSupportedClasses(it.key),
                             transformSupportedClasses(it.value)
                         )
-                    }.toMap())
+                    }.toMap(), thing.sourceByteRange)
                 }
             }
 

@@ -13,7 +13,7 @@ expect class Date(timestamp: Long) {
 
 expect fun currentTimestamp(): Long
 
-expect fun dateFromUTCString(string: String): Date
+expect fun dateFromUTCString(string: String, fullYear: Boolean): Date
 
 fun looksLikeUtf8String(data: ByteArray): Double {
     val string = data.decodeToString()

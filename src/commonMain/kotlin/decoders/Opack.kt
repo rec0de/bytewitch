@@ -15,7 +15,7 @@ class OpackParser {
     companion object : ByteWitchDecoder {
         override val name = "opack"
 
-        override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+        override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             return OpackParser().parseTopLevel(data, sourceOffset)
         }
 
@@ -60,7 +60,7 @@ class OpackParser {
         sourceOffset = sourceOffsetParam
         val result = parse(bytes)
 
-        check(parseOffset >= bytes.size-1){ "input data not fully consumed" }
+        check(parseOffset >= bytes.size){ "input data not fully consumed" }
 
         return result
     }
@@ -313,7 +313,16 @@ class OPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>)
     override fun renderHtmlValue(): String {
         // try to decode nested stuff
         val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
-        return decode?.renderHTML() ?: "<div class=\"bpvalue data\" $byteRangeDataTags>0x${value.hex()}</div>"
+
+        // we have to wrap in a bpvalue if we have a nested decode of the same type to distinguish them visually
+        // for nested decodes of different types we can omit it for cleaner display
+        val requiresWrapping = decode == null || decode is OpackObject
+
+        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $byteRangeDataTags>" else ""
+        val postPayload = if(requiresWrapping) "</div>" else ""
+        val payloadHTML = decode?.renderHTML() ?: "0x${value.hex()}"
+
+        return "$prePayload$payloadHTML$postPayload"
     }
 }
 
@@ -324,22 +333,26 @@ data class OPString(val value: String, override val sourceByteRange: Pair<Int, I
 data class OPArray(val values: List<OpackObject>, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
     override fun toString() = "[${values.joinToString(", ")}]"
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
         if(values.isEmpty())
-            return "<div class=\"bpvalue\">[∅]</div>"
+            return "<div class=\"roundbox opack\">[∅]</div>"
         val entries = values.joinToString(""){ it.renderHtmlValue() }
         val maybelarge = if(entries.length > 700) "largecollection" else ""
-        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"oparray $maybelarge\">$entries</div></div>"
+        return "<div class=\"roundbox opack oparray $maybelarge\" $byteRangeDataTags>$entries</div>"
     }
+
+    override fun renderHtmlValue() = "<div class=\"bpvalue\">${renderHTML()}</div>"
 }
 
 data class OPDict(val values: Map<OpackObject, OpackObject>, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
     override fun toString() = values.toString()
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
         if(values.isEmpty())
-            return "<div class=\"bpvalue\">{∅}</div>"
+            return "<div class=\"roundbox opack\">{∅}</div>"
         val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${it.second.renderHtmlValue()}</div>" }
-        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"opdict\">$entries</div></div>"
+        return "<div class=\"roundbox opack opdict\" $byteRangeDataTags>$entries</div>"
     }
+
+    override fun renderHtmlValue() = "<div class=\"bpvalue\">${renderHTML()}</div>"
 }

@@ -17,7 +17,7 @@ interface ByteWitchDecoder {
         return if(decodesAsValid(data)) 1.0 else 0.0
     }
 
-    fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult
+    fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean = false): ByteWitchResult
 
     /*
         tryhard decoding may relax some restrictions, accept partial decodes, apply slight brute force, etc

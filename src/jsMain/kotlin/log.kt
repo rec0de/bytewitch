@@ -17,7 +17,8 @@ actual fun currentTimestamp(): Long {
     return (kotlin.js.Date().getTime()).toLong()
 }
 
-actual fun dateFromUTCString(string: String): Date {
+actual fun dateFromUTCString(string: String, fullYear: Boolean): Date {
+    Logger.log("hello?")
     var timezone = "Z"
     var time = string
 
@@ -34,17 +35,28 @@ actual fun dateFromUTCString(string: String): Date {
     else
         time = time.removeSuffix("Z")
 
+    var century = ""
+    // extract century and reduce to two-character year format
+    if(fullYear) {
+        century = time.substring(0..1)
+        time = time.substring(2)
+    }
 
     val year = time.substring(0..1)
     val month = time.substring(2..3)
-    val day = time.substring(3..4)
-    val hour = time.substring(4..5)
-    val minute = time.substring(5..6)
-    val second = if(time.length > 6) time.substring(6..7) else "00"
+    val day = time.substring(4..5)
+    val hour = time.substring(6..7)
+    val minute = time.substring(8..9)
+    val second = if(time.length > 11) time.substring(10..11) else "00"
 
-    val century = if(year.toInt() < 50) "20" else "19"
+    // ... there could be fractional seconds here in generalized time formats but let's just ignore those for now
+
+    if(!fullYear)
+        century = if(year.toInt() < 50) "20" else "19"
 
     val canonicalString = "$century$year-$month-${day}T${hour}:$minute:$second.000$timezone"
+
+    Logger.log(canonicalString)
 
     return Date(kotlin.js.Date.parse(canonicalString).toLong())
 }

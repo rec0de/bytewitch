@@ -5,6 +5,7 @@ import kotlinx.dom.createElement
 import org.w3c.dom.*
 
 var liveDecodeEnabled = true
+var currentHighlight: Element? = null
 
 fun main() {
 
@@ -87,6 +88,18 @@ fun attachRangeListeners(element: Element) {
 
             evt.stopPropagation()
         })
+
+        // highlightable elements
+        if(listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack").any { element.classList.contains(it) }) {
+            element.addEventListener("mouseover", { evt ->
+                if(currentHighlight != null)
+                    currentHighlight!!.classList.remove("highlight")
+
+                element.classList.add("highlight")
+                currentHighlight = element
+                evt.stopPropagation()
+            })
+        }
     }
     element.children.asList().forEach { attachRangeListeners(it) }
 }

@@ -9,14 +9,13 @@ import bitmage.fromIndex
 import bitmage.hex
 import dateFromUTCString
 import htmlEscape
-import kotlin.time.Duration.Companion.seconds
 
 class ASN1BER : ParseCompanion() {
 
     companion object : ByteWitchDecoder {
         override val name = "ASN.1"
 
-        override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+        override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             val decoder = ASN1BER()
             val result = decoder.decode(data, sourceOffset)
             check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
@@ -46,11 +45,10 @@ class ASN1BER : ParseCompanion() {
 
     private fun decode(bytes: ByteArray, sourceOffset: Int) : ASN1Result {
         val tag = readIdentifier(bytes)
-        Logger.log(tag.toString())
+
         checkPlausibleTag(tag)
-
+        
         val len = readLength(bytes)
-
         if(len > bytes.size - parseOffset)
             throw Exception("excessive length: $len")
 
@@ -58,7 +56,11 @@ class ASN1BER : ParseCompanion() {
         val payload = readBytes(bytes, len)
         val byteRange = Pair(sourceOffset, sourceOffset+parseOffset)
 
-        val supportedTypes = setOf(0, 1, 2, 5, 6, 12, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28, 29, 30)
+
+        //Logger.log("Payload size: $len")
+        //Logger.log("Payload: ${payload.hex()}")
+
+        val supportedTypes = setOf(0, 1, 2, 5, 6, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30)
 
         return if(tag.tagClass == ASN1Class.Universal && tag.type in supportedTypes) {
             when(tag.type) {
@@ -92,7 +94,8 @@ class ASN1BER : ParseCompanion() {
                 // Strings
                 12, in 18..22, in 25..30 -> ASN1String(tag, len, payload.decodeToString(), byteRange)
                 // Time
-                23 -> ASN1Time(tag, len, payload.decodeToString(), byteRange)
+                23 -> ASN1Time(tag, len, payload.decodeToString(), byteRange, generalized = false)
+                24 -> ASN1Time(tag, len, payload.decodeToString(), byteRange, generalized = true)
                 else -> throw Exception("unreachable (update supported types?)")
             }
         }
@@ -129,7 +132,9 @@ class ASN1BER : ParseCompanion() {
         }
 
         val encodedLength = parseOffset - start
-        return ASN1Tag(ASN1Class.fromInt(tagClass), primitive, tagType, encodedLength)
+        val tag = ASN1Tag(ASN1Class.fromInt(tagClass), primitive, tagType, encodedLength)
+        //Logger.log("read ASN tag: $tag")
+        return tag
     }
 
     private fun readLength(bytes: ByteArray): Int {
@@ -208,9 +213,16 @@ class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArra
     override fun renderHtmlValue(): String {
         // try to decode nested stuff
         val decode = ByteWitch.quickDecode(payload, sourceByteRange.second - payload.size)
-        val payloadHtml = decode?.renderHTML() ?: payload.hex()
+        val payloadHtml = decode?.renderHTML() ?: ("0x" + payload.hex())
 
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$payloadHtml</div>"
+        // we have to wrap in a bpvalue if we have a nested decode of the same type to distinguish them visually
+        // for nested decodes of different types we can omit it for cleaner display
+        val requiresWrapping = decode == null || decode is ASN1Result
+
+        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>" else ""
+        val postPayload = if(requiresWrapping) "</div>" else ""
+
+        return "$tagLengthDivs $prePayload$payloadHtml$postPayload"
     }
 }
 
@@ -241,9 +253,9 @@ class ASN1Integer(tag: ASN1BER.ASN1Tag, length: Int, val value: ByteArray, sourc
     }
 }
 
-class ASN1Time(tag: ASN1BER.ASN1Tag, length: Int, val value: String, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
+class ASN1Time(tag: ASN1BER.ASN1Tag, length: Int, val value: String, sourceByteRange: Pair<Int, Int>, val generalized: Boolean) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
-        val valueRendering = dateFromUTCString(value).toString()
+        val valueRendering = dateFromUTCString(value, generalized).toString()
         return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$valueRendering</div>"
     }
 }
@@ -309,7 +321,7 @@ class ASN1ObjectIdentifier(tag: ASN1BER.ASN1Tag, length: Int, val value: ByteArr
 
 class ASN1Sequence(tag: ASN1BER.ASN1Tag, length: Int, val elements: List<ASN1Result>, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
-
-        return "$tagLengthDivs <div class=\"bpvalue asn1sequence\" $asnPayloadByteRangeDataTags>${elements.joinToString("") { it.renderHTML() }}</div>"
+        val renderedElements = if(elements.isEmpty()) "∅" else elements.joinToString("") { it.renderHTML() }
+        return "$tagLengthDivs <div class=\"bpvalue asn1sequence\" $asnPayloadByteRangeDataTags>$renderedElements</div>"
     }
 }

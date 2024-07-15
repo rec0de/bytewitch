@@ -9,7 +9,6 @@ interface ByteWitchResult {
     fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
 
     val sourceByteRange: Pair<Int,Int>?
-        get() = null
 
     val byteRangeDataTags: String
         get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)

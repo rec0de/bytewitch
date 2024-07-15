@@ -1,8 +1,9 @@
 import bitmage.fromHex
+import bitmage.hex
 import decoders.*
 
 object ByteWitch {
-    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, ProtobufParser, ASN1BER, GenericTLV, TLV8)
+    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, ProtobufParser, ASN1BER, GenericTLV, TLV8, EntropyDetector, HeuristicSignatureDetector)
 
     fun analyzeHex(data: String, tryhard: Boolean = false): List<Pair<String, ByteWitchResult>> {
         val filtered = data.filter { it in "0123456789abcdefABCDEF" }
@@ -36,5 +37,9 @@ object ByteWitch {
         }
     }
 
-    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? = decoders.firstOrNull { it.confidence(data) > 0.75 }?.decode(data, sourceOffset)
+    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? = decoders.firstOrNull {
+        val confidence = it.confidence(data)
+        //Logger.log("quick decode of ${data.hex()} as ${it.name}: $confidence")
+        confidence > 0.75
+    }?.decode(data, sourceOffset, inlineDisplay = true)
 }

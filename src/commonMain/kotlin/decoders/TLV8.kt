@@ -7,7 +7,7 @@ import bitmage.hex
 object TLV8 : ByteWitchDecoder {
     override val name = "tlv8"
 
-    override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val tlvs = mutableListOf<Tlv8Entry>()
         var remainder = data
         var internalOffset = 0
@@ -29,6 +29,21 @@ object TLV8 : ByteWitchDecoder {
 
         return Tlv8Result(tlvs, Pair(sourceOffset, sourceOffset+data.size))
     }
+
+    override fun confidence(data: ByteArray): Double {
+        try {
+            val res = decode(data, 0) as Tlv8Result
+
+            val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
+
+            return 1.0 - zeroLengthPenalty
+        } catch (e: Exception) {
+            return 0.0
+        }
+    }
+
+    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.33
 }
 
 class Tlv8Result(val tlvs: List<Tlv8Entry>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
@@ -42,6 +57,6 @@ class Tlv8Entry(val type: Int, val length: Int, val value: ByteArray, override v
         Logger.log("TLV8 nested quick decode of ${value.hex()}")
         val parseAttempt = ByteWitch.quickDecode(value, sourceByteRange.first+2)
         val valueHTML = parseAttempt?.renderHTML() ?: "0x${value.hex()}"
-        return "<div class=\"bpvalue\" $byteRangeDataTags>Type 0x${type.toString(16)} Length $length Value $valueHTML</div>"
+        return "<div class=\"bpvalue flexy\" $byteRangeDataTags>Type 0x${type.toString(16)} Length $length Value $valueHTML</div>"
     }
 }

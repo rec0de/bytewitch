@@ -5,14 +5,28 @@ import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
 import bitmage.hex
+import kotlin.math.min
 
 object GenericTLV : ByteWitchDecoder {
     override val name = "generic-tlv"
 
-    override fun decodesAsValid(data: ByteArray): Boolean {
+    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.0
+
+    override fun confidence(data: ByteArray): Double {
         if(data.size < 3)
-            return false
-        return testLengthPrefixAtOffset(data, 0) != null || testLengthPrefixAtOffset(data, 1) != null || testLengthPrefixAtOffset(data, 2) != null
+            return 0.0
+
+        val lengthPrefixes = listOf(testLengthPrefixAtOffset(data, 0), testLengthPrefixAtOffset(data, 1), testLengthPrefixAtOffset(data, 2))
+
+        if(lengthPrefixes.all { it == null })
+            return 0.0
+
+        val validPrefix = lengthPrefixes.first { it != null }!!
+        val payloadLen = validPrefix.first
+
+        // TLVs with a payload length of less than 5 bytes are considered uncertain decodings
+        // (add 1 to distinguish zero-length TLVs from completely invalid decodes)
+        return min((payloadLen+1).toDouble()/6, 1.0)
     }
 
     private fun testLengthPrefixAtOffset(bytes: ByteArray, offset: Int): Triple<Int, Int, ByteOrder>? {
@@ -42,7 +56,7 @@ object GenericTLV : ByteWitchDecoder {
         return parsedLengths.firstOrNull { (it.first in expectedLengths) || (it.first + it.second in expectedLengths)}
     }
 
-    override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+    override fun decode(data: ByteArray, sourceOffset: Int,  inlineDisplay: Boolean): ByteWitchResult {
         val params = listOf(1, 2, 0).map { Pair(it, testLengthPrefixAtOffset(data, it)) }.first { it.second != null }
 
         val typeLength = params.first
@@ -70,9 +84,20 @@ data class GenericTLVResult(
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
 
-    private val encodedLength = Int.fromBytes(length, byteOrder)
-    private val endian = if(byteOrder == ByteOrder.BIG) "big" else "little"
-    private val valueHTML = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)?.renderHTML() ?: "<div class=\"bpvalue data\">${value.hex()}</div>"
-    override fun renderHTML() = "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\">Type 0x${type.hex()}</div><div class=\"bpvalue\">Len: ${encodedLength} (${length.size} B, $endian endian)</div>$valueHTML</div>"
+    override fun renderHTML(): String {
+        val encodedLength = Int.fromBytes(length, byteOrder)
+        val endian = if(byteOrder == ByteOrder.BIG) "big" else "little"
+        val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
+
+        // we have to wrap in a bpvalue if we have a nested decode of the same type to distinguish them visually
+        // for nested decodes of different types we can omit it for cleaner display
+        val requiresWrapping = decode == null || decode is GenericASN1Result || decode is Tlv8Result
+
+        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\">" else ""
+        val postPayload = if(requiresWrapping) "</div>" else ""
+        val payloadHTML = decode?.renderHTML() ?: "0x${value.hex()}"
+
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\">Type 0x${type.hex()}</div><div class=\"bpvalue\">Len: $encodedLength (${length.size} B, $endian endian)</div>$prePayload$payloadHTML$postPayload</div>"
+    }
 
 }

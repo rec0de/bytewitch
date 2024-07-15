@@ -15,7 +15,7 @@ class ProtobufParser {
 
     companion object : ByteWitchDecoder {
         override val name = "protobuf"
-        override fun decode(data: ByteArray, sourceOffset: Int) = ProtobufParser().parse(data, sourceOffset)
+        override fun decode(data: ByteArray, sourceOffset: Int,  inlineDisplay: Boolean) = ProtobufParser().parse(data, sourceOffset)
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
             var offsetSearchStart = 0
@@ -312,9 +312,17 @@ class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byte
                         "<div class=\"protovalue stringlit$veryLong\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                     }
                     is ProtoLen -> {
-                        val parseAttempt = ByteWitch.quickDecode(it.value, it.sourceByteRange.second - it.value.size)
-                        Logger.log("ProtoLen parse attempt yielded $parseAttempt")
-                        parseAttempt?.renderHTML() ?: "<div class=\"protovalue data\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
+                        val decode = ByteWitch.quickDecode(it.value, it.sourceByteRange.second - it.value.size)
+
+                        // we have to wrap in a protovalue if we have a nested decode of the same type to distinguish them visually
+                        // for nested decodes of different types we can omit it for cleaner display
+                        val requiresWrapping = decode == null || decode is ProtoValue
+
+                        val prePayload = if(requiresWrapping) "<div class=\"protovalue data\" ${it.byteRangeDataTags}>" else ""
+                        val postPayload = if(requiresWrapping) "</div>" else ""
+                        val payloadHTML = decode?.renderHTML() ?: it.renderHTML()
+
+                        "$prePayload$payloadHTML$postPayload"
                     }
                     else -> "<div class=\"protovalue\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                 }

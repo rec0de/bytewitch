@@ -23,7 +23,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
             return data.size > 8 && data.sliceArray(0 until 8).decodeToString() == "bplist00"
         }
 
-        override fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
+        override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             return BPListParser().parse(data, sourceOffset)
         }
 
@@ -134,8 +134,23 @@ class BPListParser(private val nestedDecode: Boolean = true) {
             in 0x10 until 0x20 -> {
                 // length bits encode int byte size as 2^n
                 val byteLen = 1 shl lengthBits
-                // TODO: does this mess with signs? how does bigint do it?
-                BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
+
+                // some bplists contain crazy long integers for tiny numbers
+                // we'll just hope they're never used beyond actual long range
+                if(byteLen in 9..16) {
+                    val upper = Long.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.BIG)
+                    val lower = Long.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.BIG)
+
+                    if(upper != 0L) {
+                        Logger.log("Encountered very long BPInt ($byteLen B) that cannot be equivalently represented as Long")
+                        throw Exception("Overlong BPInt")
+                    }
+                    // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
+                    BPInt(lower, Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
+                }
+                else
+                    // TODO: does this mess with signs? how does bigint do it?
+                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
             }
             // Real
             in 0x20 until 0x30 -> {
@@ -277,15 +292,19 @@ abstract class BPListObject : ByteWitchResult {
 }
 
 object BPNull : BPListObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = "null"
 }
 object BPTrue : BPListObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = "true"
 }
 object BPFalse : BPListObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = "false"
 }
 object BPFill : BPListObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = "BPFill"
 }
 data class BPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): BPListObject() {
@@ -365,7 +384,7 @@ data class BPUnicodeString(override val value: String, override val sourceByteRa
 class BPUid(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : BPListObject() {
     override fun toString() = "uid(${value.hex()})"
 }
-data class BPArray(val values: List<BPListObject>, override val sourceByteRange: Pair<Int, Int>? = null) : BPListObject() {
+data class BPArray(val values: List<BPListObject>, override val sourceByteRange: Pair<Int, Int>?) : BPListObject() {
     override fun toString() = "[${values.joinToString(", ")}]"
 
     override fun renderHtmlValue(): String {
@@ -373,10 +392,10 @@ data class BPArray(val values: List<BPListObject>, override val sourceByteRange:
             return "<div class=\"bpvalue\" $byteRangeDataTags>[∅]</div>"
         val entries = values.joinToString(""){ it.renderHtmlValue() }
         val maybelarge = if(entries.length > 700) "largecollection" else ""
-        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bparray $maybelarge\">$entries</div></div>"
+        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bplist bparray $maybelarge\">$entries</div></div>"
     }
 }
-data class BPSet(val entries: Int, val values: List<BPListObject>, override val sourceByteRange: Pair<Int, Int>? = null) : BPListObject() {
+data class BPSet(val entries: Int, val values: List<BPListObject>, override val sourceByteRange: Pair<Int, Int>?) : BPListObject() {
     override fun toString() = "<${values.joinToString(", ")}>"
 
     override fun renderHtmlValue(): String {
@@ -384,17 +403,17 @@ data class BPSet(val entries: Int, val values: List<BPListObject>, override val 
             return "<div class=\"bpvalue\" $byteRangeDataTags><∅></div>"
         val entries = values.joinToString(""){ it.renderHtmlValue() }
         val maybelarge = if(entries.length > 500) "largecollection" else ""
-        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bpset $maybelarge\">$entries</div></div>"
+        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bplist bpset $maybelarge\">$entries</div></div>"
     }
 }
-data class BPDict(val values: Map<BPListObject, BPListObject>, override val sourceByteRange: Pair<Int, Int>? = null) : BPListObject() {
+data class BPDict(val values: Map<BPListObject, BPListObject>, override val sourceByteRange: Pair<Int, Int>?) : BPListObject() {
     override fun toString() = values.toString()
 
     override fun renderHtmlValue(): String {
         if(values.isEmpty())
             return "<div class=\"bpvalue\" $byteRangeDataTags>{∅}</div>"
         val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${it.second.renderHtmlValue()}</div>" }
-        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bpdict\">$entries</div></div>"
+        return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bplist bpdict\">$entries</div></div>"
     }
 }
 
@@ -430,6 +449,7 @@ data class NSSet(val values: Set<BPListObject>, override val sourceByteRange: Pa
 }
 
 data class NSDict(val values: Map<BPListObject, BPListObject>) : NSObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = values.toString()
 
     override fun renderHtmlValue(): String {
@@ -454,10 +474,20 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
     override fun renderHtmlValue(): String {
         // try to decode string-based payloads despite this not being a string, same for opack
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.first)
-        return decodeAttempt?.renderHTML() ?: "<div class=\"nsvalue data\" $byteRangeDataTags>0x${value.hex()}</div>"
+
+        // we have to wrap in an nsvalue if we have a nested decode of the same type to distinguish them visually
+        // for nested decodes of different types we can omit it for cleaner display
+        val requiresWrapping = decodeAttempt == null || decodeAttempt is NSObject
+
+        val prePayload = if(requiresWrapping) "<div class=\"nsvalue data\" $byteRangeDataTags>" else ""
+        val postPayload = if(requiresWrapping) "</div>" else ""
+        val payloadHTML = decodeAttempt?.renderHTML() ?: "0x${value.hex()}"
+
+        return "$prePayload$payloadHTML$postPayload"
     }
 }
 
 data class RecursiveBacklink(val index: Int, var value: BPListObject?) : BPListObject() {
+    override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = "Backlink(not rendering, index $index)"
 }

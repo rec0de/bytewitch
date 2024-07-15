@@ -6,14 +6,20 @@
     <style>
 
         :root {
-            --accent: #c9748f;
             --on-accent: #fff;
             --content-back: #fee5ed;
+            --accent: #c9748f;
+            --accent-highlight: #b9466b;
             --bplist: #7e74c9;
+            --bplist-highlight: #5547b8;
             --nsarchive: #74c9c7;
+            --nsarchive-highlight: #46b9b6;
             --opack: #74c97b;
+            --opack-highlight: #46b951;
             --asn: #c574c9;
+            --asn-highlight: #b346b9;
             --generic: #c9a074;
+            --generic-highlight: #b98346;
             --rowgap: 0.3rem;
             --sans: Lato, Roboto, Helvetica, sans-serif;
             --mono: monospace;
@@ -182,14 +188,13 @@
 
         .generic {
             background: var(--generic);
-            display: flex;
-            gap: var(--rowgap);
-            align-items: start;
-            flex-wrap: wrap;
         }
 
         .asn1 {
             background: var(--asn);
+        }
+
+        .generic, .asn1, .flexy {
             display: flex;
             gap: var(--rowgap);
             align-items: start;
@@ -237,6 +242,7 @@
         .asn1sequence {
             display: flex;
             flex-direction: column;
+            align-items: flex-start;
             gap: var(--rowgap);
         }
 
@@ -246,7 +252,8 @@
         }
 
         .data {
-            word-wrap: anywhere;
+            overflow-wrap: anywhere;
+            word-break: break-all;
         }
 
         #output {
@@ -260,11 +267,35 @@
         #floatview {
             margin-top: var(--rowgap);
             font-family: var(--mono);
-            word-wrap: anywhere;
+            overflow-wrap: anywhere;
         }
 
         #floatview > span {
             background: var(--accent);
+        }
+
+        .protobuf.highlight {
+            background: var(--accent-highlight);
+        }
+
+        .asn1.highlight {
+            background: var(--asn-highlight);
+        }
+
+        .bplist.highlight {
+            background: var(--bplist-highlight);
+        }
+
+        .opack.highlight {
+            background: var(--opack-highlight);
+        }
+
+        .nsarchive.highlight {
+            background: var(--nsarchive-highlight);
+        }
+
+        .generic.highlight {
+            background: var(--generic-highlight);
         }
     </style>
 </head>
