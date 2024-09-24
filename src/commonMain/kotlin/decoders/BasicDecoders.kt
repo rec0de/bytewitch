@@ -142,11 +142,22 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "7573746172" to "tar archive",
         "377ABCAF271C" to "7zip compression",
         "1F8B" to "gzip compresssion",
-        "FD377A585A00" to "xz compression",
+        "FD377A58" to "xz compression",
         "04224D18" to "LZ4 frame",
         "0061736D" to "web assembly binary",
         "62767832" to "lzfse compression",
         "0000000C4A584C200D0A870A" to "JPEG XL header",
+        "424f4d53746f7265" to "BOMStore (Apple OTA)",
+        "70627a78" to "pbzx (Apple OTA)",
+        "59414131" to "YAA (Apple OTA archive)",
+        "070707" to "cpio archive",
+        "4367424950" to "iOS optimized PNG",
+        "160301" to "TLS 1.0 record header",
+        "160302" to "TLS 1.1 record header",
+        "160303" to "TLS 1.2 record header",
+        "160304" to "TLS 1.3 record header",
+        "16fefd" to "DTLS 1.2 record header",
+        
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
