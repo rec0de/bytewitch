@@ -129,6 +129,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "3082" to "ASN.1 sequence",
         "3081" to "ASN.1 sequence",
         "62706c697374" to "binary plist header",
+        "7062696c7473" to "binary plist header - wrong endianness",
         "53514C697465" to "sqlite header",
         "425A68" to "bzip2 compression",
         "4C5A4950" to "lzip compression",
