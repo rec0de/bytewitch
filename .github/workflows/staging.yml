@@ -1,8 +1,8 @@
-name: Build Release
+name: Build Staging
 
 on:
   push:
-    branches: 'main'
+    branches: 'staging'
     
 jobs:
   build:
@@ -35,4 +35,4 @@ jobs:
       env:
         DEPLOY_KEY: ${{ secrets.FTP_DEPLOY_KEY }}
         DEPLOY_HOST: ${{ secrets.FTP_DEPLOY_HOST }}
-      run: lftp -c "open -e \"mput build/distributions/*;\" -u \"bytewitch-ci\",\"${DEPLOY_KEY}\" ${DEPLOY_HOST}"
+      run: lftp -c "open -e \"cd staging; mput build/distributions/*;\" -u \"bytewitch-ci\",\"${DEPLOY_KEY}\" ${DEPLOY_HOST}"
