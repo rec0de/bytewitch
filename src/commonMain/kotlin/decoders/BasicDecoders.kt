@@ -125,40 +125,41 @@ object EntropyDetector : ByteWitchDecoder {
 object HeuristicSignatureDetector : ByteWitchDecoder {
     override val name = "heuristic"
 
-    private val patterns: Map<String, String> = mapOf(
-        "3082" to "ASN.1 sequence",
-        "3081" to "ASN.1 sequence",
-        "62706c697374" to "binary plist header",
-        "7062696c7473" to "binary plist header - wrong endianness",
-        "53514C697465" to "sqlite header",
-        "425A68" to "bzip2 compression",
-        "4C5A4950" to "lzip compression",
-        "504B0304" to "zip archive",
-        "47494638" to "GIF magic bytes",
-        "FFD8FF" to "JPG magic bytes",
-        "52617221" to "RAR magic bytes",
-        "7F454C46" to "ELF header",
-        "89504E470D0A1A0A" to "PNG header",
-        "255044462D" to "PDF header",
-        "7573746172" to "tar archive",
-        "377ABCAF271C" to "7zip compression",
-        "1F8B" to "gzip compresssion",
-        "FD377A58" to "xz compression",
-        "04224D18" to "LZ4 frame",
-        "0061736D" to "web assembly binary",
-        "62767832" to "lzfse compression",
-        "0000000C4A584C200D0A870A" to "JPEG XL header",
-        "424f4d53746f7265" to "BOMStore (Apple OTA)",
-        "70627a78" to "pbzx (Apple OTA)",
-        "59414131" to "YAA (Apple OTA archive)",
-        "070707" to "cpio archive",
-        "4367424950" to "iOS optimized PNG",
-        "160301" to "TLS 1.0 record header",
-        "160302" to "TLS 1.1 record header",
-        "160303" to "TLS 1.2 record header",
-        "160304" to "TLS 1.3 record header",
-        "16fefd" to "DTLS 1.2 record header",
-        
+    private val patterns: Map<String, Pair<String, String?>> = mapOf(
+        "3082" to Pair("ASN.1 sequence", null),
+        "3081" to Pair("ASN.1 sequence", null),
+        "62706c697374" to Pair("binary plist header", "https://newosxbook.com/bonus/bplist.pdf"),
+        "7062696c7473" to Pair("binary plist header - wrong endianness", "https://newosxbook.com/bonus/bplist.pdf"),
+        "53514C697465" to Pair("sqlite header", null),
+        "425A68" to Pair("bzip2 compression", null),
+        "4C5A4950" to Pair("lzip compression", null),
+        "504B0304" to Pair("zip archive", null),
+        "47494638" to Pair("GIF magic bytes", null),
+        "FFD8FF" to Pair("JPG magic bytes", null),
+        "52617221" to Pair("RAR magic bytes", null),
+        "7F454C46" to Pair("ELF header", null),
+        "89504E470D0A1A0A" to Pair("PNG header", null),
+        "255044462D" to Pair("PDF header", null),
+        "7573746172" to Pair("tar archive", null),
+        "377ABCAF271C" to Pair("7zip compression", null),
+        "1F8B" to Pair("gzip compresssion", null),
+        "FD377A58" to Pair("xz compression", null),
+        "04224D18" to Pair("LZ4 frame", null),
+        "0061736D" to Pair("web assembly binary", null),
+        "62767832" to Pair("lzfse compression", null),
+        "0000000C4A584C200D0A870A" to Pair("JPEG XL header", null),
+        "424f4d53746f7265" to Pair("BOMStore (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
+        "70627a78" to Pair("pbzx (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
+        "59414131" to Pair("YAA (Apple OTA archive)", "https://newosxbook.com/articles/OTA9.html"),
+        "dec07eab" to Pair("Apple Remote Invocation (ARI) magic bytes", "https://github.com/seemoo-lab/aristoteles"),
+        "4157444d" to Pair("Apple Wireless Debug Metadata", "https://github.com/hack-different/apple-diagnostics-format"),
+        "070707" to Pair("cpio archive", null),
+        "4367424950" to Pair("iOS optimized PNG", "https://github.com/erlendfh/pngdefry"),
+        "160301" to Pair("TLS 1.0 record header", null),
+        "160302" to Pair("TLS 1.1 record header", null),
+        "160303" to Pair("TLS 1.2 record header", null),
+        "160304" to Pair("TLS 1.3 record header", null),
+        "16fefd" to Pair("DTLS 1.2 record header", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
@@ -169,7 +170,15 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         if(containedSignatures.isEmpty())
             return null
 
-        return BWStringCollection(containedSignatures.map { BWString(it.second, Pair(it.first, it.first+it.third)) }, Pair(0, 0))
+        return BWStringCollection(
+            containedSignatures.map {
+                if(it.second.second == null)
+                    BWString(it.second.first, Pair(it.first, it.first + it.third))
+                else
+                    BWLinkedString(it.second.first, it.second.second!!, Pair(it.first, it.first + it.third))
+            },
+            Pair(0, 0)
+        )
     }
 
     // we only want this to kick in as a last-ditch effort on a tryhard decode
@@ -182,8 +191,12 @@ class BWStringCollection(val elements: List<BWString>, override val sourceByteRa
     override fun renderHTML() = elements.joinToString(" ") { it.renderHTML() }
 }
 
-class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)}</div>"
+}
+
+class BWLinkedString(string: String, private val url: String, sourceByteRange: Pair<Int, Int>): BWString(string, sourceByteRange) {
+    override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)} <a href=\"${url}\" target=\"_blank\">(info)</a></div>"
 }
 
 class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {

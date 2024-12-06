@@ -27,6 +27,7 @@ interface ByteWitchDecoder {
             return decode(data, 0)
         }
         catch (e: Exception) {
+            Logger.log(e.toString())
             return null
         }
     }

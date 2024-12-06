@@ -137,4 +137,10 @@ open class ParseCompanion {
         parseOffset += size
         return int
     }
+
+    protected fun readUInt(bytes: ByteArray, size: Int): UInt {
+        val int = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+        parseOffset += size
+        return int
+    }
 }
