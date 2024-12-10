@@ -14,8 +14,10 @@ object Utf8Decoder : ByteWitchDecoder {
     override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.6
 
     override fun confidence(data: ByteArray): Double {
+        val effectiveData = stripNullTerminator(data)
+
         try {
-            val score = looksLikeUtf8String(data)
+            val score = looksLikeUtf8String(effectiveData)
             //Logger.log(data.decodeToString())
             //Logger.log(score)
             return score
@@ -25,7 +27,7 @@ object Utf8Decoder : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        return BWString(data.decodeToString(), Pair(sourceOffset, sourceOffset+data.size))
+        return BWString(stripNullTerminator(data).decodeToString(), Pair(sourceOffset, sourceOffset+data.size))
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
@@ -34,6 +36,15 @@ object Utf8Decoder : ByteWitchDecoder {
         else
             null
     }
+
+    fun stripNullTerminator(data: ByteArray): ByteArray {
+        // to hell with it, we'll support arbitrarily long null terminators
+        var end = data.size
+        while (end > 0 && data[end-1] == 0.toByte()) {
+            end -= 1
+        }
+        return data.sliceArray(0 until end)
+    }
 }
 
 object Utf16Decoder : ByteWitchDecoder {
@@ -41,7 +52,7 @@ object Utf16Decoder : ByteWitchDecoder {
 
     override fun confidence(data: ByteArray): Double {
         try {
-            val string = data.decodeAsUTF16BE()
+            val string = Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE()
             return looksLikeUtf8String(string.encodeToByteArray())
         } catch (e: Exception) {
             return 0.0
@@ -51,7 +62,7 @@ object Utf16Decoder : ByteWitchDecoder {
     override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.6
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        return BWString(data.decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
+        return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
