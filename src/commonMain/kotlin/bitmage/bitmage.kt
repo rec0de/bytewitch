@@ -7,6 +7,7 @@ enum class ByteOrder {
 @OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.hex() = asUByteArray().joinToString("") { it.toString(16).padStart(2, '0') }
 fun ByteArray.fromIndex(i: Int) = sliceArray(i until size)
+fun ByteArray.untilIndex(i: Int) = sliceArray(0 until i)
 @OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.decodeAsUTF16BE(): String {
     // oh my
