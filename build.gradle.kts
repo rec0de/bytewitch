@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform") version "1.6.10"
+    kotlin("multiplatform") version "2.1.0"
 }
 
 group = "me.user"
@@ -14,11 +14,15 @@ kotlin {
         binaries.executable()
         browser {
             commonWebpackConfig {
-                cssSupport.enabled = true
             }
         }
     }
     sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation("com.ionspin.kotlin:bignum:0.3.10")
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test")) // This brings all the platform dependencies automatically
