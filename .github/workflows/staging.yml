@@ -29,10 +29,10 @@ jobs:
       run: sudo apt-get install -y lftp
 
     - name: Build
-      run: gradle jsBrowserProductionWebpack
+      run: gradle jsBrowserDistribution
 
     - name: Deploy
       env:
         DEPLOY_KEY: ${{ secrets.FTP_DEPLOY_KEY }}
         DEPLOY_HOST: ${{ secrets.FTP_DEPLOY_HOST }}
-      run: lftp -c "open -e \"cd staging; mput build/distributions/*;\" -u \"bytewitch-ci\",\"${DEPLOY_KEY}\" ${DEPLOY_HOST}"
+      run: lftp -c "open -e \"cd staging; mput build/dist/js/productionExecutable/*;\" -u \"bytewitch-ci\",\"${DEPLOY_KEY}\" ${DEPLOY_HOST}"
