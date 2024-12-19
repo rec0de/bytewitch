@@ -22,14 +22,12 @@ class AppleProtobuf : ParseCompanion() {
     private fun decode(bytes: ByteArray, sourceOffset: Int) : ByteWitchResult {
         parseOffset = 0
         val startOffset = parseOffset
-        val version = readInt(bytes, 1)
+        val version = readInt(bytes, 2)
         check(version == 1){ "expecting version 1 in first byte, got $version" }
 
         // try to see if we have metadata strings or not
-        val localeLen = UInt.fromBytes(bytes.sliceArray(1 until 3), ByteOrder.BIG)
-        Logger.log(localeLen)
+        val localeLen = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset+2), ByteOrder.BIG)
         val hasMetadata = localeLen >= 2u && localeLen < 64u && looksLikeUtf8String(bytes.sliceArray(3 until 3+localeLen.toInt())) > 0.4
-        Logger.log(hasMetadata)
 
         val metadata = if(hasMetadata) {
             var stringStart = parseOffset
