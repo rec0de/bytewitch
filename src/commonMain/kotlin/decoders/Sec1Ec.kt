@@ -14,7 +14,10 @@ import kotlin.math.ceil
  * Curve point detection heuristics based on "Elligator: Elliptic-curve points indistinguishable from uniform random strings"
  * see https://dl.acm.org/doi/pdf/10.1145/2508859.2516734
  */
-object ECCurves {
+object ECCurves : ByteWitchDecoder {
+
+    override val name = "EC Point"
+
     val modulos = mapOf<String, ECCurveModulus>(
         "M-221" to ModPair(221, 3),
         "E-222" to ModPair(222, 117),
@@ -166,9 +169,12 @@ object ECCurves {
     )
 
     // find curves that could plausibly generate the supplied data as a curve point
-    fun whichCurves(data: ByteArray, includeCompressed: Boolean = true, includeUncompressed: Boolean = true): Set<String> {
+    fun whichCurves(data: ByteArray, includeCompressed: Boolean = true, includeUncompressed: Boolean = true, errorOnInvalidSize: Boolean = false): Set<String> {
         var compressedCandidates = if(includeCompressed) modulos.filter { data.size == it.value.byteSize } else emptyMap()
         var uncompressedCandidates = if(includeUncompressed) modulos.filter { data.size == 2 * it.value.byteSize } else emptyMap()
+
+        if(errorOnInvalidSize && compressedCandidates.isEmpty() && uncompressedCandidates.isEmpty())
+            throw Exception("no curves with matching byte sizes")
 
         // first: naive quick check - see if encoded points are small enough to be plausible curve points
 
@@ -196,9 +202,8 @@ object ECCurves {
             uncompressedCandidates = uncompressedCandidates.filter { checkPlausible(x, y, it.key) }
         }
 
-
         val guesses = (compressedCandidates.keys + uncompressedCandidates.keys)
-        return guesses.ifEmpty { setOf("unknown curve") }
+        return guesses
     }
 
     private fun checkPlausibleQuick(x: BigInteger, y: BigInteger?, modulus: ECCurveModulus): Boolean {
@@ -232,6 +237,30 @@ object ECCurves {
         val legendre = ysq.pow((mod.exactValue-1)/2) // expect 1 for quadratic residue
 
         return legendre.toBigInteger() == BigInteger.ONE
+    }
+
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        var curves = whichCurves(data, errorOnInvalidSize = true)
+        var littleEndian = false
+
+        // try little endian encoding
+        if(curves.isEmpty()) {
+            littleEndian = true
+            curves = whichCurves(data.reversedArray(), errorOnInvalidSize = true)
+        }
+
+        check(curves.isNotEmpty()){ "no curves pass modulo / square / equation checks" }
+
+        val uncompressedCandidates = curves.filter { modulos[it]!!.byteSize * 2 == data.size }
+        if(uncompressedCandidates.isNotEmpty()) {
+            val x = if(littleEndian) data.untilIndex(data.size/2).reversedArray() else data.untilIndex(data.size/2)
+            val y = if(littleEndian) data.fromIndex(data.size/2).reversedArray() else data.fromIndex(data.size/2)
+            return GenericECPoint(x, y, uncompressedCandidates.joinToString("/"), inlineDisplay, Pair(sourceOffset, sourceOffset+data.size))
+        }
+
+        val x = if(littleEndian) data.reversedArray() else data
+        return GenericECPoint(x, null, curves.joinToString("/"), inlineDisplay, Pair(sourceOffset, sourceOffset+data.size))
+
     }
 }
 
@@ -270,9 +299,9 @@ class Sec1Ec {
             val x = data.sliceArray(1 until 1+elementSize)
             val y = data.sliceArray(1+elementSize until 1+2*elementSize)
 
-            val curves = ECCurves.whichCurves(data.fromIndex(1), includeCompressed = false).joinToString("/")
+            val curves = ECCurves.whichCurves(data.fromIndex(1), includeCompressed = false).ifEmpty { setOf("unknown curve") }.joinToString("/")
 
-            return EcPoint(x, y, curves, inlineDisplay, Pair(sourceOffset, sourceOffset+1+2*elementSize))
+            return Sec1Point(x, y, curves, inlineDisplay, Pair(sourceOffset, sourceOffset+1+2*elementSize))
         }
 
         private fun decodeCompressed(data: ByteArray, elementSize: Int, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult? {
@@ -282,14 +311,14 @@ class Sec1Ec {
             val x = data.sliceArray(1 until 1+elementSize)
             val y = data.sliceArray(0 until 1)
 
-            val curves = ECCurves.whichCurves(data.fromIndex(1), includeUncompressed = false).joinToString("/")
+            val curves = ECCurves.whichCurves(data.fromIndex(1), includeUncompressed = false).ifEmpty { setOf("unknown curve") }.joinToString("/")
 
-            return EcPoint(x, y, curves, inlineDisplay, Pair(sourceOffset, sourceOffset+1+elementSize))
+            return Sec1Point(x, y, curves, inlineDisplay, Pair(sourceOffset, sourceOffset+1+elementSize))
         }
     }
 }
 
-class EcPoint(private val x: ByteArray, private val y: ByteArray, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+class Sec1Point(private val x: ByteArray, private val y: ByteArray, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override fun renderHTML(): String {
 
         val compressed = if(y.size == 1) "Compressed" else "Uncompressed"
@@ -305,6 +334,23 @@ class EcPoint(private val x: ByteArray, private val y: ByteArray, private val cu
 
         return "<div class=\"roundbox generic\" $byteRangeDataTags>$identifier$xHtml$yHtml</div>"
 
+    }
+}
+
+class GenericECPoint(private val x: ByteArray, private val y: ByteArray?, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override fun renderHTML(): String {
+
+        val compressed = if(y == null) "possible compressed" else ""
+
+        val identifier = if (inlineDisplay)
+            "<div class=\"bpvalue\">$compressed ECPoint $curve</div>"
+        else
+            "<div class=\"bpvalue\">$compressed $curve</div>"
+
+        val xHtml = "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.first+x.size)}>X: 0x${x.hex()}</div>"
+        val yHtml = if(y != null) "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first+x.size, sourceByteRange.second)}>Y: 0x${y.hex()}</div>" else ""
+
+        return "<div class=\"roundbox generic\" $byteRangeDataTags>$identifier$xHtml$yHtml</div>"
     }
 }
 
