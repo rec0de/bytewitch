@@ -23,7 +23,7 @@ class AppleProtobuf : ParseCompanion() {
         parseOffset = 0
         val startOffset = parseOffset
         val version = readInt(bytes, 2)
-        check(version == 1){ "expecting version 1 in first byte, got $version" }
+        check(version == 1){ "expecting version 1 in first bytes, got $version" }
 
         // try to see if we have metadata strings or not
         val localeLen = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset+2), ByteOrder.BIG)

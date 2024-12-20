@@ -77,7 +77,7 @@ fun attachRangeListeners(element: Element) {
         val start = element.getAttribute("data-start")!!.toInt()
         val end =  element.getAttribute("data-end")!!.toInt()
         element.addEventListener("click", { evt ->
-            console.log("$start to $end")
+            //console.log("$start to $end")
             val floatview = document.getElementById("floatview")!!
             floatview.innerHTML = floatview.textContent!! // re-set previous highlights
             val text = floatview.childNodes[0]!!

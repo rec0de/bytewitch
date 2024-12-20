@@ -18,7 +18,6 @@ actual fun currentTimestamp(): Long {
 }
 
 actual fun dateFromUTCString(string: String, fullYear: Boolean): Date {
-    Logger.log("hello?")
     var timezone = "Z"
     var time = string
 

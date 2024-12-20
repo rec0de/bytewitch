@@ -44,7 +44,9 @@ class ProtobufParser {
                     else {
                         PartialDecode(prefix, result, data.fromIndex(parser.offset+effectiveStartOffset), Pair(0, data.size))
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    Logger.log(e.toString())
+                }
             }
 
             return null
@@ -247,13 +249,18 @@ class ProtobufParser {
         // little endian
         numberBytes.reverse()
 
-        check(numberBytes.size <= 4 || (!expectInt && numberBytes.size <= 8)){ "overly long varint: ${numberBytes.size} bytes" }
+        // the largest 64bit ints would result in 10 byte varints (32bit ints -> 5 byte varint)
+        check(numberBytes.size <= 5 || (!expectInt && numberBytes.size <= 10)){ "overly long varint: ${numberBytes.size} bytes" }
 
+        // we might clip the top bits of a >64bit int here
         var assembled = 0L
         numberBytes.forEach {
             assembled = assembled shl 7
             assembled = assembled or it.toLong()
         }
+
+        if(expectInt && (assembled > Int.MAX_VALUE || assembled < Int.MIN_VALUE))
+            throw Exception("overly long varint: ${numberBytes.size} bytes, $assembled (exceeds expected int32 value)")
 
         return assembled
     }
