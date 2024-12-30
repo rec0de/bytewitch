@@ -8,11 +8,10 @@ enum class ByteOrder {
 fun ByteArray.hex() = asUByteArray().joinToString("") { it.toString(16).padStart(2, '0') }
 fun ByteArray.fromIndex(i: Int) = sliceArray(i until size)
 fun ByteArray.untilIndex(i: Int) = sliceArray(0 until i)
-@OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.decodeAsUTF16BE(): String {
     // oh my
     val shorts = this.toList().chunked(2).map { UInt.fromBytes(it.toByteArray(), ByteOrder.BIG).toUShort() }.toTypedArray()
-    return shorts.toUShortArray().utf16BEToUtf8().toByteArray().decodeToString()
+    return shorts.map { Char(it) }.toCharArray().concatToString()
 }
 
 fun ByteArray.indexOfSubsequence(target: ByteArray): Int {

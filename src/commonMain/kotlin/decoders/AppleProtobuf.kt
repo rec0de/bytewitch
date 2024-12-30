@@ -3,7 +3,6 @@ package decoders
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromBytes
-import bitmage.fromIndex
 import looksLikeUtf8String
 
 class AppleProtobuf : ParseCompanion() {

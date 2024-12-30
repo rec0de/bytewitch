@@ -7,7 +7,6 @@ import currentTimestamp
 import htmlEscape
 import looksLikeUtf8String
 import kotlin.math.absoluteValue
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 

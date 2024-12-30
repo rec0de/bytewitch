@@ -15,6 +15,11 @@ kotlin {
         browser {
             commonWebpackConfig {
             }
+            testTask {
+                useKarma {
+                    useFirefox()
+                }
+            }
         }
     }
     sourceSets {

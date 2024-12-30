@@ -1,9 +1,7 @@
 import bitmage.ByteOrder
 import bitmage.fromBytes
-import bitmage.toUnicodeCodepoints
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 
 
 // replicate required Date functionality from JVM
@@ -15,90 +13,90 @@ expect fun currentTimestamp(): Long
 
 expect fun dateFromUTCString(string: String, fullYear: Boolean): Date
 
-fun looksLikeUtf8String(data: ByteArray): Double {
-    val string = data.decodeToString()
-    val unusual = string.filter { !it.toString().matches(Regex("[a-zA-Z0-9\\-\\./,;\\(\\)_ \t\r\n<>]")) }
+fun looksLikeUtf16String(string: String): Double {
+    val printableASCII = string.filter { it.code in 32..126 || it.code in 9..13 }
+    val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
+
+    if(veryWeird || string.isEmpty())
+        return 0.0
 
     val lengthBias = max((10-string.length).toDouble()/10, 0.0) * 0.6
 
-    val veryWeird = string.any{ it.code == 0xFFFD || (it.code < 32 && it.code !in listOf(9, 10, 13)) || it.category in setOf(CharCategory.PRIVATE_USE, CharCategory.UNASSIGNED) }
-    if(veryWeird) {
-        //Logger.log("very weird")
-        return 0.0
-    }
+    // string is mostly printable ASCII, seems plausible
+    val asciiPercentage = printableASCII.length.toDouble() / string.length
+    if(asciiPercentage > 0.8)
+        return max(asciiPercentage - lengthBias, 0.0)
 
-    val unusualPercentage = unusual.length.toDouble() / string.length
+    // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
+    // let's sort the characters into some bins matching the largest character blocks on the BMP
+    val bins = IntArray(18){ 0 }
 
-    // ... ok we'll have to do some deep unicode magic to get good results here
-    if(unusualPercentage > 0.2) {
-        // strings are utf16 characters - for stuff outside the BMP, we have to convert to codepoints
-        val codepoints = unusual.toUnicodeCodepoints()
-        val unicodeLength = codepoints.size // better approximation of string length
-        val nonLatinLetters = unusual.filter { it.isLetter() } // unusual letters ON BMP ONLY
-        // unicode blocks emoticons, miscellaneous symbols and pictograms, supplemental symbols and pictograms
-        val emoji = codepoints.count { it in 0x1F600..0x1F64F || it in 0x1F900..0x1F9FF || it in 0x1F300..0x1F5FF }
-
-        // we consider BMP letters + emojis to be plausible by default
-        val unusualValidLetterPercentage = (nonLatinLetters.length + emoji).toDouble() / max(unicodeLength, 1)
-
-        // if the only uncommon characters are emoji, that's a very good sign
-        val emojiExclusiveBonus = if(emoji == unicodeLength) 0.75 else 0.0
-
-        // if the unicode codepoint length is shorter than the utf16 character length, we encountered at least one valid surrogate pair
-        // this is unlikely to happen randomly
-        val validSurrogatePairBonus = if(unicodeLength < unusual.length) 0.5 else 0.0
-
-        // unlikely to be found in real text:
-        val suspicious = codepoints.any {
-            it in 0x1100..0x11ff ||
-                    it in 0x17000..0x187FF || // partial korean syllables
-                    it in 0x2CEB0..0x2EBEF || // tangut script from the yuan dynasty
-                    it in 0x30000..0x3134F || // historic han characters
-                    it in 0xA000..0xA48F ||   // yi syllables from nuosu
-                    it in 0x18800..0x18AFF || // tangut components
-                    it in 0xFB50..0xFDFF || // arabic presentation codes
-                    it in 0x1B170..0x1B2FF || // nüshu women's script
-                    it in 0x10600..0x1077F || // undeciphered linear a script
-                    it in 0xA500..0xA63F || // vai language
-                    it in 0x2F00..0x2FDF || // han radicals
-                    it in 0x1400..0x167F || // canadian aboriginal script
-                    it in 0x1200..0x137F // ethiopic
+    string.forEach {
+        when(it.code) {
+            in 0x4e00..0x9fff -> bins[0] += 1 // CJK Unified Ideographs
+            in 0xac00..0xd7af -> bins[1] += 1 // Hangul Syllables
+            in 0x3400..0x4dbf -> bins[2] += 1 // CJK Extension A
+            in 0xd800..0xdfff -> bins[3] += 1 // Surrogates (high or low)
+            in 0xa000..0xa48f -> bins[4] += 1 // Yi Syllables
+            in 0xfb50..0xfdff -> bins[5] += 1 // Arabic Presentation Forms-A
+            in 0x1400..0x167f -> bins[6] += 1 // Unified Canadian Aboriginal Syllabics
+            in 0xf900..0xfaff -> bins[7] += 1 // CJK Compatibility Ideographs
+            in 0x1200..0x137f -> bins[8] += 1 // Ethiopic
+            in 0xa500..0xa63f -> bins[9] += 1 // Vai
+            in 0x2e80..0x2eff -> bins[10] += 1 // CJK Radicals and unlikely chars
+            in 0xa800..0xa95f, in 0xa980..0xaaff -> bins[11] += 1 // Various Brahmic scripts
+            in 0x0590..0x8ff -> bins[12] += 1 // Various Semitic & right-to-left
+            in 0x2200..0x26ff -> bins[13] += 1 // Symbols, Math
+            in 0x0032..0x007e -> bins[14] += 1 // Basic Latin (ASCII)
+            in 0x0080..0x024f -> bins[15] += 1 // Extended Latin
+            in 0x0400..0x058f -> bins[16] += 1 // Various Cyrillic
+            else -> bins[17] += 1 // others
         }
-        if(suspicious)
-            return 0.0
-
-        val korean = nonLatinLetters.any { it.code in 0xAC00..0xD7AF }
-        val cyrillic = nonLatinLetters.any { it.code in 0x0400..0x04FF }
-        val arabic = nonLatinLetters.any { it.code in 0x0600..0x06FF }
-        val rareHan = codepoints.any { it in 0x20000..0x2A6DF || it in 0x2B820..0x2CEAF}
-        val commonHan = nonLatinLetters.any { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF } // CJK extension A
-        val rareLatin = nonLatinLetters.any { it.code in 0x1E00..0x1EFF }
-
-        // we most likely will never see rare han characters - but if we do, we definitely should have seen a common character around it
-        // also, cyrillic characters probably don't appear with han or korean ones
-        if((rareHan && !commonHan) || (rareLatin && commonHan) || (cyrillic && (commonHan || korean || rareLatin)) || (arabic && (cyrillic || korean || commonHan || rareLatin)))
-            return 0.0
-
-        // korean text _may_ include han characters, but mixing many different scripts is suspicious
-        val mixedScriptBias = if(korean && commonHan) -0.4 else 0.0
-        val rarePenalty = if(rareHan || rareLatin) -0.3 else 0.0
-
-        val nonExclusiveCJKPenalty = if(korean || commonHan)
-            -nonLatinLetters.count { !(it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF || it.code in 0xAC00..0xD7AF)}.toDouble()*2 / nonLatinLetters.length
-        else
-            0.0
-
-        Logger.log("$nonLatinLetters mixed: $mixedScriptBias rare: $rarePenalty nonExCJK: $nonExclusiveCJKPenalty emojiBonus: $emojiExclusiveBonus validSurrogateBonus: $validSurrogatePairBonus")
-
-        // no hard science behind this - low share of unusual characters is good
-        // if we have lots of unusual chars we might still consider it if most unusual letters are valid unicode letters
-        // this likely still misses emoji sequences
-        val score = min((1 - unusualPercentage) + unusualValidLetterPercentage.pow(4) + mixedScriptBias + rarePenalty + nonExclusiveCJKPenalty + emojiExclusiveBonus + validSurrogatePairBonus - lengthBias*1.5, 1.0)
-        Logger.log("$string: $score")
-        return score
     }
-    else
-        return max(1 - unusualPercentage - lengthBias, 0.0)
+
+    Logger.log(bins.joinToString(" "))
+
+    // CJK Extension A is rare, but not _that_ rare - we'll dampen the effect a little
+    val rareCharactersPenalty = (bins[2].toDouble()/3 + bins[4] + bins[5] + bins[6] + bins[7] + bins[10]) / string.length
+
+    // CJK characters are the most likely to generate "randomly" and should usually not co-occur with non-CJK characters, excluding common ASCII
+    val mixedCJKnonCJKPenalty = if((bins[0]+bins[1]+bins[2]) > 0 && (bins[5] + bins[6] + bins[8] + bins[9] + bins[11] + bins[12] + bins[15] + bins[16]) > 0) 1.0 else 0.0
+
+    // han characters and hangul syllables make up for most codepoints - therefore both occurring in the same decode is likely for non-Unicode data
+    // however, some han characters also appear in korean texts - if 70% of characters are hangul, we consider this a plausible korean text
+    // the reverse (some hangul mixed with mostly han characters) is highly unlikely
+    val mixedHanHangulPenalty = if((bins[0]+bins[2]) > 0 && bins[1] > 0 && (bins[1].toDouble()/(bins[0]+bins[1]+bins[2]) < 0.7)) 1.0 else 0.0
+
+    // randomly generated valid surrogate pairs should be extremely rare
+    val surrogatesBonus = bins[3]
+
+    // codepoints spread over many blocks / alphabets are a red flag
+    val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
+
+    // some ascii characters (spaces, basic punctuation) are a good sign
+    val asciiBonus = bins[14].toDouble() / string.length
+
+    val score = max(0.0, 1.0 + surrogatesBonus*0.25 + asciiBonus - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
+    Logger.log("rare $rareCharactersPenalty, mixCJK $mixedCJKnonCJKPenalty, mixHan $mixedHanHangulPenalty, surrogate $surrogatesBonus, ascii $asciiBonus, bins $binCountPenalty, length $lengthBias, final $score, string $string")
+
+    return score
+}
+
+fun looksLikeUtf8String(data: ByteArray): Double {
+    val string = data.decodeToString()
+
+    // there are a lot of ways to cause decoding errors
+    // random / non-UTF-8 bytes should trigger them reliably
+    if(string.any { it.code == 0xFFFD })
+        return 0.0
+
+    // if the string has no decoding errors and contains multi-byte UTF8 sequences
+    // we can be pretty sure this is a valid string
+    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8))
+        return 1.0
+
+    // otherwise, default to generic UTF16 judgment
+    return looksLikeUtf16String(string)
 }
 
 fun dateFromAppleTimestamp(timestamp: Double): Date {
