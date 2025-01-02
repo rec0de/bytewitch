@@ -43,7 +43,7 @@ object TLV8 : ByteWitchDecoder {
         }
     }
 
-    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.33
+    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.33, null)
 }
 
 class Tlv8Result(val tlvs: List<Tlv8Entry>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {

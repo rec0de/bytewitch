@@ -102,13 +102,13 @@ class ProtobufParser {
             return 0
         }
 
-        override fun decodesAsValid(data: ByteArray): Boolean {
+        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
             try {
                 val parser = ProtobufParser()
-                parser.parse(data, 0)
-                return parser.fullyParsed
+                val res = parser.parse(data, 0)
+                return Pair(parser.fullyParsed, res)
             } catch (e: Exception) {
-                return false
+                return Pair(false, null)
             }
         }
 

@@ -23,12 +23,23 @@ object ByteWitch {
 
     }
 
-    fun analyze(data: ByteArray): List<Pair<String, ByteWitchResult>> {
-        val possibleDecoders = decoders.filter { it.decodesAsValid(data) }
-        return possibleDecoders.map { Pair(it.name, it.decode(data, 0)) }
+    private fun analyze(data: ByteArray): List<Pair<String, ByteWitchResult>> {
+        // decodes as valid gives a quick estimate of which decoders could decode a payload
+        // this is not necessarily true, so we catch failed parses later on also and remove them from the results
+        val possibleDecoders = decoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+
+        return possibleDecoders.mapNotNull {
+            try {
+                Pair(it.first.name, it.second.second ?: it.first.decode(data, 0))
+            } catch (e: Exception) {
+                Logger.log(e.toString())
+                null
+            }
+
+        }
     }
 
-    fun analyzeTryhard(data: ByteArray): List<Pair<String, ByteWitchResult>> {
+    private fun analyzeTryhard(data: ByteArray): List<Pair<String, ByteWitchResult>> {
         Logger.log("tryhard decode attempt...")
         return decoders.mapNotNull {
             val decode = it.tryhardDecode(data)

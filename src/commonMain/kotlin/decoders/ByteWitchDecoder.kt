@@ -4,17 +4,17 @@ interface ByteWitchDecoder {
 
     val name: String
 
-    fun decodesAsValid(data: ByteArray): Boolean {
+    fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
         try {
-            decode(data, 0)
-            return true
+            val decoded = decode(data, 0)
+            return Pair(true, decoded)
         } catch (e: Exception) {
-            return false
+            return Pair(false, null)
         }
     }
 
     fun confidence(data: ByteArray): Double {
-        return if(decodesAsValid(data)) 1.0 else 0.0
+        return if(decodesAsValid(data).first) 1.0 else 0.0
     }
 
     fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean = false): ByteWitchResult

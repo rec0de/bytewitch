@@ -10,7 +10,7 @@ import kotlin.math.min
 object GenericTLV : ByteWitchDecoder {
     override val name = "generic-tlv"
 
-    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.0
+    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.0, null)
 
     override fun confidence(data: ByteArray): Double {
         if(data.size < 3)

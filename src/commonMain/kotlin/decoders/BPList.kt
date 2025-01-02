@@ -19,8 +19,8 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
     companion object : ByteWitchDecoder {
         override val name = "bplist"
-        override fun decodesAsValid(data: ByteArray): Boolean {
-            return data.size > 8 && data.sliceArray(0 until 8).decodeToString() == "bplist00"
+        override fun decodesAsValid(data: ByteArray): Pair<Boolean,ByteWitchResult?> {
+            return Pair(data.size > 8 && data.sliceArray(0 until 7).decodeToString() == "bplist0", null)
         }
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
@@ -94,8 +94,8 @@ class BPListParser(private val nestedDecode: Boolean = true) {
         objectMap.clear()
 
         val header = bytes.sliceArray(0 until 8)
-        if (header.decodeToString() != "bplist00")
-            throw Exception("Expected bplist header 'bplist00' in bytes ${bytes.hex()}")
+        if (!header.decodeToString().startsWith("bplist0"))
+            throw Exception("Expected bplist header 'bplist0*' in bytes ${bytes.hex()}")
 
         val trailer = bytes.fromIndex(bytes.size - 32)
         offsetTableOffsetSize = trailer[6].toInt()
@@ -182,7 +182,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 val data = bytes.sliceArray(effectiveOffset until effectiveOffset+byteLen)
 
                 // decode nested bplists
-                return if(decodesAsValid(data) && nestedDecode)
+                return if(decodesAsValid(data).first && nestedDecode)
                     BPListParser().parseCodable(data, effectiveOffset)
                 else
                     BPData(data, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+byteLen))

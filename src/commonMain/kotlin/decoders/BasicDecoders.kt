@@ -12,7 +12,7 @@ import kotlin.math.*
 object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
-    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.6
+    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
 
     override fun confidence(data: ByteArray): Double {
         val effectiveData = stripNullTerminator(data)
@@ -60,7 +60,7 @@ object Utf16Decoder : ByteWitchDecoder {
         }
     }
 
-    override fun decodesAsValid(data: ByteArray) = confidence(data) > 0.6
+    override fun decodesAsValid(data: ByteArray) = Pair(Utf8Decoder.confidence(data) > 0.6, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
@@ -79,7 +79,7 @@ object EntropyDetector : ByteWitchDecoder {
 
     override fun tryhardDecode(data: ByteArray) = null
 
-    override fun decodesAsValid(data: ByteArray) = true
+    override fun decodesAsValid(data: ByteArray) = Pair(true, null)
 
     // we'll display entropy indicators in quick decode results (if no other decode is available) given sufficient length
     // (for small payloads entropy doesn't really say anything)
@@ -214,7 +214,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
     }
 
     // we only want this to kick in as a last-ditch effort on a tryhard decode
-    override fun decodesAsValid(data: ByteArray) = false
+    override fun decodesAsValid(data: ByteArray) = Pair(false, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) = BWString("you should not see this", Pair(sourceOffset, sourceOffset))
 }
