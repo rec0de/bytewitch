@@ -24,6 +24,7 @@ object ECCurves : ByteWitchDecoder {
         "NIST P-224" to ModTriple(224, 96, -1),
         "Curve1174" to ModPair(251, 9),
         "Curve25519" to ModPair(255, 19),
+        "Ed25519" to ModPair(255, 19),
         "secp256r1" to ModPolynomial(listOf(Pair(1, 256), Pair(-1, 224), Pair(1, 192), Pair(1, 96), Pair(-1, 0))),
         "secp256k1" to ModTriple(256, 32, 977),
         "E-382" to ModPair(382, 105),
@@ -31,6 +32,7 @@ object ECCurves : ByteWitchDecoder {
         "NIST P-384" to ModPolynomial(listOf(Pair(1, 384), Pair(-1, 128), Pair(-1, 96), Pair(1, 32), Pair(-1, 0))),
         "Curve41417" to ModPair(414, 17),
         "Ed448-Goldilocks" to ModTriple(448, 224, 1),
+        "Curve448" to ModTriple(448, 224, 1),
         "M-511" to ModPair(511, 187),
         "E-521" to ModPair(521, 1),
     )
@@ -38,24 +40,9 @@ object ECCurves : ByteWitchDecoder {
     // largely untested - here be typos
     private val equations = mapOf<String, EcEqEquation?>(
         // y^2 = x^3+117050x^2+x
-        "M-221" to EcEqYSquaredEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 3),
-                Triple(117050, EcEqX, 2),
-                Triple(1, EcEqX, 1)
-            )
-        ),
+        "M-221" to MontgomeryCurve(117050),
         // x^2+y^2 = 1+160102x^2y^2
-        "E-222" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(160102, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "E-222" to EdwardsCurve(160102),
         // y^2 = x^3-3x+18958286285566608000408668544493926415504680968679321075787234672564
         "NIST P-224" to EcEqYSquaredEquals(
             EcEqPolynomial(
@@ -65,24 +52,10 @@ object ECCurves : ByteWitchDecoder {
             )
         ),
         // x^2+y^2 = 1-1174x^2y^2
-        "Curve1174" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(-1174, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "Curve1174" to EdwardsCurve(-1174),
         // y^2 = x^3+486662x^2+x
-        "Curve25519" to EcEqYSquaredEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 3),
-                Triple(486662, EcEqX, 2),
-                Triple(1, EcEqX, 1),
-            )
-        ),
+        "Curve25519" to MontgomeryCurve(486662),
+        "Ed25519" to TwistedEdwardsCurve(BigInteger.parseString("37095705934669439343138083508754565189542113879843219016388785533085940283555")),
         // y^2 = x^3-3x+41058363725152142129326129780047268409114441015993725554835256314039467401291
         "secp256r1" to EcEqYSquaredEquals(
             EcEqPolynomial(
@@ -99,24 +72,9 @@ object ECCurves : ByteWitchDecoder {
             )
         ),
         // x^2+y^2 = 1-67254x^2y^2
-        "E-382" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(-67254, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "E-382" to EdwardsCurve(-67254),
         // y^2 = x^3+2065150x^2+x
-        "M-383" to EcEqYSquaredEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 3),
-                Triple(2065150, EcEqX, 2),
-                Triple(1, EcEqX, 1),
-            )
-        ),
+        "M-383" to MontgomeryCurve(2065150),
         // y^2 = x^3-3x+27580193559959705877849011840389048093056905856361568521428707301988689241309860865136260764883745107765439761230575
         "NIST P-384" to EcEqYSquaredEquals(
             EcEqPolynomial(
@@ -126,46 +84,14 @@ object ECCurves : ByteWitchDecoder {
             )
         ),
         // x^2+y^2 = 1+3617x^2y^2
-        "Curve41417" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(3617, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "Curve41417" to EdwardsCurve(3617),
         // x^2+y^2 = 1-39081x^2y^2
-        "Ed448-Goldilocks" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(-39081, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "Ed448-Goldilocks" to EdwardsCurve(-39081),
+        "Curve448" to MontgomeryCurve(156326),
         // y^2 = x^3+530438x^2+x
-        "M-511" to EcEqYSquaredEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 3),
-                Triple(530438, EcEqX, 2),
-                Triple(1, EcEqX, 1),
-            )
-        ),
+        "M-511" to MontgomeryCurve(530438),
         // x^2+y^2 = 1-376014x^2y^2
-        "E-521" to EcEqEquals(
-            EcEqPolynomial(
-                Triple(1, EcEqX, 2),
-                Triple(1, EcEqY, 2)
-            ),
-            EcEqPolynomial(
-                Triple(1, EcEqConstant((1).toBigInteger()), 1),
-                Triple(-376014, EcEqProduct(EcEqXSquare, EcEqYSquare), 1),
-            )
-        ),
+        "E-521" to EdwardsCurve(-376014)
     )
 
     // find curves that could plausibly generate the supplied data as a curve point
@@ -177,6 +103,20 @@ object ECCurves : ByteWitchDecoder {
             throw Exception("no curves with matching byte sizes")
 
         // first: naive quick check - see if encoded points are small enough to be plausible curve points
+
+        // implies data length is even
+        if(uncompressedCandidates.isNotEmpty()) {
+            val x = BigInteger.fromByteArray(data.untilIndex(data.size/2), Sign.POSITIVE)
+            val y = BigInteger.fromByteArray(data.fromIndex(data.size/2), Sign.POSITIVE)
+            uncompressedCandidates = uncompressedCandidates.filter { checkPlausibleQuick(x, y, it.value) }
+
+            // second: for uncompressed points, evaluate the curve polynomial and check if valid
+            uncompressedCandidates = uncompressedCandidates.filter { checkPlausible(x, y, it.key) }
+        }
+
+        // if we got a match for a compressed point, we are pretty certain it's the one
+        if(uncompressedCandidates.isNotEmpty())
+            return uncompressedCandidates.keys
 
         if(compressedCandidates.isNotEmpty()) {
             Logger.log("Compressed candidates (matching bytesize): ${compressedCandidates.keys}")
@@ -190,16 +130,6 @@ object ECCurves : ByteWitchDecoder {
             // second: for compressed points, try to compute y^2 and see if it is actually square
             compressedCandidates = compressedCandidates.filter { checkPlausible(x, it.key) }
             Logger.log("Compressed candidates (y^2 is square): ${compressedCandidates.keys}")
-        }
-
-        // implies data length is even
-        if(uncompressedCandidates.isNotEmpty()) {
-            val x = BigInteger.fromByteArray(data.untilIndex(data.size/2), Sign.POSITIVE)
-            val y = BigInteger.fromByteArray(data.fromIndex(data.size/2), Sign.POSITIVE)
-            uncompressedCandidates = uncompressedCandidates.filter { checkPlausibleQuick(x, y, it.value) }
-
-            // second: for uncompressed points, evaluate the curve polynomial and check if valid
-            uncompressedCandidates = uncompressedCandidates.filter { checkPlausible(x, y, it.key) }
         }
 
         val guesses = (compressedCandidates.keys + uncompressedCandidates.keys)
@@ -226,17 +156,7 @@ object ECCurves : ByteWitchDecoder {
         val mod = modulos[curve]!!
         val eq = equations[curve] ?: return true
 
-        if(eq !is EcEqYSquaredEquals)
-            return true
-
-        val ysq = eq.computeYSquare(x, mod.exactValue)
-
-        // assuming our curve modulus is prime (does that actually always hold? hope so)
-        // we can check if our computed y^2 is actually a square using the Legendre symbol
-        // https://en.wikipedia.org/wiki/Legendre_symbol
-        val legendre = ysq.pow((mod.exactValue-1)/2) // expect 1 for quadratic residue
-
-        return legendre.toBigInteger() == BigInteger.ONE
+        return eq.checkYSquare(x, mod.exactValue)
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
@@ -392,18 +312,8 @@ class ModPolynomial(list: List<Pair<Int, Int>>): ECCurveModulus {
 
 interface EcEqEquation {
     fun test(x: BigInteger, y: BigInteger, mod: BigInteger): Boolean
-}
 
-class EcEqEquals(val a: EcExpression, val b: EcExpression) : EcEqEquation {
-    override fun test(x: BigInteger, y: BigInteger, mod: BigInteger): Boolean {
-        val modCreator = ModularBigInteger.creatorForModulo(mod)
-        val xm = modCreator.fromBigInteger(x)
-        val ym = modCreator.fromBigInteger(y)
-
-        val ra = a.evaluate(xm, ym)
-        val rb = b.evaluate(xm, ym)
-        return ra == rb
-    }
+    fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean
 }
 
 class EcEqYSquaredEquals(val a: EcExpression) : EcEqEquation {
@@ -412,18 +322,97 @@ class EcEqYSquaredEquals(val a: EcExpression) : EcEqEquation {
         val xm = modCreator.fromBigInteger(x)
         val ym = modCreator.fromBigInteger(y)
 
-        val b = EcEqYSquare
         val ra = a.evaluate(xm, ym)
-        val rb = b.evaluate(xm, ym)
+        val rb = ym.pow(2)
         return ra == rb
     }
 
-    fun computeYSquare(x: BigInteger, mod: BigInteger): ModularBigInteger {
+    private fun computeYSquare(x: BigInteger, mod: BigInteger): ModularBigInteger {
         val modCreator = ModularBigInteger.creatorForModulo(mod)
         val xm = modCreator.fromBigInteger(x)
 
         return a.evaluate(xm, xm)
     }
+
+    override fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean {
+        val ysq = computeYSquare(x, mod)
+        // assuming our curve modulus is prime (does that actually always hold? hope so)
+        // we can check if our computed y^2 is actually a square using the Legendre symbol
+        // https://en.wikipedia.org/wiki/Legendre_symbol
+        val legendre = ysq.pow((mod-1)/2) // expect 1 for quadratic residue
+
+        return legendre.toBigInteger() == BigInteger.ONE
+    }
+}
+
+class MontgomeryCurve(val a: BigInteger) : EcEqEquation {
+
+    constructor(a: Int) : this(BigInteger.fromInt(a))
+
+    override fun test(x: BigInteger, y: BigInteger, mod: BigInteger): Boolean {
+        val modCreator = ModularBigInteger.creatorForModulo(mod)
+        val xm = modCreator.fromBigInteger(x)
+        val ym = modCreator.fromBigInteger(y)
+
+        val ra = xm * (xm.pow(2) + modCreator.fromBigInteger(a) * xm + modCreator.ONE)
+        val rb = ym.pow(2)
+        return ra == rb
+    }
+
+    private fun computeYSquare(x: BigInteger, mod: BigInteger): ModularBigInteger {
+        val modCreator = ModularBigInteger.creatorForModulo(mod)
+        val xm = modCreator.fromBigInteger(x)
+        return xm * (xm.pow(2) + modCreator.fromBigInteger(a) * xm + modCreator.ONE)
+    }
+
+    override fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean {
+        val ysq = computeYSquare(x, mod)
+        // assuming our curve modulus is prime (does that actually always hold? hope so)
+        // we can check if our computed y^2 is actually a square using the Legendre symbol
+        // https://en.wikipedia.org/wiki/Legendre_symbol
+        val legendre = ysq.pow((mod-1)/2) // expect 1 for quadratic residue
+
+        return legendre.toBigInteger() == BigInteger.ONE
+    }
+}
+
+open class EdwardsCurve(private val d: BigInteger) : EcEqEquation {
+
+    protected open val sign = 1
+
+    constructor(d: Int) : this(BigInteger.fromInt(d))
+
+    override fun test(x: BigInteger, y: BigInteger, mod: BigInteger): Boolean {
+        val modCreator = ModularBigInteger.creatorForModulo(mod)
+        val xm = modCreator.fromBigInteger(x)
+        val ym = modCreator.fromBigInteger(y)
+
+        val xsq = xm.pow(2)
+        val ysq = ym.pow(2)
+
+        val ra = xsq * sign + ysq
+        val rb = modCreator.fromBigInteger(d) * xsq * ysq + 1
+        return ra == rb
+    }
+
+    // xsq + ysq = 1 + d xsq ysq
+
+    override fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean {
+        val modCreator = ModularBigInteger.creatorForModulo(mod)
+        val xm = modCreator.fromBigInteger(x)
+        val xsq = xm.pow(2)
+
+        val u = xsq - 1
+        val v = xsq * modCreator.fromBigInteger(d) - 1
+
+        val y = u.pow(3) * v * (u.pow(5) * v.pow(3)).pow((mod-3)/4)
+
+        return v * y.pow(2) == u
+    }
+}
+
+class TwistedEdwardsCurve(d: BigInteger) : EdwardsCurve(d) {
+    override val sign = -1
 }
 
 interface EcExpression {
@@ -439,12 +428,6 @@ class EcEqPolynomial(private vararg val parts: Triple<Int, EcExpression, Int>) :
     }
 }
 
-class EcEqProduct(private vararg val parts: EcExpression) : EcExpression {
-    override fun evaluate(x: ModularBigInteger, y: ModularBigInteger): ModularBigInteger {
-        return parts.map { it.evaluate(x, y) }.reduce { sum, elem -> sum * elem }
-    }
-}
-
 class EcEqConstant(val value: BigInteger) : EcExpression {
     override fun evaluate(x: ModularBigInteger, y: ModularBigInteger) = value.toModularBigInteger(x.modulus)
 }
@@ -457,10 +440,3 @@ object EcEqY : EcExpression {
     override fun evaluate(x: ModularBigInteger, y: ModularBigInteger) = y
 }
 
-object EcEqYSquare : EcExpression {
-    override fun evaluate(x: ModularBigInteger, y: ModularBigInteger) = y.pow(2)
-}
-
-object EcEqXSquare : EcExpression {
-    override fun evaluate(x: ModularBigInteger, y: ModularBigInteger) = x.pow(2)
-}
