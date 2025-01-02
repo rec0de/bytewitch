@@ -3,7 +3,7 @@ import bitmage.hex
 import decoders.*
 
 object ByteWitch {
-    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, Sec1Ec, AppleProtobuf, ProtobufParser, ASN1BER, GenericTLV, TLV8, ECCurves, EntropyDetector, HeuristicSignatureDetector)
+    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, Sec1Ec, AppleProtobuf, ProtobufParser, ASN1BER, GenericTLV, TLV8, EdDSA, ECCurves, EntropyDetector, HeuristicSignatureDetector)
 
     fun analyzeHex(data: String, tryhard: Boolean = false): List<Pair<String, ByteWitchResult>> {
         val filtered = data.filter { it in "0123456789abcdefABCDEF" }

@@ -160,13 +160,14 @@ object ECCurves : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        var curves = whichCurves(data, errorOnInvalidSize = true)
-        var littleEndian = false
+        // little endian format seems to be more prevalent, let's default to that
+        var curves = whichCurves(data.reversedArray(), errorOnInvalidSize = true)
+        var littleEndian = true
 
         // try little endian encoding
         if(curves.isEmpty()) {
-            littleEndian = true
-            curves = whichCurves(data.reversedArray(), errorOnInvalidSize = true)
+            littleEndian = false
+            curves = whichCurves(data, errorOnInvalidSize = true)
         }
 
         check(curves.isNotEmpty()){ "no curves pass modulo / square / equation checks" }
@@ -238,6 +239,63 @@ class Sec1Ec {
     }
 }
 
+object EdDSA : ByteWitchDecoder {
+    override val name = "EdDSA"
+
+    private val expectedSizes = setOf(57)
+    private val tryhardSizes = setOf(32)
+
+    override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> = Pair(data.size in expectedSizes, null)
+
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        return when(data.size) {
+            57 -> decodeEd448(data, sourceOffset, inlineDisplay)
+            else -> throw Exception("unknown EdDSA pubkey size: ${data.size}")
+        }
+    }
+
+    override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+        try {
+            return when(data.size) {
+                32 -> decodeEd25519(data, 0, false)
+                57 -> decodeEd448(data, 0, false)
+                else -> null
+            }
+        }
+        catch (e: Exception) {
+            Logger.log(e.toString())
+            return null
+        }
+
+    }
+
+    private fun decodeEd448(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        if(data.last().toInt() != 0x00 && data.last().toInt() != 0x80)
+            throw Exception("Ed448 pubkey should end with 0x00 or 0x80")
+        val reordered = data.reversedArray().fromIndex(1)
+        val curves = ECCurves.whichCurves(reordered, includeUncompressed = false)
+
+        if("Ed448-Goldilocks" !in curves)
+            throw Exception("Ed448 pubkey does not seem to be on Ed448 curve")
+
+        return EdDSAPubkey(reordered, data.last().toInt(), "Ed448", inlineDisplay, Pair(sourceOffset, sourceOffset+data.size))
+    }
+
+    private fun decodeEd25519(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        val reordered = data.reversedArray()
+        val sign = data.last().toInt() and 0x80
+        reordered[0] = (reordered[0].toInt() and 0x7F).toByte()
+
+        println(reordered.hex())
+        val curves = ECCurves.whichCurves(reordered, includeUncompressed = false)
+
+        if("Ed25519" !in curves)
+            throw Exception("Ed25519 pubkey does not seem to be on Ed25519 curve")
+
+        return EdDSAPubkey(reordered, sign, "Ed25519", inlineDisplay, Pair(sourceOffset, sourceOffset+data.size))
+    }
+}
+
 class Sec1Point(private val x: ByteArray, private val y: ByteArray, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override fun renderHTML(): String {
 
@@ -269,6 +327,21 @@ class GenericECPoint(private val x: ByteArray, private val y: ByteArray?, privat
 
         val xHtml = "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.first+x.size)}>X: 0x${x.hex()}</div>"
         val yHtml = if(y != null) "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first+x.size, sourceByteRange.second)}>Y: 0x${y.hex()}</div>" else ""
+
+        return "<div class=\"roundbox generic\" $byteRangeDataTags>$identifier$xHtml$yHtml</div>"
+    }
+}
+
+class EdDSAPubkey(private val x: ByteArray, private val y: Int, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override fun renderHTML(): String {
+
+        val identifier = if (inlineDisplay)
+            "<div class=\"bpvalue\">EdDSA $curve</div>"
+        else
+            "<div class=\"bpvalue\">$curve</div>"
+
+        val xHtml = "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.first+x.size)}>X: 0x${x.hex()}</div>"
+        val yHtml = "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first+x.size, sourceByteRange.second)}>Y: 0x${y.toString(16)}</div>"
 
         return "<div class=\"roundbox generic\" $byteRangeDataTags>$identifier$xHtml$yHtml</div>"
     }
@@ -376,7 +449,7 @@ class MontgomeryCurve(val a: BigInteger) : EcEqEquation {
     }
 }
 
-open class EdwardsCurve(private val d: BigInteger) : EcEqEquation {
+open class EdwardsCurve(protected val d: BigInteger) : EcEqEquation {
 
     protected open val sign = 1
 
@@ -397,6 +470,7 @@ open class EdwardsCurve(private val d: BigInteger) : EcEqEquation {
 
     // xsq + ysq = 1 + d xsq ysq
 
+    // based on https://www.rfc-editor.org/rfc/rfc8032.html
     override fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean {
         val modCreator = ModularBigInteger.creatorForModulo(mod)
         val xm = modCreator.fromBigInteger(x)
@@ -413,6 +487,22 @@ open class EdwardsCurve(private val d: BigInteger) : EcEqEquation {
 
 class TwistedEdwardsCurve(d: BigInteger) : EdwardsCurve(d) {
     override val sign = -1
+
+    // based on https://www.rfc-editor.org/rfc/rfc8032.html
+    override fun checkYSquare(x: BigInteger, mod: BigInteger): Boolean {
+        val modCreator = ModularBigInteger.creatorForModulo(mod)
+        val xm = modCreator.fromBigInteger(x)
+        val xsq = xm.pow(2)
+
+        val u = xsq - 1
+        val v = xsq * modCreator.fromBigInteger(d) + 1
+
+        val y = u * v.pow(3) * (u * v.pow(7)).pow((mod-5)/8)
+
+        val r = v * y.pow(2)
+
+        return r == u || r == -u
+    }
 }
 
 interface EcExpression {
