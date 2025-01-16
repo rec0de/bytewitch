@@ -83,49 +83,38 @@ object EntropyDetector : ByteWitchDecoder {
 
     // we'll display entropy indicators in quick decode results (if no other decode is available) given sufficient length
     // (for small payloads entropy doesn't really say anything)
-    override fun confidence(data: ByteArray) = if(data.size > 20) 0.76 else 0.00
+    override fun confidence(data: ByteArray) = if(data.size > 10) 0.76 else 0.00
 
 
-    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) =
+        if(data.size > 100)
+            decodeLong(data, sourceOffset, inlineDisplay)
+        else
+            decodeShort(data, sourceOffset, inlineDisplay)
+
+    private fun decodeLong(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val byteCounts = IntArray(256){ 0 }
-        val nibbleCounts = IntArray(16){ 0 }
 
         data.forEach { byte ->
             byteCounts[byte.toUByte().toInt()] += 1
-            val lowerNibble = (byte.toUByte().toInt() and 0x0F)
-            val upperNibble = (byte.toUByte().toInt() and 0xF0) ushr 4
-            nibbleCounts[lowerNibble] += 1
-            nibbleCounts[upperNibble] += 1
         }
 
         // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
         val expected = data.size.toDouble() / 256
-        val expectedNibbles = (data.size.toDouble() * 2) / 16
-        val entropyNibbles = nibbleCounts.map { it.toDouble() / (data.size*2) }.filter { it > 0 }.sumOf { - it * log2(it) }
-
-
         val sd = sqrt(0.003890991*data.size) // constant is p(1-p) = (1/256)*(1-(1/256))
         val entropy = byteCounts.map { it.toDouble() / data.size }.filter { it > 0 }.sumOf { - it * log2(it) }
 
         //Logger.log("expecting $expected counts per byte, 2sd above: ${expected+2*sd}")
 
         val emoji = when {
-            entropy > 7.0 -> "\uD83C\uDFB2"
-            entropy > 5.5 -> "\uD83D\uDCDA"
+            entropy > 6.5 -> "\uD83C\uDFB2"
+            entropy > 5 -> "\uD83D\uDCDA"
             entropy > 3 -> "📖"
             else -> "\uD83D\uDDD2\uFE0F"
         }
 
-        val emojiNib = when {
-            entropyNibbles > 3.7 -> "\uD83C\uDFB2"
-            entropyNibbles > 3.3 -> "\uD83D\uDCDA"
-            entropyNibbles > 2.5 -> "📖"
-            else -> "\uD83D\uDDD2\uFE0F"
-        }
-
         val rounded = round(entropy*10)/10
-        val roundedNib = round(entropyNibbles*10)/10
-        val iconHTML = "<span title=\"entropy: $rounded/$roundedNib\">$emoji$emojiNib</span>"
+        val iconHTML = "<span title=\"entropy: $rounded\">$emoji</span>"
 
         // alright, here's how we'll do this:
         // if a 'hot byte' (<5% chance of occurring this often randomly in the sample) occurs more than 2 times
@@ -147,10 +136,42 @@ object EntropyDetector : ByteWitchDecoder {
             data.hex()
 
         return if(inlineDisplay) {
-                BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
-            }
-            else
-                BWAnnotatedData("$iconHTML Shannon Entropy: $rounded (0-8) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
+            BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
+        }
+        else
+            BWAnnotatedData("$iconHTML Shannon Entropy: $rounded (0-8 b/byte) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
+    }
+
+    private fun decodeShort(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        val nibbleCounts = IntArray(16){ 0 }
+
+        data.forEach { byte ->
+            val lowerNibble = (byte.toUByte().toInt() and 0x0F)
+            val upperNibble = (byte.toUByte().toInt() and 0xF0) ushr 4
+            nibbleCounts[lowerNibble] += 1
+            nibbleCounts[upperNibble] += 1
+        }
+
+        // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
+        val entropyNibbles = nibbleCounts.map { it.toDouble() / (data.size*2) }.filter { it > 0 }.sumOf { - it * log2(it) }
+
+        val emojiNib = when {
+            entropyNibbles > 3.5 -> "\uD83C\uDFB2"
+            entropyNibbles > 3.1 -> "\uD83D\uDCDA"
+            entropyNibbles > 2.5 -> "📖"
+            else -> "\uD83D\uDDD2\uFE0F"
+        }
+
+        val roundedNib = round(entropyNibbles*10)/10
+        val iconHTML = "<span title=\"entropy: $roundedNib out of 4 b/nib\">$emojiNib</span>"
+
+        val hotByteRendering = data.hex()
+
+        return if(inlineDisplay) {
+            BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
+        }
+        else
+            BWAnnotatedData("$iconHTML Shannon Entropy: $roundedNib (0-4 b/nib) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
     }
 }
 
