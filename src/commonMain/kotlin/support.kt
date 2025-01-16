@@ -15,6 +15,7 @@ expect fun dateFromUTCString(string: String, fullYear: Boolean): Date
 
 fun looksLikeUtf16String(string: String): Double {
     val printableASCII = string.filter { it.code in 32..126 || it.code in 9..13 }
+    val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
     if(veryWeird || string.isEmpty())
@@ -55,9 +56,15 @@ fun looksLikeUtf16String(string: String): Double {
     }
 
     Logger.log(bins.joinToString(" "))
-
-    // CJK Extension A is rare, but not _that_ rare - we'll dampen the effect a little
-    val rareCharactersPenalty = (bins[2].toDouble()/3 + bins[4] + bins[5] + bins[6] + bins[7] + bins[10]) / string.length
+    
+    val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], weirdASCII.length)
+    val multipleRares = rares.count { it > 0 } > 1
+    val rareNonAsciiShare = rares.sum().toDouble() / (string.length - printableASCII.length)
+    val hasRareCJK = bins[2] > 0
+    // multiple different rare characters are super suspicious
+    // a message consisting of only rare characters from one particular bin, however, is plausible
+    // and single rare CJK characters may also occur in otherwise common CJK text
+    val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) rareNonAsciiShare * 5 else if(hasRareCJK) rareNonAsciiShare else (1-rareNonAsciiShare)
 
     // CJK characters are the most likely to generate "randomly" and should usually not co-occur with non-CJK characters, excluding common ASCII
     val mixedCJKnonCJKPenalty = if((bins[0]+bins[1]+bins[2]) > 0 && (bins[5] + bins[6] + bins[8] + bins[9] + bins[11] + bins[12] + bins[15] + bins[16]) > 0) 1.0 else 0.0
@@ -73,11 +80,8 @@ fun looksLikeUtf16String(string: String): Double {
     // codepoints spread over many blocks / alphabets are a red flag
     val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
 
-    // some ascii characters (spaces, basic punctuation) are a good sign
-    val asciiBonus = bins[14].toDouble() / string.length
-
-    val score = max(0.0, 1.0 + surrogatesBonus*0.25 + asciiBonus - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
-    Logger.log("rare $rareCharactersPenalty, mixCJK $mixedCJKnonCJKPenalty, mixHan $mixedHanHangulPenalty, surrogate $surrogatesBonus, ascii $asciiBonus, bins $binCountPenalty, length $lengthBias, final $score, string $string")
+    val score = max(0.0, 1.0 + surrogatesBonus*0.25 + asciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
+    Logger.log("rare $rareCharactersPenalty, mixCJK $mixedCJKnonCJKPenalty, mixHan $mixedHanHangulPenalty, surrogate $surrogatesBonus, ascii $asciiPercentage, bins $binCountPenalty, length $lengthBias, final $score, string $string")
 
     return score
 }
