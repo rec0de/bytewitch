@@ -74,7 +74,7 @@ class ProtobufParser {
                     if(numberBytes.size > 1 && continueFlag)
                         continue@outer
                 }
-
+                
                 // little endian
                 numberBytes.reverse()
 

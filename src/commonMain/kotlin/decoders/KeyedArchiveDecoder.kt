@@ -12,8 +12,20 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
         return if (BPListParser.decodesAsValid(data)) {
             val parsed = BPListParser.decode(data, 0) as BPListObject
             isKeyedArchive(parsed)
-        } else
-            false
+        }
+        else ({
+            if (BPList17.decodesAsValid(data)) {
+                val parsed = BPList17.decode(data, 0) as BPListObject
+                isKeyedArchive(parsed)
+            } else {
+                if (BPList15.decodesAsValid(data)) {
+                    val parsed = BPList15.decode(data, 0) as BPListObject
+                    isKeyedArchive(parsed)
+                } else {
+                    false
+                }
+            }
+        }) as Boolean
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {

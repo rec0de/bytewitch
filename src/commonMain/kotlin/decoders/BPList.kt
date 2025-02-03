@@ -81,12 +81,12 @@ class BPListParser(private val nestedDecode: Boolean = true) {
         rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
 
         return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
-                val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
-                archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
-                archive
-            }
-            else
-                rootObject
+            val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
+            archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+            archive
+        }
+        else
+            rootObject
     }
 
     fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
@@ -149,7 +149,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                     BPInt(lower, Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
                 }
                 else
-                    // TODO: does this mess with signs? how does bigint do it?
+                // TODO: does this mess with signs? how does bigint do it?
                     BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+offset+1+byteLen))
             }
             // Real
@@ -219,6 +219,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 val values = (0 until entries).map {i ->
                     val objectIndex = Int.fromBytes(bytes.sliceArray(effectiveOffset+i*objectRefSize until effectiveOffset+(i+1)*objectRefSize), ByteOrder.BIG)
                     readObjectFromOffsetTableEntry(bytes, objectIndex)
+                    //replace this fnct for other encodings,illtry to copy and debug the outpu
                 }
 
                 BPArray(values, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
