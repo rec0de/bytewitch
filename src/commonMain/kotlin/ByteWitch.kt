@@ -5,47 +5,33 @@ import decoders.*
 object ByteWitch {
 
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPList16, BPListParser, OpackParser, Utf8Decoder, Utf16Decoder,
+        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser,
         ProtobufParser, ASN1BER, GenericTLV, TLV8,
         EntropyDetector, HeuristicSignatureDetector
     )
 
-    fun analyzeInput(data: String, tryhard: Boolean = false): List<Pair<String, ByteWitchResult>> {
+    fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
-        val isHex = cleanedData.all { it in "0123456789abcdefABCDEF" }
-        val isBase64 = cleanedData.matches(Regex("^[A-Za-z0-9+/=]+$"))
-        val isHexdump = cleanedData.contains("\n") && cleanedData.any { it in "0123456789abcdefABCDEF" }
+        val isBase64 = cleanedData.matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
 
-        val outputs = when {
-            isHex -> analyzeHex(cleanedData, tryhard)
-            isBase64 -> analyze(decodeBase64(cleanedData), tryhard)
-            isHexdump -> analyze(decodeHexdump(cleanedData), tryhard)
+        Logger.log("is hexdump: $isHexdump isB64: $isBase64")
+
+        return when {
+            isBase64 -> decodeBase64(cleanedData)
+            isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                Logger.log("Unsupported format: Data must be in Hex, Base64, or Hexdump format")
-                emptyList()
+                val filtered = data.filter { it in "0123456789abcdefABCDEF" }
+                Logger.log(filtered)
+                if (filtered.length % 2 != 0)
+                    byteArrayOf()
+                else
+                    filtered.fromHex()
             }
         }
-
-        return outputs
     }
 
-    fun analyzeHex(data: String, tryhard: Boolean = false): List<Pair<String, ByteWitchResult>> {
-        val filtered = data.filter { it in "0123456789abcdefABCDEF" }
-
-        if (filtered.length % 2 != 0)
-            return emptyList()
-
-        try {
-            val bytes = filtered.fromHex()
-            return analyze(bytes, tryhard)
-        } catch (e: Exception) {
-            Logger.log("Failed to analyze hex: ${e.message}")
-            e.printStackTrace()
-            return emptyList()
-        }
-    }
-
-    private fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
+    fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
             return decoders.mapNotNull {
@@ -55,8 +41,18 @@ object ByteWitch {
             }
         }
         else {
-            val possibleDecoders = decoders.filter { it.decodesAsValid(data) }
-            return possibleDecoders.map { Pair(it.name, it.decode(data, 0)) }
+            // decodes as valid gives a quick estimate of which decoders could decode a payload
+            // this is not necessarily true, so we catch failed parses later on also and remove them from the results
+            val possibleDecoders = decoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+
+            return possibleDecoders.mapNotNull {
+                try {
+                    Pair(it.first.name, it.second.second ?: it.first.decode(data, 0))
+                } catch (e: Exception) {
+                    Logger.log(e.toString())
+                    null
+                }
+            }
         }
     }
 
@@ -94,9 +90,14 @@ object ByteWitch {
 
     private fun decodeBase64(base64Data: String): ByteArray {
         // Decode Base64 directly into raw bytes
-        return js("atob(base64Data)").unsafeCast<String>()
-            .toCharArray()
-            .map { it.code.toByte() }
-            .toByteArray()
+        return try {
+            js("atob(base64Data)").unsafeCast<String>()
+                .toCharArray()
+                .map { it.code.toByte() }
+                .toByteArray()
+        }
+        catch (e: Exception) {
+            byteArrayOf()
+        }
     }
 }

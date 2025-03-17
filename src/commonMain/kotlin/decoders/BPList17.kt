@@ -1,23 +1,22 @@
 package decoders
 
 
-import ParseCompanion
 import bitmage.*
 
-class BPList17 : ParseCompanion() {
+class BPList17 {
     private val objectMap = mutableMapOf<Int, BPListObject>()
-    private var objectRefSize = 0
     private var sourceOffset = 0
+    private var lastObjectEndOffset = 0
 
     companion object : ByteWitchDecoder {
-        override val name = "bp17"
+        override val name = "bplist17"
 
-        override fun decodesAsValid(data: ByteArray): Boolean {
+        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
             if (data.size < 8) {
-                return false
+                return Pair(false, null)
             }
-
-            return data.sliceArray(0 until 8).decodeToString() == "bplist17"
+            val headerString = data.sliceArray(0 until 8).decodeToString()
+            return Pair(headerString == "bplist17" || headerString == "bplist16", null)
         }
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
@@ -25,14 +24,13 @@ class BPList17 : ParseCompanion() {
         }
     }
 
-
     fun parse(bytes: ByteArray, sourceOffset: Int): BPListObject {
-        val magic = readBytes(bytes, 8)
+        val magic = bytes.untilIndex(8)
 
-        if(magic.decodeToString() != "bplist17")
-            throw Exception("not a bplist17")
+        if(magic.decodeToString() !in listOf("bplist16", "bplist17"))
+            throw Exception("not a bplist 16/17")
 
-        val rootObject = parseCodable(bytes, sourceOffset + 8)
+        val rootObject = parseCodable(bytes, sourceOffset)
         rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
 
         return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
@@ -44,17 +42,16 @@ class BPList17 : ParseCompanion() {
             rootObject
     }
 
-    fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
+    private fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
         this.sourceOffset = sourceOffset
         objectMap.clear()
-        return readObjectFromOffset(bytes, sourceOffset)
+        return readObjectFromOffset(bytes, 8) // first object starts after header
     }
 
     private fun readObjectFromOffset(bytes: ByteArray, offset: Int): BPListObject {
         // check cache
         if(objectMap.containsKey(offset))
             return objectMap[offset]!!
-
 
         // objects start with a one byte type descriptor
         val objectByte = bytes[offset].toUByte().toInt()
@@ -63,11 +60,13 @@ class BPList17 : ParseCompanion() {
 
         println("parsing object of type: 0x${objectByte.toUByte().toString(16).uppercase().padStart(2, '0')} and length: ${lengthBits} at $offset")
 
+        lastObjectEndOffset = offset+1
 
         val parsed = when(objectByte) {
             0x00 -> BPNull
-            0xC0 -> BPFalse
-            0xB0 -> BPTrue
+            0xe0 -> BPNull
+            0xc0 -> BPFalse
+            0xb0 -> BPTrue
             0x0f -> BPFill
             // Int
             in 0x10 until 0x20 -> {
@@ -76,9 +75,6 @@ class BPList17 : ParseCompanion() {
                 // some bplists contain crazy long integers for tiny numbers
                 // we'll just hope they're never used beyond actual long range
                 if(byteLen in 9..16) {
-
-                    println("parsing int too damn long")
-
                     val upper = Long.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.BIG)
                     val lower = Long.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.BIG)
 
@@ -87,28 +83,30 @@ class BPList17 : ParseCompanion() {
                         throw Exception("Overlong BPInt")
                     }
                     // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
-                    BPInt(lower, Pair(offset, offset+1+byteLen))
+                    lastObjectEndOffset = offset+1+byteLen
+                    BPInt(lower, Pair(sourceOffset+offset, lastObjectEndOffset))
                 }
                 else {
-
-                    println("parsing int result from " + (offset+1) + " to " + (offset+1+byteLen) + " : " + Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG))
-
                     // TODO: does this mess with signs? how does bigint do it?
-                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(offset, offset+1+byteLen))
+                    lastObjectEndOffset = offset+1+byteLen
+                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
                 }
             }
             // Real float
-            in 0x22 until 0x23 -> {
-                BPReal(bytes.sliceArray(offset+1 until offset+1+4).readFloat(ByteOrder.BIG).toDouble(), Pair(offset, offset+1+4))
+            0x22 -> {
+                lastObjectEndOffset = offset+1+4
+                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readFloat(ByteOrder.BIG).toDouble(), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Real double
-            in 0x23 until 0x24 -> {
-                BPReal(bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.BIG), Pair(offset, offset+1+8))
+            0x23 -> {
+                lastObjectEndOffset = offset+1+8
+                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readDouble(ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Date, always 8 bytes long
             0x33 -> {
                 val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.BIG)
-                BPDate(timestamp, Pair(offset, offset+1+8))
+                lastObjectEndOffset = offset+1+8
+                BPDate(timestamp, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Data
             in 0x40 until 0x50 -> {
@@ -117,10 +115,9 @@ class BPList17 : ParseCompanion() {
                 val byteLen = tmp.first
                 val effectiveOffset = tmp.second
 
-                println("parsing BPData of byteLen " + byteLen + " with offset " + effectiveOffset)
-
-                val data = bytes.sliceArray(effectiveOffset until effectiveOffset+byteLen)
-                return BPData(data, Pair(offset, effectiveOffset+byteLen))
+                lastObjectEndOffset = effectiveOffset+byteLen
+                val data = bytes.sliceArray(effectiveOffset until lastObjectEndOffset)
+                return BPData(data, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Unicode string
             in 0x60 until 0x70 -> {
@@ -129,10 +126,10 @@ class BPList17 : ParseCompanion() {
                 val charLen = tmp.first
                 val effectiveOffset = tmp.second
                 // this is UTF16, encodes at two bytes per char
-                val stringBytes = bytes.sliceArray(effectiveOffset until effectiveOffset+charLen*2)
-                val string = stringBytes.decodeToString()
-                println("parsed String of type 0x${objectByte.toUByte().toString(16).uppercase().padStart(2, '0')} and len " + charLen + " at offset " + effectiveOffset + " value '" + string + "'")
-                BPUnicodeString(string, Pair(offset, effectiveOffset+charLen*2))
+                lastObjectEndOffset = effectiveOffset+charLen*2
+                val stringBytes = bytes.sliceArray(effectiveOffset until lastObjectEndOffset)
+                val string = stringBytes.decodeAsUTF16LE()
+                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Ascii string
             in 0x70 until 0x80 -> {
@@ -140,85 +137,97 @@ class BPList17 : ParseCompanion() {
                 val tmp = getFillAwareLengthAndOffset(bytes, offset)
                 val charLen = tmp.first
                 val effectiveOffset = tmp.second
+                lastObjectEndOffset = effectiveOffset+charLen
                 val stringBytes = bytes.sliceArray(effectiveOffset until effectiveOffset+charLen)
                 val string = stringBytes.decodeToString()
-                println("parsed String of type 0x${objectByte.toUByte().toString(16).uppercase().padStart(2, '0')} and len " + charLen + " at offset " + effectiveOffset + " value '" + string + "'")
-                BPUnicodeString(string, Pair(offset, effectiveOffset+charLen))
+                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // reference object
             in 0x80 until 0x90 -> {
                 val tmp = getFillAwareLengthAndOffset(bytes, offset)
                 val sizeFieldLength = tmp.first
                 val effectiveOffset = tmp.second
-
                 val objAddr = Int.fromBytes(bytes.sliceArray(effectiveOffset until effectiveOffset + sizeFieldLength), ByteOrder.LITTLE)
-                println("parsing reference object at index $objAddr")
 
-                BPReferenceObject(readObjectFromOffset(bytes, objAddr), Pair(offset, effectiveOffset+sizeFieldLength))
+                lastObjectEndOffset = effectiveOffset+sizeFieldLength
+                readObjectFromOffset(bytes, objAddr)
             }
             // Array
             in 0xa0 until 0xb0 -> {
-                println("parsing array")
-                val endAddr = Long.fromBytes(bytes.sliceArray(offset + 1 until offset + 1 + 8), ByteOrder.LITTLE)
-
-                println("parsing array with end addr $endAddr")
+                val endAddr = Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+8), ByteOrder.LITTLE)
 
                 val values = mutableListOf<BPListObject>()
                 var currentOffset = offset + 1 + 8
-                val arrayStartOffset = currentOffset
 
                 while (currentOffset < endAddr) {
-                    println("parsing next array entry at " + currentOffset)
                     val obj = readObjectFromOffset(bytes, currentOffset)
                     values.add(obj)
                     // if no end range, we have a 1 byte object
-                    currentOffset = obj.sourceByteRange?.second ?: (currentOffset + 1)
-                    println("setting next array entry byte to index $currentOffset")
+                    currentOffset = lastObjectEndOffset
                 }
 
-                println("array parsed, we are at addr " + currentOffset + " of " + endAddr + ". obj starting at " + (arrayStartOffset) + ", ends at " + (currentOffset))
-                BPArray(values, Pair(offset, currentOffset))
+                lastObjectEndOffset = currentOffset
+                BPArray(values, Pair(sourceOffset+offset, sourceOffset+currentOffset))
             }
-            // Set
+            // Set (this is not based on any documentation, but we assume it to work like an array, if it exists)
             in 0xc0 until 0xd0 -> {
-                val tmp = getFillAwareLengthAndOffset(bytes, offset)
-                val entries = tmp.first
-                val effectiveOffset = tmp.second
+                val endAddr = Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+8), ByteOrder.LITTLE)
 
-                val values = (0 until entries).map {i ->
-                    val objectIndex = Int.fromBytes(bytes.sliceArray(effectiveOffset+i*objectRefSize until effectiveOffset+(i+1)*objectRefSize), ByteOrder.BIG)
-                    readObjectFromOffset(bytes, objectIndex)
+                val values = mutableListOf<BPListObject>()
+                var currentOffset = offset + 1 + 8
+
+                while (currentOffset < endAddr) {
+                    val obj = readObjectFromOffset(bytes, currentOffset)
+                    values.add(obj)
+                    // if no end range, we have a 1 byte object
+                    currentOffset = lastObjectEndOffset
                 }
 
-                BPSet(entries, values, Pair(offset, effectiveOffset+objectRefSize*entries))
+                lastObjectEndOffset = currentOffset
+
+                BPSet(values.size, values, Pair(sourceOffset+offset, sourceOffset+currentOffset))
             }
             // Dict
             in 0xd0 until 0xe0 -> {
-                println("parsing dict")
                 val endAddr = Long.fromBytes(bytes.sliceArray(offset + 1 until offset + 1 + 8), ByteOrder.LITTLE)
-
-                println("parsing array with end addr $endAddr")
 
                 val map = mutableMapOf<BPListObject, BPListObject>()
                 var currentOffset = offset + 1 + 8
-                val dictStartOffset = currentOffset
 
                 while (currentOffset < endAddr) {
-                    println("parsing next dict key at " + currentOffset)
                     val key = readObjectFromOffset(bytes, currentOffset)
-                    currentOffset = key.sourceByteRange?.second ?: (currentOffset + 1)
-                    println("parsing next dict value at " + currentOffset)
+                    currentOffset = lastObjectEndOffset
                     val value = readObjectFromOffset(bytes, currentOffset)
-                    currentOffset = value.sourceByteRange?.second ?: (currentOffset + 1)
+                    currentOffset = lastObjectEndOffset
                     map[key] = value
                 }
 
-                println("dict parsed. obj starting at ${offset}, ends at $currentOffset")
-                BPDict(map, Pair(offset, currentOffset))
+                lastObjectEndOffset = currentOffset
+                BPDict(map, Pair(sourceOffset+offset, sourceOffset+currentOffset))
             }
-            in 0xe0 until 0xf0 -> {
-                println("parsed NULL")
-                BPNull
+            // UInt
+            in 0xf0 until 0x100 -> {
+                val byteLen = lengthBits
+
+                // some bplists contain crazy long integers for tiny numbers
+                // we'll just hope they're never used beyond actual long range
+                if(byteLen in 9..16) {
+                    val upper = ULong.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.BIG)
+                    val lower = ULong.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.BIG)
+
+                    if(upper != 0uL) {
+                        Logger.log("Encountered very long BPUInt ($byteLen B) that cannot be equivalently represented as ULong")
+                        throw Exception("Overlong BPUInt")
+                    }
+                    // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
+                    lastObjectEndOffset = offset+1+byteLen
+                    BPUInt(lower, Pair(sourceOffset+offset, lastObjectEndOffset))
+                }
+                else {
+                    // TODO: does this mess with signs? how does bigint do it?
+                    lastObjectEndOffset = offset+1+byteLen
+                    BPUInt(ULong.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                }
             }
 
             else -> throw Exception("Unknown object type byte 0b${objectByte.toString(2)}")
@@ -234,9 +243,6 @@ class BPList17 : ParseCompanion() {
         if(lengthBits < 0x0f)
             return Pair(lengthBits, offset+1)
 
-
-        // TODO should also check if bytes[offset+1] & 0x10 = 0x10
-
         val sizeFieldSize = bytes[offset+1].toInt() and 0x0f // size field is n bytes
 
         // Read the raw value from the byte array
@@ -245,19 +251,5 @@ class BPList17 : ParseCompanion() {
             ByteOrder.LITTLE
         )
         return Pair(rawSize, offset+2+sizeFieldSize)
-    }
-}
-
-data class BPReferenceObject(
-    val referencedObject: BPListObject,
-    override val sourceByteRange: Pair<Int, Int>
-) : BPListObject() {
-
-    override fun renderHtmlValue(): String {
-        return """<div class="bpvalue bpreference" $byteRangeDataTags>→ ${referencedObject.renderHtmlValue()}</div>"""
-    }
-
-    override fun toString(): String {
-        return "ref → $referencedObject"
     }
 }

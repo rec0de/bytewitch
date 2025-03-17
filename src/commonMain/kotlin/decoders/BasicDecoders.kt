@@ -17,11 +17,13 @@ object Utf8Decoder : ByteWitchDecoder {
     override fun confidence(data: ByteArray): Double {
         val effectiveData = stripNullTerminator(data)
 
+        val nullTerminatorBonus = if(effectiveData.size == data.size-1) 0.2 else 0.0
+
         try {
             val score = looksLikeUtf8String(effectiveData)
             //Logger.log(data.decodeToString())
             //Logger.log(score)
-            return score
+            return min(score+nullTerminatorBonus, 1.0)
         } catch (e: Exception) {
             return 0.0
         }

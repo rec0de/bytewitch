@@ -1,3 +1,4 @@
+import bitmage.hex
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
@@ -39,6 +40,10 @@ fun main() {
             decode(false)
         }
 
+        tryhardBtn.onclick = {
+            decode(true)
+        }
+
         uploadBtn.onclick = {
             val fileInput = document.createElement("input") as HTMLInputElement
             fileInput.type = "file"
@@ -74,11 +79,12 @@ fun decode(tryhard: Boolean) {
     val floatview = document.getElementById("floatview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    val result = ByteWitch.analyzeInput(input.value, tryhard)
+    val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
+    val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
         output.clear()
-        floatview.innerText = input.value.filter { it in "0123456789abcdefABCDEF" }
+        floatview.innerText = bytes.hex()
         bytefinder.style.display = "flex"
 
         result.forEach {
