@@ -14,6 +14,11 @@ fun ByteArray.decodeAsUTF16BE(): String {
     return shorts.map { Char(it) }.toCharArray().concatToString()
 }
 
+fun ByteArray.decodeAsUTF16LE(): String {
+    val shorts = this.toList().chunked(2).map { UInt.fromBytes(it.toByteArray(), ByteOrder.LITTLE).toUShort() }.toTypedArray()
+    return shorts.map { Char(it) }.toCharArray().concatToString()
+}
+
 fun ByteArray.indexOfSubsequence(target: ByteArray): Int {
     var targetPosition = -1
     var offset = 0

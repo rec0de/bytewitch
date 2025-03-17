@@ -1,24 +1,38 @@
+import bitmage.hex
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
 import kotlinx.dom.createElement
 import org.w3c.dom.*
+import kotlinx.browser.document
+import kotlinx.browser.window
+import kotlinx.dom.clear
+import kotlinx.dom.createElement
+import org.w3c.dom.*
+import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.files.File
+import org.w3c.files.FileReader
+import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.Int8Array
+import org.khronos.webgl.Uint8Array
+
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
-fun main() {
 
+fun main() {
     window.addEventListener("load", {
         val input = document.getElementById("data") as HTMLTextAreaElement
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
         val tryhardBtn = document.getElementById("tryhard") as HTMLButtonElement
+        val uploadBtn = document.getElementById("upload") as HTMLButtonElement
 
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
 
         input.oninput = {
-            if(liveDecodeEnabled)
+            if (liveDecodeEnabled)
                 decode(false)
         }
 
@@ -28,6 +42,28 @@ fun main() {
 
         tryhardBtn.onclick = {
             decode(true)
+        }
+
+        uploadBtn.onclick = {
+            val fileInput = document.createElement("input") as HTMLInputElement
+            fileInput.type = "file"
+            fileInput.accept = "*" // Accept any file type
+
+            fileInput.onchange = {
+                val file = fileInput.files?.item(0)
+                if (file != null) {
+                    if (file.type == "text/plain") {
+                        // Handle .txt files
+                        readFile(file)
+                    } else {
+                        // Handle binary files
+                        readBinaryFile(file)
+                    }
+                }
+            }
+
+            // Trigger the file selection dialog
+            fileInput.click()
         }
 
         liveDecode.onchange = {
@@ -43,11 +79,12 @@ fun decode(tryhard: Boolean) {
     val floatview = document.getElementById("floatview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    val result = ByteWitch.analyzeHex(input.value, tryhard)
+    val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
+    val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
         output.clear()
-        floatview.innerText = input.value.filter { it in "0123456789abcdefABCDEF" }
+        floatview.innerText = bytes.hex()
         bytefinder.style.display = "flex"
 
         result.forEach {
@@ -77,7 +114,7 @@ fun attachRangeListeners(element: Element) {
         val start = element.getAttribute("data-start")!!.toInt()
         val end =  element.getAttribute("data-end")!!.toInt()
         element.addEventListener("click", { evt ->
-            //console.log("$start to $end")
+            console.log("$start to $end")
             val floatview = document.getElementById("floatview")!!
             floatview.innerHTML = floatview.textContent!! // re-set previous highlights
             val text = floatview.childNodes[0]!!
@@ -102,4 +139,52 @@ fun attachRangeListeners(element: Element) {
         }
     }
     element.children.asList().forEach { attachRangeListeners(it) }
+}
+
+fun readBinaryFile(file: File) {
+    val input = document.getElementById("data") as HTMLTextAreaElement
+    val reader = FileReader()
+
+    reader.onload = {
+        val arrayBuffer = reader.result as? ArrayBuffer
+        if (arrayBuffer != null) {
+            val hexContent = arrayBufferToHex(arrayBuffer) // Convert binary data to hex
+            input.value = hexContent // Display hex content in the textarea
+        } else {
+            console.error("Failed to read binary file content")
+        }
+    }
+
+    reader.onerror = {
+        console.error("Failed to read the file: ${reader.error?.message}")
+    }
+
+    reader.readAsArrayBuffer(file) // Read binary data in the file
+}
+
+fun readFile(file: File) {
+    val input = document.getElementById("data") as HTMLTextAreaElement
+    val reader = FileReader()
+
+    reader.onload = {
+        val content = reader.result?.toString() // Safely convert `result` to a string
+        if (content != null) {
+            input.value = content // Write the file content to the textarea
+        } else {
+            console.error("File content is null")
+        }
+    }
+
+    reader.onerror = {
+        console.error("Failed to read the file: ${reader.error?.message}")
+    }
+
+    reader.readAsText(file) // Read the file content as text
+}
+
+fun arrayBufferToHex(buffer: ArrayBuffer): String {
+    val byteArray = Uint8Array(buffer) // Create a Uint8Array view for the buffer
+    return (0 until byteArray.length).joinToString("") { index ->
+        byteArray.asDynamic()[index].toString(16).padStart(2, '0')
+    }
 }
