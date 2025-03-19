@@ -18,11 +18,12 @@ kotlin {
             testTask {
                 useKarma {
                     //useFirefox()
-                    useSafari()
+                    useSafari() // added by Niklas to use Safari instead of firefox
                 }
             }
         }
     }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
