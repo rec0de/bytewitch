@@ -3,7 +3,7 @@ import bitmage.hex
 import decoders.*
 
 object ByteWitch {
-    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, Sec1Ec, AppleProtobuf, ProtobufParser, ASN1BER, GenericTLV, TLV8, EdDSA, ECCurves, EntropyDetector, HeuristicSignatureDetector)
+    private val decoders = listOf<ByteWitchDecoder>(BPListParser, OpackParser, Utf8Decoder, Utf16Decoder, Sec1Ec, AppleProtobuf, ProtobufParser, ASN1BER, GenericTLV, TLV8, EdDSA, ECCurves, EntropyDetector, HeuristicSignatureDetector, Nemesys)
 
     fun analyzeHex(data: String, tryhard: Boolean = false): List<Pair<String, ByteWitchResult>> {
         val filtered = data.filter { it in "0123456789abcdefABCDEF" }
@@ -27,6 +27,8 @@ object ByteWitch {
         // decodes as valid gives a quick estimate of which decoders could decode a payload
         // this is not necessarily true, so we catch failed parses later on also and remove them from the results
         val possibleDecoders = decoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+
+        Logger.log(possibleDecoders)
 
         return possibleDecoders.mapNotNull {
             try {
