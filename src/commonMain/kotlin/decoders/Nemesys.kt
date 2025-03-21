@@ -59,7 +59,7 @@ object Nemesys : ByteWitchDecoder {
         return result.toString()
     }
 
-    private fun bitCongruence(b1: Byte, b2: Byte): Double {
+    fun bitCongruence(b1: Byte, b2: Byte): Double {
         var count = 0
         for (i in 0 until 8) {
             if (((b1.toInt() shr i) and 1) == ((b2.toInt() shr i) and 1)) {
@@ -69,7 +69,7 @@ object Nemesys : ByteWitchDecoder {
         return count / 8.0
     }
 
-    private fun computeDeltaBC(message: ByteArray): DoubleArray {
+    fun computeDeltaBC(message: ByteArray): DoubleArray {
         val n = message.size
         if (n < 3) return DoubleArray(0) // return empty array if it's too short
 
@@ -120,7 +120,7 @@ object Nemesys : ByteWitchDecoder {
 
     // get all local minimum and maximum of smoothed deltaBC
     // return List(Index, extrema) with extrema meaning(-1:minimum, 0:nothing, 1:maximum)
-    private fun findExtremaInList(smoothedDeltaBC: DoubleArray): List<Pair<Int, Int>> {
+    fun findExtremaInList(smoothedDeltaBC: DoubleArray): List<Pair<Int, Int>> {
         val extrema = mutableListOf<Pair<Int, Int>>()
 
         // get extrema of first point
@@ -162,7 +162,7 @@ object Nemesys : ByteWitchDecoder {
 
     // identify rising edges of minimums to maximums
     // extrema must be in format List(Index, min/max) with min/max meaning(-1:minimum, 0:nothing, 1:maximum)
-    private fun findRisingDeltas(extrema: List<Pair<Int, Int>>): List<Pair<Int, Int>> {
+    fun findRisingDeltas(extrema: List<Pair<Int, Int>>): List<Pair<Int, Int>> {
         val risingDeltas = mutableListOf<Pair<Int, Int>>()
         var lastMinIndex: Int? = null
         for ((index, extremaType) in extrema) {
@@ -179,7 +179,8 @@ object Nemesys : ByteWitchDecoder {
     }
 
     // find inflection point based on maximum delta in rising deltas
-    private fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, smoothedDeltaBC: DoubleArray): List<Int> {
+    // it adds +2 on the result to because the segment highlighting counts differently
+    fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, smoothedDeltaBC: DoubleArray): List<Int> {
         val boundaries = mutableListOf<Int>()
 
         for ((minIndex, maxIndex) in risingDeltas) {
