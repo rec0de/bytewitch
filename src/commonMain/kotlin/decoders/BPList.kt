@@ -310,6 +310,9 @@ object BPFill : BPListObject() {
 data class BPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): BPListObject() {
     override fun toString() = value.toString()
 }
+data class BPUInt(val value: ULong, override val sourceByteRange: Pair<Int, Int>): BPListObject() {
+    override fun toString() = value.toString()
+}
 data class BPReal(val value: Double, override val sourceByteRange: Pair<Int, Int>): BPListObject() {
     override fun renderHtmlValue(): String {
 

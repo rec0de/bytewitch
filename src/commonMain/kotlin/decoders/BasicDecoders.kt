@@ -17,11 +17,13 @@ object Utf8Decoder : ByteWitchDecoder {
     override fun confidence(data: ByteArray): Double {
         val effectiveData = stripNullTerminator(data)
 
+        val nullTerminatorBonus = if(effectiveData.size == data.size-1) 0.2 else 0.0
+
         try {
             val score = looksLikeUtf8String(effectiveData)
             //Logger.log(data.decodeToString())
             //Logger.log(score)
-            return score
+            return min(score+nullTerminatorBonus, 1.0)
         } catch (e: Exception) {
             return 0.0
         }
@@ -212,7 +214,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "160302" to Pair("TLS 1.1 record header", null),
         "160303" to Pair("TLS 1.2 record header", null),
         "160304" to Pair("TLS 1.3 record header", null),
-        "16fefd" to Pair("DTLS 1.2 record header", null)
+        "16fefd" to Pair("DTLS 1.2 record header", null),
+        "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
