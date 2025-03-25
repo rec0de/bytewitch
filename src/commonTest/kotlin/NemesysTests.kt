@@ -3,6 +3,7 @@ import bitmage.fromHex
 import decoders.BWAnnotatedData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NemesysTests {
@@ -185,5 +186,41 @@ class NemesysTests {
         val expected = emptyList<Int>()
         val result = Nemesys.findInflectionPoints(risingDeltas, smoothedDeltaBC)
         assertEquals(expected, result)
+    }
+
+    @Test
+    fun testIsPrintableChar() {
+        assertTrue(Nemesys.isPrintableChar(0x41)) // 'A'
+        assertTrue(Nemesys.isPrintableChar(0x7E)) // '~'
+        assertTrue(Nemesys.isPrintableChar(0x20)) // ' '
+        assertTrue(Nemesys.isPrintableChar(0x09)) // '\t'
+        assertTrue(Nemesys.isPrintableChar(0x0A)) // '\n'
+        assertTrue(Nemesys.isPrintableChar(0x0D)) // '\r'
+
+        assertFalse(Nemesys.isPrintableChar(0x19)) // Non-printable
+    }
+
+    @Test
+    fun testFieldIsTextSegment() {
+        val message = "48656C6C6F20576F726C6421".fromHex() // "Hello World!"
+
+        assertTrue(Nemesys.fieldIsTextSegment(0, message.size, message)) // Whole message is text
+        assertTrue(Nemesys.fieldIsTextSegment(0, 5, message)) // "Hello"
+        assertFalse(Nemesys.fieldIsTextSegment(0, 6, "48656C6C6F00".fromHex())) // "Hello" + non-printable
+    }
+
+    @Test
+    fun testMergeCharSequences() {
+        val message = "48656C6C6F00576F726C6421".fromHex() // "Hello\0World!"
+        val boundaries = mutableListOf(5, 6) // Segments: ["Hello"], ["\0"], ["World!"]
+
+        val merged = Nemesys.mergeCharSequences(boundaries, message)
+        assertEquals(mutableListOf(5, 6), merged) // No merge since '\0' breaks text sequence
+
+        val message2 = "48656C6C6F20576F726C6421".fromHex() // "Hello World!"
+        val boundaries2 = mutableListOf(6) // ["Hello "], ["World!"]
+
+        val merged2 = Nemesys.mergeCharSequences(boundaries2, message2)
+        assertEquals(mutableListOf(), merged2) // Full merge, as both are text segments
     }
 }

@@ -41,7 +41,7 @@ object Nemesys : ByteWitchDecoder {
     private fun highlightSegments(data: ByteArray, boundaries: List<Int>): String {
         if (boundaries.isEmpty()) return data.hex() // if no segments are found
 
-        val colors = listOf("#F6B9D3", "#FFE5B8", "#C9D8A3", "#F3DDC6", "#FEF1B0") // different colors
+        val colors = listOf("#F6B9D3", "#FFE5B8", "#C9D8A3", "#F3DDC6", "#AEC6CF") // different colors
         var colorIndex = 0
 
         val result = StringBuilder()
@@ -59,6 +59,7 @@ object Nemesys : ByteWitchDecoder {
         return result.toString()
     }
 
+    // check how similar consecutive bytes are
     fun bitCongruence(b1: Byte, b2: Byte): Double {
         var count = 0
         for (i in 0 until 8) {
@@ -69,6 +70,7 @@ object Nemesys : ByteWitchDecoder {
         return count / 8.0
     }
 
+    // get the delta of the bit congruence. Checkout how much consecutive bytes differ
     fun computeDeltaBC(message: ByteArray): DoubleArray {
         val n = message.size
         if (n < 3) return DoubleArray(0) // return empty array if it's too short
@@ -86,7 +88,9 @@ object Nemesys : ByteWitchDecoder {
         return deltaBC
     }
 
+    // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
     private fun applyGaussianFilter(deltaBC: DoubleArray, sigma: Double): DoubleArray {
+        // TODO maybe change gaussian filter a bit. It's still not good enough and only lower the values
         val radius = ceil(3 * sigma).toInt()
         val size = 2 * radius + 1 // calc kernel size
         val kernel = DoubleArray(size)  // kernel as DoubleArray
@@ -180,7 +184,7 @@ object Nemesys : ByteWitchDecoder {
 
     // find inflection point based on maximum delta in rising deltas
     // it adds +2 on the result to because the segment highlighting counts differently
-    fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, smoothedDeltaBC: DoubleArray): List<Int> {
+    fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, smoothedDeltaBC: DoubleArray): MutableList<Int> {
         val boundaries = mutableListOf<Int>()
 
         for ((minIndex, maxIndex) in risingDeltas) {
@@ -201,6 +205,57 @@ object Nemesys : ByteWitchDecoder {
         return boundaries
     }
 
+    // check if complete field consists of printable chars
+    fun fieldIsTextSegment(start: Int, end: Int, message: ByteArray): Boolean {
+        for (j in start until end) {
+            if (!isPrintableChar(message[j])) {
+                return false
+            }
+        }
+        return true
+    }
+
+    // check if byte is a printable char
+    fun isPrintableChar(byte: Byte): Boolean {
+        return (byte == 0x09.toByte() || byte == 0x0A.toByte() || byte == 0x0D.toByte() || (byte in 0x20..0x7E))
+    }
+
+    // merge adjacent fields together if both are printable char values
+    fun mergeCharSequences(boundaries: MutableList<Int>, message: ByteArray): List<Int> {
+        if (boundaries.isEmpty()) return boundaries
+        boundaries.add(0, 0)
+
+        val mergedBoundaries = mutableListOf<Int>()
+        var i = 0
+
+        while (i < boundaries.size) {
+            // set start and end of segment
+            val start = boundaries[i]
+            val end = if (i + 1 < boundaries.size) boundaries[i + 1] else message.size
+
+            if (fieldIsTextSegment(start, end, message)) {
+                // merge following segments together if they are also a text segments
+                while (i + 1 < boundaries.size) {
+                    // set new start and end of segment
+                    val nextStart = boundaries[i + 1]
+                    val nextEnd = if (i + 2 < boundaries.size) boundaries[i + 2] else message.size
+
+                    if (fieldIsTextSegment(nextStart, nextEnd, message)) {
+                        i++ // skip following segment because we merged it together
+                    } else {
+                        break
+                    }
+                }
+            }
+
+            mergedBoundaries.add(start)
+            i++
+        }
+
+        // delete the first element of the list because it only shows the start=0 point
+        return mergedBoundaries.drop(1)
+    }
+
     // find segmentation boundaries
     private fun findSegmentBoundaries(message: ByteArray): List<Int> {
         val deltaBC = computeDeltaBC(message)
@@ -218,7 +273,12 @@ object Nemesys : ByteWitchDecoder {
         val risingDeltas = findRisingDeltas(extrema)
 
         // find inflection point in risingDeltas -> those are considered as boundaries
-        val boundaries = findInflectionPoints(risingDeltas, smoothedDeltaBC)
+        val preBoundaries = findInflectionPoints(risingDeltas, smoothedDeltaBC)
+
+        // merge consecutive text segments together
+        val boundaries = mergeCharSequences(preBoundaries, message)
+
+        Logger.log(boundaries)
 
         return boundaries
     }
