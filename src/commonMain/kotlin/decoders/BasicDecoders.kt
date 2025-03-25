@@ -215,7 +215,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "160303" to Pair("TLS 1.2 record header", null),
         "160304" to Pair("TLS 1.3 record header", null),
         "16fefd" to Pair("DTLS 1.2 record header", null),
-        "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1")
+        "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1"),
+        "4d500305" to Pair("Apple MsgPack header", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

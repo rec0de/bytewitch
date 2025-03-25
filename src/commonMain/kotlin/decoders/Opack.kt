@@ -116,12 +116,15 @@ class OpackParser {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
 
+        // NOTE: deviation from prior documentation ("Analyzing Apple’s private wireless communication protocols with a focus on security and privacy")
+        // instead of linar byte length increments (1, 2, 3, 4) it seems apple uses exponential increments (1, 2, 4, 8)
+        // is this an error in the documentation, or do both versions exist?
         return when(type) {
             in 0x08..0x2f -> OPInt((type - 8).toLong(), Pair(start, lastConsumedBytePosition))
             0x30 -> OPInt(readInt(bytes, 1).toLong(), Pair(start, lastConsumedBytePosition))
             0x31 -> OPInt(readInt(bytes, 2).toLong(), Pair(start, lastConsumedBytePosition))
-            0x32 -> OPInt(readInt(bytes, 3).toLong(), Pair(start, lastConsumedBytePosition))
-            0x33 -> OPInt(readInt(bytes, 4).toLong(), Pair(start, lastConsumedBytePosition))
+            0x32 -> OPInt(readInt(bytes, 4).toLong(), Pair(start, lastConsumedBytePosition))
+            0x33 -> OPInt(readInt(bytes, 8).toLong(), Pair(start, lastConsumedBytePosition))
             else -> throw Exception("Unexpected OPACK int ${bytes.hex()}")
         }
     }
@@ -265,11 +268,11 @@ abstract class OpackObject : ByteWitchResult {
 
 
 class OPTrue(bytePosition: Int) : OpackObject() {
-    override val sourceByteRange = Pair(bytePosition, bytePosition)
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "true"
 }
 class OPFalse(bytePosition: Int) : OpackObject() {
-    override val sourceByteRange = Pair(bytePosition, bytePosition)
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "false"
 }
 
