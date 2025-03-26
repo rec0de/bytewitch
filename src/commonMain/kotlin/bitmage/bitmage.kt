@@ -64,7 +64,6 @@ fun Int.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder, explicitlySi
     else {
         value - (1 shl (bytes.size*8))
     }
-
 }
 
 fun Long.toBytes(byteOrder: ByteOrder): ByteArray {

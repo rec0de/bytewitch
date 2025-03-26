@@ -135,26 +135,26 @@ open class ParseCompanion {
         return str
     }
 
-    protected fun readInt(bytes: ByteArray, size: Int, explicitlySigned: Boolean = false): Int {
-        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG, explicitlySigned)
+    protected fun readInt(bytes: ByteArray, size: Int, explicitlySigned: Boolean = false, byteOrder: ByteOrder = ByteOrder.BIG): Int {
+        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), byteOrder, explicitlySigned)
         parseOffset += size
         return int
     }
 
-    protected fun readLong(bytes: ByteArray, size: Int): Long {
-        val int = Long.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+    protected fun readLong(bytes: ByteArray, size: Int, byteOrder: ByteOrder = ByteOrder.BIG): Long {
+        val int = Long.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), byteOrder)
         parseOffset += size
         return int
     }
 
-    protected fun readUInt(bytes: ByteArray, size: Int): UInt {
-        val int = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+    protected fun readUInt(bytes: ByteArray, size: Int, byteOrder: ByteOrder = ByteOrder.BIG): UInt {
+        val int = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), byteOrder)
         parseOffset += size
         return int
     }
 
-    protected fun readULong(bytes: ByteArray, size: Int): ULong {
-        val int = ULong.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+    protected fun readULong(bytes: ByteArray, size: Int, byteOrder: ByteOrder = ByteOrder.BIG): ULong {
+        val int = ULong.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), byteOrder)
         parseOffset += size
         return int
     }

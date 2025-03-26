@@ -2,14 +2,16 @@ package decoders
 
 import ByteWitch
 import Date
+import ParseCompanion
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
 import htmlEscape
 import kotlin.math.absoluteValue
+import kotlin.math.exp
 
 
-class OpackParser {
+class OpackParser : ParseCompanion() {
 
     companion object : ByteWitchDecoder {
         override val name = "opack"
@@ -48,7 +50,6 @@ class OpackParser {
         }
     }
 
-    private var parseOffset = 0
     private var sourceOffset = 0
 
     private val lastConsumedBytePosition: Int
@@ -118,12 +119,13 @@ class OpackParser {
         // NOTE: deviation from prior documentation ("Analyzing Apple’s private wireless communication protocols with a focus on security and privacy")
         // instead of linar byte length increments (1, 2, 3, 4) it seems apple uses exponential increments (1, 2, 4, 8)
         // is this an error in the documentation, or do both versions exist?
+        // we also assume these are all signed - i don't actually know if that's the case, but we also don't have a counterexample
         return when(type) {
             in 0x08..0x2f -> OPInt((type - 8).toLong(), Pair(start, lastConsumedBytePosition))
-            0x30 -> OPInt(readInt(bytes, 1).toLong(), Pair(start, lastConsumedBytePosition))
-            0x31 -> OPInt(readInt(bytes, 2).toLong(), Pair(start, lastConsumedBytePosition))
-            0x32 -> OPInt(readInt(bytes, 4).toLong(), Pair(start, lastConsumedBytePosition))
-            0x33 -> OPInt(readInt(bytes, 8).toLong(), Pair(start, lastConsumedBytePosition))
+            0x30 -> OPInt(readInt(bytes, 1, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
+            0x31 -> OPInt(readInt(bytes, 2, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
+            0x32 -> OPInt(readInt(bytes, 4, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
+            0x33 -> OPInt(readLong(bytes, 8, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             else -> throw Exception("Unexpected OPACK int ${bytes.hex()}")
         }
     }
@@ -133,10 +135,10 @@ class OpackParser {
         val type = readInt(bytes, 1)
         when(type) {
             0x35 -> {
-                return OPReal(readBytes(bytes, 4).readFloat(ByteOrder.BIG).toDouble(), Pair(start, lastConsumedBytePosition))
+                return OPReal(readBytes(bytes, 4).readFloat(ByteOrder.LITTLE).toDouble(), Pair(start, lastConsumedBytePosition))
             }
             0x36 -> {
-                return OPReal(readBytes(bytes, 8).readDouble(ByteOrder.BIG), Pair(start, lastConsumedBytePosition))
+                return OPReal(readBytes(bytes, 8).readDouble(ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK float ${bytes.hex()}")
         }
@@ -153,15 +155,15 @@ class OpackParser {
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x62 -> {
-                val length = readInt(bytes, 2)
+                val length = readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x63 -> {
-                val length = readInt(bytes, 3)
+                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x64 -> {
-                val length = readInt(bytes, 4)
+                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK string ${bytes.hex()}")
@@ -179,15 +181,15 @@ class OpackParser {
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x92 -> {
-                val length = readInt(bytes, 2)
+                val length = readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x93 -> {
-                val length = readInt(bytes, 3)
+                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x94 -> {
-                val length = readInt(bytes, 4)
+                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK data ${bytes.hex()}")
@@ -240,18 +242,6 @@ class OpackParser {
         }
 
         return OPDict(entries, Pair(start, lastConsumedBytePosition))
-    }
-
-    private fun readBytes(bytes: ByteArray, length: Int): ByteArray {
-        val sliced = bytes.sliceArray(parseOffset until parseOffset + length)
-        parseOffset += length
-        return sliced
-    }
-
-    private fun readInt(bytes: ByteArray, size: Int): Int {
-        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
-        parseOffset += size
-        return int
     }
 }
 
