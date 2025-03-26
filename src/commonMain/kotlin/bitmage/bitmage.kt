@@ -53,7 +53,19 @@ fun UInt.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): UInt {
     check(bytes.size <= 4) { "trying to parse oversized bytearray ${bytes.hex()} as UInt" }
     return ULong.fromBytes(bytes, byteOrder).toUInt()
 }
-fun Int.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder) = UInt.fromBytes(bytes, byteOrder).toInt()
+fun Int.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder, explicitlySigned: Boolean = false): Int {
+    val value = UInt.fromBytes(bytes, byteOrder).toInt()
+
+    // usually, we only get negative integers when the input is 4 bytes long and represents a signed negative int
+    // however, we might want to interpret 1, 2, or 3-byte signed ints. these will be negative if their highest bit
+    // is set, i.e. if the unsigned value is >= 1 shl bit-size
+    return if(!explicitlySigned || bytes.size == 4 || value < 1 shl (bytes.size*8 - 1))
+        value
+    else {
+        value - (1 shl (bytes.size*8))
+    }
+
+}
 
 fun Long.toBytes(byteOrder: ByteOrder): ByteArray {
     val bytesBE = byteArrayOf(

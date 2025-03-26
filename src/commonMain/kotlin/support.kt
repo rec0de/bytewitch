@@ -5,6 +5,7 @@ import kotlin.math.min
 
 
 // replicate required Date functionality from JVM
+// timestamp is milliseconds since January 1, 1970, 00:00:00
 expect class Date(timestamp: Long) {
     fun toAppleTimestamp(): Double
 }
@@ -134,14 +135,26 @@ open class ParseCompanion {
         return str
     }
 
-    protected fun readInt(bytes: ByteArray, size: Int): Int {
-        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+    protected fun readInt(bytes: ByteArray, size: Int, explicitlySigned: Boolean = false): Int {
+        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG, explicitlySigned)
+        parseOffset += size
+        return int
+    }
+
+    protected fun readLong(bytes: ByteArray, size: Int): Long {
+        val int = Long.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
         parseOffset += size
         return int
     }
 
     protected fun readUInt(bytes: ByteArray, size: Int): UInt {
         val int = UInt.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
+        parseOffset += size
+        return int
+    }
+
+    protected fun readULong(bytes: ByteArray, size: Int): ULong {
+        val int = ULong.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
         parseOffset += size
         return int
     }

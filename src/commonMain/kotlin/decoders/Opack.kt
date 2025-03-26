@@ -9,7 +9,6 @@ import htmlEscape
 import kotlin.math.absoluteValue
 
 
-// OPACK encodes a subset of data that can be encoded in BPLists - we'll just use the existing BPList wrapper classes for now
 class OpackParser {
 
     companion object : ByteWitchDecoder {
@@ -266,19 +265,31 @@ abstract class OpackObject : ByteWitchResult {
     }
 }
 
-
 class OPTrue(bytePosition: Int) : OpackObject() {
     override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "true"
 }
+
 class OPFalse(bytePosition: Int) : OpackObject() {
     override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "false"
 }
 
+class OPNull(bytePosition: Int) : OpackObject() {
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
+    override fun toString() = "null"
+}
+
 data class OPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
+    constructor(value: Int, sourceByteRange: Pair<Int, Int>) : this(value.toLong(), sourceByteRange)
     override fun toString() = value.toString()
 }
+
+data class OPUInt(val value: ULong, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
+    constructor(value: UInt, sourceByteRange: Pair<Int, Int>) : this(value.toULong(), sourceByteRange)
+    override fun toString() = value.toString()
+}
+
 data class OPReal(val value: Double, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
     override fun renderHtmlValue(): String {
 
@@ -303,13 +314,22 @@ data class OPReal(val value: Double, override val sourceByteRange: Pair<Int, Int
         return Date((value*1000).toLong() + offset)
     }
 }
-data class OPDate(val timestamp: Double, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+
+data class OPDate(val timestamp: Double, override val sourceByteRange: Pair<Int, Int>, val isAppleEpoch: Boolean = true) : OpackObject() {
     override fun toString() = "BPDate($timestamp)"
 
     override fun renderHtmlValue() = "<div class=\"bpvalue\" $byteRangeDataTags>${asDate()}</div>"
 
-    fun asDate(): Date = dateFromAppleTimestamp(timestamp)
+    fun asDate(): Date {
+        return if(isAppleEpoch) {
+            dateFromAppleTimestamp(timestamp)
+        }
+        else {
+            Date((timestamp*1000).toLong())
+        }
+    }
 }
+
 class OPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
     override fun toString() = "BPData(${value.hex()})"
 
@@ -358,4 +378,16 @@ data class OPDict(val values: Map<OpackObject, OpackObject>, override val source
     }
 
     override fun renderHtmlValue() = "<div class=\"bpvalue\">${renderHTML()}</div>"
+}
+
+class OPTaggedData(val value: ByteArray, val type: Int, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+    override fun toString() = "OPData(${value.hex()})"
+
+    override fun renderHtmlValue(): String {
+        // try to decode nested stuff
+        val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
+
+        val payloadHTML = decode?.renderHTML() ?: "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.second-value.size, sourceByteRange.second)}>0x${value.hex()}</div>"
+        return "<div class=\"roundbox opack\" $byteRangeDataTags><div class=\"bpvalue\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.second-value.size)}>type $type</div>$payloadHTML</div>"
+    }
 }
