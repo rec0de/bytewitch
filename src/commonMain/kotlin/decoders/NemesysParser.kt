@@ -1,41 +1,23 @@
 package decoders
 
-import ByteWitch
-import Logger
-import ParseCompanion
-import bitmage.fromHex
 import bitmage.hex
-import org.w3c.dom.mediacapture.DoubleRange
-import kotlin.math.exp
 import kotlin.math.ceil
-import kotlin.math.round
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
+import kotlin.math.exp
 
-object Nemesys : ByteWitchDecoder {
-    override val name = "Nemesys"
+class NemesysParser {
 
-    override fun tryhardDecode(data: ByteArray) = null
+    companion object : ByteWitchDecoder {
+        override val name = "nemesysparser"
 
-    override fun decodesAsValid(data: ByteArray) = Pair(true, null)
-
-    override fun confidence(data: ByteArray) = if(data.size >= 3) 0.76 else 0.00
-
-    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        // for segmentation
-        val segmentBoundaries = findSegmentBoundaries(data)
-
-        // show amount of segmentations
-        val segmentInfo = "Detected ${segmentBoundaries.size} boundaries: "
-
-        // hex representation with colored segments
-        val hexData = highlightSegments(data, segmentBoundaries)
-
-        return if (inlineDisplay) {
-            BWAnnotatedData(segmentInfo + hexData, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
-        } else {
-            BWAnnotatedData("$segmentInfo $hexData", "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
+        override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+            return NemesysParser().parse(data, sourceOffset)
         }
+
+        override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+            return null
+        }
+
+        override fun confidence(data: ByteArray) = if(data.size >= 3) 0.76 else 0.00
     }
 
     private fun highlightSegments(data: ByteArray, boundaries: List<Int>): String {
@@ -71,13 +53,13 @@ object Nemesys : ByteWitchDecoder {
     }
 
     // get the delta of the bit congruence. Checkout how much consecutive bytes differ
-    fun computeDeltaBC(message: ByteArray): DoubleArray {
-        val n = message.size
+    fun computeDeltaBC(bytes: ByteArray): DoubleArray {
+        val n = bytes.size
         if (n < 3) return DoubleArray(0) // return empty array if it's too short
 
         val bc = DoubleArray(n - 1)
         for (i in 0 until n - 1) {
-            bc[i] = bitCongruence(message[i], message[i + 1])
+            bc[i] = bitCongruence(bytes[i], bytes[i + 1])
         }
 
         val deltaBC = DoubleArray(n - 2)
@@ -90,7 +72,6 @@ object Nemesys : ByteWitchDecoder {
 
     // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
     private fun applyGaussianFilter(deltaBC: DoubleArray, sigma: Double): DoubleArray {
-        // TODO maybe change gaussian filter a bit. It's still not good enough and only lower the values
         val radius = ceil(3 * sigma).toInt()
         val size = 2 * radius + 1 // calc kernel size
         val kernel = DoubleArray(size)  // kernel as DoubleArray
@@ -206,9 +187,9 @@ object Nemesys : ByteWitchDecoder {
     }
 
     // check if complete field consists of printable chars
-    fun fieldIsTextSegment(start: Int, end: Int, message: ByteArray): Boolean {
+    fun fieldIsTextSegment(start: Int, end: Int, bytes: ByteArray): Boolean {
         for (j in start until end) {
-            if (!isPrintableChar(message[j])) {
+            if (!isPrintableChar(bytes[j])) {
                 return false
             }
         }
@@ -220,51 +201,52 @@ object Nemesys : ByteWitchDecoder {
         return (byte == 0x09.toByte() || byte == 0x0A.toByte() || byte == 0x0D.toByte() || (byte in 0x20..0x7E))
     }
 
-    // merge adjacent fields together if both are printable char values
-    fun mergeCharSequences(boundaries: MutableList<Int>, message: ByteArray): List<Int> {
-        if (boundaries.isEmpty()) return boundaries
+    // merge consecutive fields together if both are printable char values
+    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        if (boundaries.isEmpty()) return listOf<Pair<Int, NemesysField>>()
         boundaries.add(0, 0)
 
-        val mergedBoundaries = mutableListOf<Int>()
+        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
         var i = 0
 
         while (i < boundaries.size) {
             // set start and end of segment
             val start = boundaries[i]
-            val end = if (i + 1 < boundaries.size) boundaries[i + 1] else message.size
+            val end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
 
-            if (fieldIsTextSegment(start, end, message)) {
+            var fieldType = NemesysField.UNKNOWN
+            if (fieldIsTextSegment(start, end, bytes)) {
                 // merge following segments together if they are also a text segments
                 while (i + 1 < boundaries.size) {
                     // set new start and end of segment
                     val nextStart = boundaries[i + 1]
-                    val nextEnd = if (i + 2 < boundaries.size) boundaries[i + 2] else message.size
+                    val nextEnd = if (i + 2 < boundaries.size) boundaries[i + 2] else bytes.size
 
-                    if (fieldIsTextSegment(nextStart, nextEnd, message)) {
+                    if (fieldIsTextSegment(nextStart, nextEnd, bytes)) {
                         i++ // skip following segment because we merged it together
+                        fieldType = NemesysField.STRING // we have two consecutive text fields interpret it as a string
                     } else {
                         break
                     }
                 }
             }
 
-            mergedBoundaries.add(start)
+            mergedBoundaries.add(Pair(start, fieldType))
             i++
         }
 
-        // delete the first element of the list because it only shows the start=0 point
-        return mergedBoundaries.drop(1)
+        return mergedBoundaries
     }
 
     // find segmentation boundaries
-    private fun findSegmentBoundaries(message: ByteArray): List<Int> {
-        val deltaBC = computeDeltaBC(message)
+    private fun findSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        val deltaBC = computeDeltaBC(bytes)
 
         // sigma should depend on the field length: Nemesys paper on page 5
         val smoothedDeltaBC = applyGaussianFilter(deltaBC, 0.6)
 
         // Safety check
-        if (smoothedDeltaBC.isEmpty()) return mutableListOf<Int>()
+        if (smoothedDeltaBC.isEmpty()) return listOf<Pair<Int, NemesysField>>()
 
         // find extrema of smoothedDeltaBC
         val extrema = findExtremaInList(smoothedDeltaBC)
@@ -276,8 +258,49 @@ object Nemesys : ByteWitchDecoder {
         val preBoundaries = findInflectionPoints(risingDeltas, smoothedDeltaBC)
 
         // merge consecutive text segments together
-        val boundaries = mergeCharSequences(preBoundaries, message)
+        val boundaries = mergeCharSequences(preBoundaries, bytes)
 
         return boundaries
+    }
+
+    // this finds all segment boundaries and returns a nemesys object that can be called to get the html code
+    fun parse(bytes: ByteArray, sourceOffset: Int): NemesysObject {
+        val segments = findSegmentBoundaries(bytes)
+
+        return NemesysObject(segments, bytes, Pair(sourceOffset, sourceOffset+bytes.size))
+    }
+}
+
+enum class NemesysField {
+    UNKNOWN, STRING
+}
+
+// this object can be used to get useable html code from the nemesys parser
+class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: ByteArray, override val sourceByteRange: Pair<Int, Int>?) : ByteWitchResult {
+    override fun renderHTML(): String {
+        val sourceOffset = sourceByteRange?.first ?: 0
+
+        // go through complete segment list and extract the nemesys values as useable html code
+        var renderedFieldContents = segments.mapIndexed { index, (start, fieldType) ->
+            val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
+            val segmentBytes = bytes.sliceArray(start until end)
+
+            val valueLengthTag = " data-start='${start+sourceOffset}' data-end='${end+sourceOffset}'"
+
+            // differ between field types
+            when (fieldType) {
+                NemesysField.STRING -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"</div>"
+                NemesysField.UNKNOWN -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+            }
+        }
+
+        // put all nemesys values in one nemesys field
+        var renderedContent = "<div class=\"nemesysfield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
+
+        if (renderedContent.isEmpty()) {
+            renderedContent = "∅"
+        }
+
+        return "<div class=\"nemesys roundbox\" $byteRangeDataTags>${renderedContent}</div>"
     }
 }
