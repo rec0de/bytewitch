@@ -19,8 +19,6 @@ object Utf8Decoder : ByteWitchDecoder {
 
         try {
             val score = looksLikeUtf8String(effectiveData)
-            //Logger.log(data.decodeToString())
-            //Logger.log(score)
             return min(score+nullTerminatorBonus, 1.0)
         } catch (e: Exception) {
             return 0.0
@@ -60,7 +58,7 @@ object Utf16Decoder : ByteWitchDecoder {
         }
     }
 
-    override fun decodesAsValid(data: ByteArray) = Pair(Utf8Decoder.confidence(data) > 0.6, null)
+    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
@@ -277,7 +275,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "160304" to Pair("TLS 1.3 record header", null),
         "16fefd" to Pair("DTLS 1.2 record header", null),
         "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1"),
-        "4d500305" to Pair("Apple MsgPack header", null)
+        "4d500305" to Pair("Apple MsgPack header", null),
+        "7b22" to Pair("JSON dict", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
