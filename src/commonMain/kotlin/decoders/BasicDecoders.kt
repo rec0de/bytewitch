@@ -1,9 +1,7 @@
 package decoders
 
-import bitmage.decodeAsUTF16BE
-import bitmage.fromHex
-import bitmage.hex
-import bitmage.indexOfSubsequence
+import Logger
+import bitmage.*
 import htmlEscape
 import looksLikeUtf16String
 import looksLikeUtf8String
@@ -21,8 +19,6 @@ object Utf8Decoder : ByteWitchDecoder {
 
         try {
             val score = looksLikeUtf8String(effectiveData)
-            //Logger.log(data.decodeToString())
-            //Logger.log(score)
             return min(score+nullTerminatorBonus, 1.0)
         } catch (e: Exception) {
             return 0.0
@@ -62,7 +58,7 @@ object Utf16Decoder : ByteWitchDecoder {
         }
     }
 
-    override fun decodesAsValid(data: ByteArray) = Pair(Utf8Decoder.confidence(data) > 0.6, null)
+    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
@@ -73,6 +69,69 @@ object Utf16Decoder : ByteWitchDecoder {
             decode(data, 0)
         else
             null
+    }
+}
+
+object IEEE754 : ByteWitchDecoder {
+    override val name = "IEEE754"
+
+    private fun looksReasonable(positive: Boolean, exponent: Int, mantissa: Long, value: Double, isDouble: Boolean): Double {
+        val positiveBonus = if(positive) 0.1 else 0.0
+        val mantissaComplexity = if(isDouble) mantissa.countTrailingZeroBits().toDouble() / 52 else mantissa.countTrailingZeroBits().toDouble() / 23
+        val magnitudeScore = (12 - abs(exponent)).toDouble() / 18
+        val stringLength = (8.0 - value.toString().length) / 8
+
+        val score = positiveBonus + mantissaComplexity + magnitudeScore + stringLength
+        //Logger.log("number plausibility: positive $positiveBonus exponent $exponent / $magnitudeScore roundness $mantissaComplexity stringLength $stringLength total $score")
+        return score
+    }
+
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        when(data.size) {
+            4 -> {
+                val partsBE = dissectFloat(data.readInt(ByteOrder.BIG))
+                val valueBE = data.readFloat(ByteOrder.BIG).toDouble()
+                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third.toLong(), valueBE, isDouble = false)
+                if(scoreBE > 0.75)
+                    return BWString("Float BE: $valueBE", Pair(sourceOffset, sourceOffset+4))
+
+                val partsLE = dissectFloat(data.readInt(ByteOrder.LITTLE))
+                val valueLE = data.readFloat(ByteOrder.LITTLE).toDouble()
+                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third.toLong(), valueLE, isDouble = false)
+                if(scoreLE > 0.75)
+                    return BWString("Float LE: $valueLE", Pair(sourceOffset, sourceOffset+4))
+                throw Exception("not a reasonable float / double")
+            }
+            8 -> {
+                val partsBE = dissectDouble(data.readLong(ByteOrder.BIG))
+                val valueBE = data.readDouble(ByteOrder.BIG)
+                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third, valueBE, isDouble = true)
+                if(scoreBE > 0.75)
+                    return BWString("Double BE: $valueBE", Pair(sourceOffset, sourceOffset+8))
+
+                val partsLE = dissectDouble(data.readLong(ByteOrder.LITTLE))
+                val valueLE = data.readDouble(ByteOrder.LITTLE)
+                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third, valueLE, isDouble = true)
+                if(scoreLE > 0.75)
+                    return BWString("Double LE: $valueLE", Pair(sourceOffset, sourceOffset+8))
+                throw Exception("not a reasonable float / double")
+            }
+            else -> throw Exception("not a reasonable float / double size")
+        }
+    }
+
+    private fun dissectFloat(data: Int): Triple<Boolean, Int, Int> {
+        val signPositive = data >= 0 // sign bit actually matches Int sign bit
+        val exponent = ((data and 0x7f800000) shr 23) - 127
+        val mantissa = data and 0x007fffff // clear top bit, which is part of exponent
+        return Triple(signPositive, exponent, mantissa)
+    }
+
+    private fun dissectDouble(data: Long): Triple<Boolean, Int, Long> {
+        val signPositive = data >= 0 // sign bit actually matches Long sign bit
+        val exponent = (((data and 0x7ff0000000000000) shr 52) - 1023).toInt()
+        val mantissa = (data and 0x000fffffffffffff)
+        return Triple(signPositive, exponent, mantissa)
     }
 }
 
@@ -216,7 +275,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "160304" to Pair("TLS 1.3 record header", null),
         "16fefd" to Pair("DTLS 1.2 record header", null),
         "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1"),
-        "4d500305" to Pair("Apple MsgPack header", null)
+        "4d500305" to Pair("Apple MsgPack header", null),
+        "7b22" to Pair("JSON dict", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

@@ -13,7 +13,19 @@ class MsgPackParser : ParseCompanion() {
         override val name = "MsgPack"
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-            return MsgPackParser().parseTopLevel(data, sourceOffset)
+            // remove prefix 4d500305 (apple MsgPack header)
+            val effectiveData: ByteArray
+            val effectiveSourceOffset: Int
+            if(data.untilIndex(4).contentEquals("4d500305".fromHex())) {
+                effectiveData = data.fromIndex(4)
+                effectiveSourceOffset = sourceOffset + 4
+            }
+            else {
+                effectiveData = data
+                effectiveSourceOffset = sourceOffset
+            }
+
+            return MsgPackParser().parseTopLevel(effectiveData, effectiveSourceOffset)
         }
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

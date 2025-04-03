@@ -1,5 +1,6 @@
 import bitmage.ByteOrder
 import bitmage.fromBytes
+import bitmage.hex
 import kotlin.math.max
 import kotlin.math.min
 
@@ -56,8 +57,6 @@ fun looksLikeUtf16String(string: String): Double {
         }
     }
 
-    Logger.log(bins.joinToString(" "))
-    
     val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], weirdASCII.length)
     val multipleRares = rares.count { it > 0 } > 1
     val rareNonAsciiShare = rares.sum().toDouble() / (string.length - printableASCII.length)
@@ -65,7 +64,7 @@ fun looksLikeUtf16String(string: String): Double {
     // multiple different rare characters are super suspicious
     // a message consisting of only rare characters from one particular bin, however, is plausible
     // and single rare CJK characters may also occur in otherwise common CJK text
-    val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) rareNonAsciiShare * 5 else if(hasRareCJK) rareNonAsciiShare else (1-rareNonAsciiShare)
+    val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) rareNonAsciiShare * 2 else if(hasRareCJK || rareNonAsciiShare < 0.05) rareNonAsciiShare else (1-rareNonAsciiShare)
 
     // CJK characters are the most likely to generate "randomly" and should usually not co-occur with non-CJK characters, excluding common ASCII
     val mixedCJKnonCJKPenalty = if((bins[0]+bins[1]+bins[2]) > 0 && (bins[5] + bins[6] + bins[8] + bins[9] + bins[11] + bins[12] + bins[15] + bins[16]) > 0) 1.0 else 0.0
@@ -82,7 +81,7 @@ fun looksLikeUtf16String(string: String): Double {
     val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
 
     val score = max(0.0, 1.0 + surrogatesBonus*0.25 + asciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
-    Logger.log("rare $rareCharactersPenalty, mixCJK $mixedCJKnonCJKPenalty, mixHan $mixedHanHangulPenalty, surrogate $surrogatesBonus, ascii $asciiPercentage, bins $binCountPenalty, length $lengthBias, final $score, string $string")
+    Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${asciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
 
     return score
 }
