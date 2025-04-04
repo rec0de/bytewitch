@@ -2,15 +2,16 @@ package decoders
 
 import ByteWitch
 import Date
+import ParseCompanion
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
 import htmlEscape
 import kotlin.math.absoluteValue
+import kotlin.math.exp
 
 
-// OPACK encodes a subset of data that can be encoded in BPLists - we'll just use the existing BPList wrapper classes for now
-class OpackParser {
+class OpackParser : ParseCompanion() {
 
     companion object : ByteWitchDecoder {
         override val name = "opack"
@@ -49,7 +50,6 @@ class OpackParser {
         }
     }
 
-    private var parseOffset = 0
     private var sourceOffset = 0
 
     private val lastConsumedBytePosition: Int
@@ -116,12 +116,16 @@ class OpackParser {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
 
+        // NOTE: deviation from prior documentation ("Analyzing Apple’s private wireless communication protocols with a focus on security and privacy")
+        // instead of linar byte length increments (1, 2, 3, 4) it seems apple uses exponential increments (1, 2, 4, 8)
+        // is this an error in the documentation, or do both versions exist?
+        // we also assume these are all signed - i don't actually know if that's the case, but we also don't have a counterexample
         return when(type) {
             in 0x08..0x2f -> OPInt((type - 8).toLong(), Pair(start, lastConsumedBytePosition))
-            0x30 -> OPInt(readInt(bytes, 1).toLong(), Pair(start, lastConsumedBytePosition))
-            0x31 -> OPInt(readInt(bytes, 2).toLong(), Pair(start, lastConsumedBytePosition))
-            0x32 -> OPInt(readInt(bytes, 3).toLong(), Pair(start, lastConsumedBytePosition))
-            0x33 -> OPInt(readInt(bytes, 4).toLong(), Pair(start, lastConsumedBytePosition))
+            0x30 -> OPInt(readInt(bytes, 1, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
+            0x31 -> OPInt(readInt(bytes, 2, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
+            0x32 -> OPInt(readInt(bytes, 4, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
+            0x33 -> OPInt(readLong(bytes, 8, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             else -> throw Exception("Unexpected OPACK int ${bytes.hex()}")
         }
     }
@@ -131,10 +135,10 @@ class OpackParser {
         val type = readInt(bytes, 1)
         when(type) {
             0x35 -> {
-                return OPReal(readBytes(bytes, 4).readFloat(ByteOrder.BIG).toDouble(), Pair(start, lastConsumedBytePosition))
+                return OPReal(readBytes(bytes, 4).readFloat(ByteOrder.LITTLE).toDouble(), Pair(start, lastConsumedBytePosition))
             }
             0x36 -> {
-                return OPReal(readBytes(bytes, 8).readDouble(ByteOrder.BIG), Pair(start, lastConsumedBytePosition))
+                return OPReal(readBytes(bytes, 8).readDouble(ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK float ${bytes.hex()}")
         }
@@ -151,15 +155,15 @@ class OpackParser {
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x62 -> {
-                val length = readInt(bytes, 2)
+                val length = readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x63 -> {
-                val length = readInt(bytes, 3)
+                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             0x64 -> {
-                val length = readInt(bytes, 4)
+                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
                 return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK string ${bytes.hex()}")
@@ -177,15 +181,15 @@ class OpackParser {
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x92 -> {
-                val length = readInt(bytes, 2)
+                val length = readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x93 -> {
-                val length = readInt(bytes, 3)
+                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x94 -> {
-                val length = readInt(bytes, 4)
+                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK data ${bytes.hex()}")
@@ -239,18 +243,6 @@ class OpackParser {
 
         return OPDict(entries, Pair(start, lastConsumedBytePosition))
     }
-
-    private fun readBytes(bytes: ByteArray, length: Int): ByteArray {
-        val sliced = bytes.sliceArray(parseOffset until parseOffset + length)
-        parseOffset += length
-        return sliced
-    }
-
-    private fun readInt(bytes: ByteArray, size: Int): Int {
-        val int = Int.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), ByteOrder.BIG)
-        parseOffset += size
-        return int
-    }
 }
 
 abstract class OpackObject : ByteWitchResult {
@@ -263,19 +255,31 @@ abstract class OpackObject : ByteWitchResult {
     }
 }
 
-
 class OPTrue(bytePosition: Int) : OpackObject() {
-    override val sourceByteRange = Pair(bytePosition, bytePosition)
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "true"
 }
+
 class OPFalse(bytePosition: Int) : OpackObject() {
-    override val sourceByteRange = Pair(bytePosition, bytePosition)
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "false"
 }
 
+class OPNull(bytePosition: Int) : OpackObject() {
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
+    override fun toString() = "null"
+}
+
 data class OPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
+    constructor(value: Int, sourceByteRange: Pair<Int, Int>) : this(value.toLong(), sourceByteRange)
     override fun toString() = value.toString()
 }
+
+data class OPUInt(val value: ULong, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
+    constructor(value: UInt, sourceByteRange: Pair<Int, Int>) : this(value.toULong(), sourceByteRange)
+    override fun toString() = value.toString()
+}
+
 data class OPReal(val value: Double, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
     override fun renderHtmlValue(): String {
 
@@ -300,13 +304,22 @@ data class OPReal(val value: Double, override val sourceByteRange: Pair<Int, Int
         return Date((value*1000).toLong() + offset)
     }
 }
-data class OPDate(val timestamp: Double, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+
+data class OPDate(val timestamp: Double, override val sourceByteRange: Pair<Int, Int>, val isAppleEpoch: Boolean = true) : OpackObject() {
     override fun toString() = "BPDate($timestamp)"
 
     override fun renderHtmlValue() = "<div class=\"bpvalue\" $byteRangeDataTags>${asDate()}</div>"
 
-    fun asDate(): Date = dateFromAppleTimestamp(timestamp)
+    fun asDate(): Date {
+        return if(isAppleEpoch) {
+            dateFromAppleTimestamp(timestamp)
+        }
+        else {
+            Date((timestamp*1000).toLong())
+        }
+    }
 }
+
 class OPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
     override fun toString() = "BPData(${value.hex()})"
 
@@ -355,4 +368,16 @@ data class OPDict(val values: Map<OpackObject, OpackObject>, override val source
     }
 
     override fun renderHtmlValue() = "<div class=\"bpvalue\">${renderHTML()}</div>"
+}
+
+class OPTaggedData(val value: ByteArray, val type: Int, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+    override fun toString() = "OPData(${value.hex()})"
+
+    override fun renderHtmlValue(): String {
+        // try to decode nested stuff
+        val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
+
+        val payloadHTML = decode?.renderHTML() ?: "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.second-value.size, sourceByteRange.second)}>0x${value.hex()}</div>"
+        return "<div class=\"roundbox opack\" $byteRangeDataTags><div class=\"bpvalue\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.second-value.size)}>type $type</div>$payloadHTML</div>"
+    }
 }

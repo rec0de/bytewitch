@@ -7,7 +7,7 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector, Nemesys, NemesysParser
+        NemesysParser, EntropyDetector, HeuristicSignatureDetector, Nemesys
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
