@@ -20,27 +20,6 @@ class NemesysParser {
         override fun confidence(data: ByteArray) = if(data.size >= 3) 0.76 else 0.00
     }
 
-    private fun highlightSegments(data: ByteArray, boundaries: List<Int>): String {
-        if (boundaries.isEmpty()) return data.hex() // if no segments are found
-
-        val colors = listOf("#F6B9D3", "#FFE5B8", "#C9D8A3", "#F3DDC6", "#AEC6CF") // different colors
-        var colorIndex = 0
-
-        val result = StringBuilder()
-        var lastIndex = 0
-
-        for (boundary in boundaries + data.size) {
-            if (boundary > lastIndex) {
-                val segment = data.sliceArray(lastIndex until boundary).hex()
-                result.append("<span style=\"background:${colors[colorIndex % colors.size]}\">$segment</span>")
-                colorIndex++
-            }
-            lastIndex = boundary
-        }
-
-        return result.toString()
-    }
-
     // check how similar consecutive bytes are
     fun bitCongruence(b1: Byte, b2: Byte): Double {
         var count = 0
