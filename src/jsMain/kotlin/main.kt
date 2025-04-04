@@ -15,6 +15,12 @@ import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
+import org.w3c.dom.events.MouseEvent
+import kotlin.math.roundToInt
+
+import kotlinx.browser.document
+import kotlinx.browser.window
+import org.w3c.dom.*
 
 
 var liveDecodeEnabled = true
@@ -105,9 +111,100 @@ fun decode(tryhard: Boolean) {
             parseResult.appendChild(parseContent)
 
             output.appendChild(parseResult)
+
+            attachNemesysSeparatorDragHandlers()
         }
     }
 }
+
+fun attachNemesysSeparatorDragHandlers() {
+    val separators = document.querySelectorAll(".field-separator")
+
+    for (i in 0 until separators.length) {
+        val separator = separators[i] as HTMLElement
+
+        var isDragging = false
+        var startX = 0.0
+        var currentSeparator: HTMLElement? = null
+        var hoverTarget: HTMLElement? = null
+
+        separator.addEventListener("mousedown", { event ->
+            event as MouseEvent
+            isDragging = true
+            startX = event.clientX.toDouble()
+            currentSeparator = separator
+            separator.style.zIndex = "100"
+            separator.style.position = "relative"
+            document.body?.style?.cursor = "ew-resize"
+            event.preventDefault()
+        })
+
+        window.addEventListener("mousemove", { event ->
+            if (!isDragging) return@addEventListener
+            event as MouseEvent
+
+            val dx = event.clientX - startX
+            currentSeparator?.style?.transform = "translateX(${dx}px)"
+
+            // Highlight nearest bytegroup
+            val byteGroups = document.querySelectorAll(".bytegroup")
+            for (j in 0 until byteGroups.length) {
+                val bg = byteGroups[j] as HTMLElement
+                val rect = bg.getBoundingClientRect()
+
+                // Mehr Toleranz für einfachere Erkennung
+                val tolerance = rect.width * 0.3
+                val within = event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance
+
+                if (within) {
+                    hoverTarget?.let { it.classList.remove("highlightbyte") }
+                    hoverTarget = bg
+                    bg.classList.add("highlightbyte")
+                    break
+                }
+            }
+
+        })
+
+        window.addEventListener("mouseup", { event ->
+            if (!isDragging) return@addEventListener
+            isDragging = false
+            event as MouseEvent
+            document.body?.style?.cursor = "default"
+
+            currentSeparator?.style?.transform = "translateX(0px)"
+            currentSeparator?.style?.zIndex = "10"
+
+            val target = hoverTarget
+            val separator = currentSeparator
+
+            if (target != null && separator != null) {
+                val parent = separator.parentElement!!
+                val targetParent = target.parentElement!!
+
+                // Logische Prüfung, dass beide im gleichen Container sind
+                if (parent == targetParent) {
+                    // Separator vorher entfernen
+                    parent.removeChild(separator)
+
+                    // Danach direkt nach dem gehighlighteten bytegroup einfügen
+                    if (target.nextSibling != null) {
+                        parent.insertBefore(separator, target.nextSibling)
+                    } else {
+                        parent.appendChild(separator)
+                    }
+
+                    console.log("Separator moved next to bytegroup.")
+                }
+            }
+
+            hoverTarget?.let { it.classList.remove("highlightbyte") }
+            hoverTarget = null
+            currentSeparator = null
+        })
+    }
+}
+
 
 fun attachRangeListeners(element: Element) {
     if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {

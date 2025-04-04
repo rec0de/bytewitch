@@ -259,6 +259,30 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
     override fun renderHTML(): String {
         val sourceOffset = sourceByteRange?.first ?: 0
 
+        val renderedFieldContents = mutableListOf<String>()
+
+        for ((index, segment) in segments.withIndex()) {
+            val (start, fieldType) = segment
+            val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
+            val segmentBytes = bytes.sliceArray(start until end)
+
+            // create byte-groups of two bytes
+            val groupedHex = segmentBytes.hex().chunked(2).joinToString("") { "<div class='bytegroup'>$it</div>" }
+
+            if (end != bytes.size) {
+                renderedFieldContents.add("$groupedHex<div class='field-separator'>|</div>")
+            } else {
+                renderedFieldContents.add(groupedHex)
+            }
+        }
+
+        val renderedContent = "<div class='nemesysfield roundbox'><div><div class='nemesysvalue' id=\"byteContainer\">${renderedFieldContents.joinToString("")}</div></div></div>"
+
+        return "<div class='nemesys roundbox' $byteRangeDataTags>${renderedContent}</div>"
+    }
+    /**override fun renderHTML(): String {
+        val sourceOffset = sourceByteRange?.first ?: 0
+
         // go through complete segment list and extract the nemesys values as useable html code
         var renderedFieldContents = segments.mapIndexed { index, (start, fieldType) ->
             val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
@@ -281,5 +305,5 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
         }
 
         return "<div class=\"nemesys roundbox\" $byteRangeDataTags>${renderedContent}</div>"
-    }
+    }*/
 }
