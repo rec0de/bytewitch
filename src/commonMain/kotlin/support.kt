@@ -20,15 +20,19 @@ fun looksLikeUtf16String(string: String): Double {
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
-    if(veryWeird || string.isEmpty())
+    if(veryWeird || string.isEmpty()) {
+        Logger.log("very weird string: $string")
         return 0.0
+    }
 
     val lengthBias = max((10-string.length).toDouble()/10, 0.0) * 0.6
 
     // string is mostly printable ASCII, seems plausible
     val asciiPercentage = printableASCII.length.toDouble() / string.length
-    if(asciiPercentage > 0.8)
+    if(asciiPercentage > 0.8 && weirdASCII.isEmpty()) {
+        Logger.log("mostly plausible ascii ($asciiPercentage): $string")
         return max(asciiPercentage - lengthBias, 0.0)
+    }
 
     // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
     // let's sort the characters into some bins matching the largest character blocks on the BMP
@@ -94,9 +98,12 @@ fun looksLikeUtf8String(data: ByteArray): Double {
     if(string.any { it.code == 0xFFFD })
         return 0.0
 
+    val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
+    Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
+
     // if the string has no decoding errors and contains multi-byte UTF8 sequences
     // we can be pretty sure this is a valid string
-    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8))
+    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8) && weirdASCII.isEmpty())
         return 1.0
 
     // otherwise, default to generic UTF16 judgment
