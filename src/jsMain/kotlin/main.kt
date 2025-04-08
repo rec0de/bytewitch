@@ -112,12 +112,12 @@ fun decode(tryhard: Boolean) {
 
             output.appendChild(parseResult)
 
-            attachNemesysSeparatorDragHandlers()
+            attachNemesysSeparatorHandlers()
         }
     }
 }
 
-fun attachNemesysSeparatorDragHandlers() {
+fun attachNemesysSeparatorHandlers() {
     val separators = document.querySelectorAll(".field-separator")
 
     for (i in 0 until separators.length) {
@@ -127,11 +127,13 @@ fun attachNemesysSeparatorDragHandlers() {
         var startX = 0.0
         var currentSeparator: HTMLElement? = null
         var hoverTarget: HTMLElement? = null
+        var separatorTop: Double = 0.0
 
         separator.addEventListener("mousedown", { event ->
             event as MouseEvent
             isDragging = true
             startX = event.clientX.toDouble()
+            separatorTop = separator.getBoundingClientRect().top
             currentSeparator = separator
             separator.style.zIndex = "100"
             separator.style.position = "relative"
@@ -146,13 +148,15 @@ fun attachNemesysSeparatorDragHandlers() {
             val dx = event.clientX - startX
             currentSeparator?.style?.transform = "translateX(${dx}px)"
 
-            // Highlight nearest bytegroup
+            // Nur bytegroups auf gleicher Zeile (Y-Position)
             val byteGroups = document.querySelectorAll(".bytegroup")
             for (j in 0 until byteGroups.length) {
                 val bg = byteGroups[j] as HTMLElement
                 val rect = bg.getBoundingClientRect()
 
-                // Mehr Toleranz für einfachere Erkennung
+                val sameLine = kotlin.math.abs(rect.top - separatorTop) < 10 // tolerance in px
+                if (!sameLine) continue
+
                 val tolerance = rect.width * 0.3
                 val within = event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance
 
@@ -163,7 +167,6 @@ fun attachNemesysSeparatorDragHandlers() {
                     break
                 }
             }
-
         })
 
         window.addEventListener("mouseup", { event ->
@@ -172,29 +175,34 @@ fun attachNemesysSeparatorDragHandlers() {
             event as MouseEvent
             document.body?.style?.cursor = "default"
 
+            val dx = event.clientX - startX
             currentSeparator?.style?.transform = "translateX(0px)"
             currentSeparator?.style?.zIndex = "10"
 
             val target = hoverTarget
             val separator = currentSeparator
 
-            if (target != null && separator != null) {
+            if (separator != null && kotlin.math.abs(dx) < 3) {
+                // Nur Klick → sanft entfernen
+                separator.classList.add("remove-animate")
+                console.log("Soft-deleting separator...")
+
+                window.setTimeout({
+                    separator.parentElement?.removeChild(separator)
+                    console.log("Separator removed after animation")
+                }, 200)
+            } else if (target != null && separator != null) {
                 val parent = separator.parentElement!!
                 val targetParent = target.parentElement!!
 
-                // Logische Prüfung, dass beide im gleichen Container sind
                 if (parent == targetParent) {
-                    // Separator vorher entfernen
                     parent.removeChild(separator)
-
-                    // Danach direkt nach dem gehighlighteten bytegroup einfügen
                     if (target.nextSibling != null) {
                         parent.insertBefore(separator, target.nextSibling)
                     } else {
                         parent.appendChild(separator)
                     }
-
-                    console.log("Separator moved next to bytegroup.")
+                    console.log("Separator moved to new position")
                 }
             }
 
@@ -204,6 +212,7 @@ fun attachNemesysSeparatorDragHandlers() {
         })
     }
 }
+
 
 
 fun attachRangeListeners(element: Element) {
