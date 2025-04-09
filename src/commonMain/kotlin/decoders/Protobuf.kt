@@ -212,13 +212,12 @@ class ProtobufParser {
     }
 
     private fun guessVarLenValue(data: ProtoLen): ProtoValue {
-        // detect nested bplists
-        //if(BPListParser.decodesAsValid(data.value))
-        //    return ProtoBPList(data.value, data.sourceByteRange)
+        // short ascii strings are sometimes hard to distinguish from valid protobufs
 
         // try decoding as string
         try {
-            if(looksLikeUtf8String(data.value) > 0.5)
+            // first character should be printable ascii
+            if(looksLikeUtf8String(data.value, enableLengthBias = false) > 0.95 && data.value[0] in 33..122)
                 return ProtoString(data.value.decodeToString(), data.sourceByteRange)
         } catch(_: Exception) {}
 
@@ -231,6 +230,12 @@ class ProtobufParser {
             if(parser.fullyParsed && nested.objs.keys.all { it in 1..99 })
                 return nested
         } catch (_: Exception) { }
+
+        // try decoding as string with lower threshold
+        try {
+            if(looksLikeUtf8String(data.value) > 0.6)
+                return ProtoString(data.value.decodeToString(), data.sourceByteRange)
+        } catch(_: Exception) {}
 
         return data
     }

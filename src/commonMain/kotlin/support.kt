@@ -15,8 +15,8 @@ expect fun currentTimestamp(): Long
 
 expect fun dateFromUTCString(string: String, fullYear: Boolean): Date
 
-fun looksLikeUtf16String(string: String): Double {
-    val printableASCII = string.filter { it.code in 32..126 || it.code in 9..13 }
+fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Double {
+    val printableASCII = string.filter { it.code in 32..126 || it.code in setOf(9, 10, 13) }
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
@@ -25,12 +25,12 @@ fun looksLikeUtf16String(string: String): Double {
         return 0.0
     }
 
-    val lengthBias = max((10-string.length).toDouble()/10, 0.0) * 0.6
+    val lengthBias = if(enableLengthBias) max((10-string.length).toDouble()/10, 0.0) * 0.6 else 0.0
 
     // string is mostly printable ASCII, seems plausible
     val asciiPercentage = printableASCII.length.toDouble() / string.length
     if(asciiPercentage > 0.8 && weirdASCII.isEmpty()) {
-        Logger.log("mostly plausible ascii ($asciiPercentage): $string")
+        Logger.log("mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias}")
         return max(asciiPercentage - lengthBias, 0.0)
     }
 
@@ -90,7 +90,7 @@ fun looksLikeUtf16String(string: String): Double {
     return score
 }
 
-fun looksLikeUtf8String(data: ByteArray): Double {
+fun looksLikeUtf8String(data: ByteArray, enableLengthBias: Boolean = true): Double {
     val string = data.decodeToString()
 
     // there are a lot of ways to cause decoding errors
@@ -107,7 +107,7 @@ fun looksLikeUtf8String(data: ByteArray): Double {
         return 1.0
 
     // otherwise, default to generic UTF16 judgment
-    return looksLikeUtf16String(string)
+    return looksLikeUtf16String(string, enableLengthBias)
 }
 
 fun dateFromAppleTimestamp(timestamp: Double): Date {

@@ -86,6 +86,11 @@ object IEEE754 : ByteWitchDecoder {
         return score
     }
 
+    /*fun score(double: Long): Double {
+        val parts = dissectDouble(double)
+        return looksReasonable(parts.first, parts.second, parts.third, valueBE, isDouble = true)
+    }*/
+
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         when(data.size) {
             4 -> {
