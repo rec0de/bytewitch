@@ -1,4 +1,6 @@
 import bitmage.hex
+import decoders.NemesysField
+import decoders.NemesysObject
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
@@ -103,6 +105,8 @@ fun decode(tryhard: Boolean) {
             parseContent.classList.add("parsecontent")
             parseContent.innerHTML = it.second.renderHTML()
 
+            attachNemesysButtons(parseContent, bytes)
+
             parseContent.children.asList().forEach { child ->
                 attachRangeListeners(child)
             }
@@ -111,24 +115,117 @@ fun decode(tryhard: Boolean) {
             parseResult.appendChild(parseContent)
 
             output.appendChild(parseResult)
-
-            attachNemesysSeparatorHandlers()
         }
     }
 }
 
+// attach button handlers for nemesys
+fun attachNemesysButtons(parseContent: Element, bytes: ByteArray) {
+    attachEditButtonHandler(parseContent)
+    attachFinishButtonHandler(parseContent, bytes)
+}
+
+
+// read out nemesys segments based on separators set by the user
+fun rebuildSegmentsFromDOM(container: HTMLElement): List<Pair<Int, NemesysField>> {
+    val byteElements = container.querySelectorAll(".bytegroup + .field-separator, .bytegroup")
+    var byteOffset = 0
+    val segmentOffsets = mutableListOf(0)
+
+    for (i in 0 until byteElements.length) {
+        val el = byteElements[i] as HTMLElement
+
+        if (el.classList.contains("bytegroup")) {
+            byteOffset += 1 // every bytegroup = 1 Chunk = 1x 2 Hex = 1 Byte
+        }
+
+        if (el.classList.contains("field-separator")) {
+            segmentOffsets.add(byteOffset)
+        }
+    }
+
+    val segments = segmentOffsets.mapIndexed { index, offset ->
+        val fieldType = NemesysField.UNKNOWN // set to field type unknown
+        offset to fieldType
+    }
+
+    return segments
+}
+
+// attach finish button handler for editable nemesys content
+fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray) {
+    container.querySelectorAll(".finish-button").asList().forEach { btnElement ->
+        val button = btnElement as HTMLButtonElement
+        button.addEventListener("click", {
+            val oldWrapper = button.closest(".nemesys") as HTMLElement
+            val byteContainer = oldWrapper.querySelector("#byteContainer") as HTMLElement
+
+            // read out where to start in the byte sequence. This is important for the offset
+            val dataStart = oldWrapper.getAttribute("data-start")?.toIntOrNull() ?: 0
+            val dataEnd = oldWrapper.getAttribute("data-end")?.toIntOrNull() ?: originalBytes.size
+            val slicedBytes = originalBytes.sliceArray(dataStart until dataEnd)
+
+            // read out new segment structure based on separators
+            val newSegments = rebuildSegmentsFromDOM(byteContainer)
+
+            // create new nemesys object with new segments
+            val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd)
+            val newHTML = newObject.renderHTML()
+
+            val temp = document.createElement("div") as HTMLDivElement
+            temp.innerHTML = newHTML
+
+            val newWrapper = temp.firstElementChild as? HTMLElement
+            if (newWrapper == null) {
+                console.error("Newly rendered .nemesys could not be parsed")
+                return@addEventListener
+            }
+
+            // replace old wrapper div
+            oldWrapper.replaceWith(newWrapper)
+
+            // attach new button handlers
+            attachRangeListeners(newWrapper)
+            attachEditButtonHandler(newWrapper)
+            attachFinishButtonHandler(newWrapper, originalBytes)
+        })
+    }
+}
+
+// if edit button is pressed show editableView and hide prettyView
+fun attachEditButtonHandler(container: Element) {
+    container.querySelectorAll(".edit-button").asList().forEach { btnElement ->
+        val button = btnElement as HTMLButtonElement
+        button.addEventListener("click", {
+            val wrapper = button.closest(".nemesys") as HTMLElement
+            val prettyView = wrapper.querySelector(".view-default") as HTMLElement
+            val editableView = wrapper.querySelector(".view-editable") as HTMLElement
+
+            // switch display mode of pretty and editable view
+            prettyView.style.display = "none"
+            editableView.style.display = "block"
+            button.style.display = "none"
+
+            // this is needed to work with the separator
+            attachNemesysSeparatorHandlers()
+        })
+    }
+}
+
 fun attachNemesysSeparatorHandlers() {
+    // get all separators
     val separators = document.querySelectorAll(".field-separator")
 
     for (i in 0 until separators.length) {
         val separator = separators[i] as HTMLElement
 
-        var isDragging = false
-        var startX = 0.0
-        var currentSeparator: HTMLElement? = null
-        var hoverTarget: HTMLElement? = null
-        var separatorTop: Double = 0.0
+        var isDragging = false // to check if the user clicks on a separator right now
+        var startX = 0.0 // save x position of dragged separator
+        var currentSeparator: HTMLElement? = null // the separator that is currently pressed by the user
+        var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator
+        var separatorTop: Double = 0.0 // needed to make sure that separator is only moved in the same line
 
+        // start dragging separator when mouse is pressed down. remember separator, start position, ...
         separator.addEventListener("mousedown", { event ->
             event as MouseEvent
             isDragging = true
@@ -137,18 +234,19 @@ fun attachNemesysSeparatorHandlers() {
             currentSeparator = separator
             separator.style.zIndex = "100"
             separator.style.position = "relative"
-            document.body?.style?.cursor = "ew-resize"
+            document.body?.style?.cursor = "ew-resize" // change cursor of mouse
             event.preventDefault()
         })
 
+        // track separator movement and highlight potential drop target
         window.addEventListener("mousemove", { event ->
-            if (!isDragging) return@addEventListener
+            if (!isDragging) return@addEventListener // do nothing if no separator is selected
             event as MouseEvent
 
             val dx = event.clientX - startX
             currentSeparator?.style?.transform = "translateX(${dx}px)"
 
-            // Nur bytegroups auf gleicher Zeile (Y-Position)
+            // only look at bytegroups on the same line (y-position)
             val byteGroups = document.querySelectorAll(".bytegroup")
             for (j in 0 until byteGroups.length) {
                 val bg = byteGroups[j] as HTMLElement
@@ -161,6 +259,7 @@ fun attachNemesysSeparatorHandlers() {
                 val within = event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance
 
                 if (within) {
+                    // update bytegroup to highlightbyte
                     hoverTarget?.let { it.classList.remove("highlightbyte") }
                     hoverTarget = bg
                     bg.classList.add("highlightbyte")
@@ -169,8 +268,9 @@ fun attachNemesysSeparatorHandlers() {
             }
         })
 
+        // drop or delete separator when mouse is released
         window.addEventListener("mouseup", { event ->
-            if (!isDragging) return@addEventListener
+            if (!isDragging) return@addEventListener // return if no separator is selected
             isDragging = false
             event as MouseEvent
             document.body?.style?.cursor = "default"
@@ -182,28 +282,14 @@ fun attachNemesysSeparatorHandlers() {
             val target = hoverTarget
             val separator = currentSeparator
 
+            // check how far the separator has been moved. 3 is just a threshold in px
             if (separator != null && kotlin.math.abs(dx) < 3) {
-                // Nur Klick → sanft entfernen
-                separator.classList.add("remove-animate")
-                console.log("Soft-deleting separator...")
-
-                window.setTimeout({
-                    separator.parentElement?.removeChild(separator)
-                    console.log("Separator removed after animation")
-                }, 200)
+                // delete if it was just a click (with a little animation)
+                deleteSeparator(separator)
             } else if (target != null && separator != null) {
-                val parent = separator.parentElement!!
-                val targetParent = target.parentElement!!
+                // move if it was dragged over a valid target
+                moveSeparatorToTarget(separator, target)
 
-                if (parent == targetParent) {
-                    parent.removeChild(separator)
-                    if (target.nextSibling != null) {
-                        parent.insertBefore(separator, target.nextSibling)
-                    } else {
-                        parent.appendChild(separator)
-                    }
-                    console.log("Separator moved to new position")
-                }
             }
 
             hoverTarget?.let { it.classList.remove("highlightbyte") }
@@ -211,6 +297,28 @@ fun attachNemesysSeparatorHandlers() {
             currentSeparator = null
         })
     }
+}
+
+// move separator to specific target element
+fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement) {
+    val parent = separator.parentElement!!
+    val targetParent = target.parentElement!!
+
+    if (parent == targetParent) {
+        parent.removeChild(separator)
+        if (target.nextSibling != null) {
+            parent.insertBefore(separator, target.nextSibling)
+        } else {
+            parent.appendChild(separator)
+        }
+    }
+}
+
+// delete separator with a smooth animation
+fun deleteSeparator(separator: HTMLElement) {
+    separator.classList.add("remove-animate")
+    window.setTimeout({
+        separator.parentElement?.removeChild(separator) }, 200)
 }
 
 

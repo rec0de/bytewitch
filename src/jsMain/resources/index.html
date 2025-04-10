@@ -382,48 +382,6 @@
 </head>
 <body>
 <script src="bytewitch.js"></script>
-<script>
-    /**document.addEventListener('DOMContentLoaded', () => {
-        // this container already exists when loading the page
-        const container = document.getElementById('output');
-
-        // add event listener for mouse down
-        container.addEventListener('mousedown', (e) => {
-            const separator = e.target.closest('.field-separator'); // checked if clicked element is a field-separator
-
-            if (separator) {
-                let isDragging = true;
-                let initialX = e.clientX;
-
-                // change style of cursor while grabbing it
-                separator.style.cursor = 'grabbing';
-
-                // function for moving the separator
-                const onMouseMove = (moveEvent) => {
-                    if (!isDragging) return;
-
-                    const deltaX = moveEvent.clientX - initialX;
-                    separator.style.transform = `translateX(${deltaX}px)`;
-                };
-
-                // when pressing the mouse stops
-                const onMouseUp = () => {
-                    if (isDragging) {
-                        isDragging = false;
-                        separator.style.cursor = 'ew-resize'; // change style of cursor back
-                        separator.style.transform = 'none';
-
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                    }
-                };
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            }
-        });
-    });*/
-</script>
 <div class="container" style="gap: 1rem; align-items: center;">
     <div class="header">
         <img src="icon.png">

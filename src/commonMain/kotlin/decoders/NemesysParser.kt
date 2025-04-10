@@ -256,9 +256,51 @@ enum class NemesysField {
 
 // this object can be used to get useable html code from the nemesys parser
 class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: ByteArray, override val sourceByteRange: Pair<Int, Int>?) : ByteWitchResult {
-    override fun renderHTML(): String {
+    // html view of the normal (non-editable) byte sequences
+    fun renderPrettyHTML(): String {
+        // val updatedSegments = updateFieldType(segments, bytes) // TODO don't think this is needed because we check it later anyway by using NemesysField.UNKOWN
+        val updatedSegments = segments
+
         val sourceOffset = sourceByteRange?.first ?: 0
 
+        val renderedFieldContents = updatedSegments.mapIndexed { index, (start, fieldType) ->
+            val end = if (index + 1 < updatedSegments.size) updatedSegments[index + 1].first else bytes.size
+            val segmentBytes = bytes.sliceArray(start until end)
+
+            val valueLengthTag = " data-start='${start+sourceOffset}' data-end='${end+sourceOffset}'"
+
+            // differentiate between field types
+            when (fieldType) {
+                NemesysField.STRING -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"</div>"
+                // NemesysField.UNKNOWN -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+                NemesysField.UNKNOWN -> {
+                    val decode = ByteWitch.quickDecode(segmentBytes, start+sourceOffset)
+
+                    // if it's a nemesys object again, just show the hex output
+                    if (decode == null || decode is NemesysObject) {
+                        // TODO maybe wrap it as in Protobuf.kt by using <div class="nemesysfield roundbox">
+                        "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+                    } else {
+                        decode.renderHTML()
+                    }
+                }
+            }
+        }
+
+        val content = "<div class=\"nemesysfield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
+
+        val editButton = """<button class="edit-button">edit</button>"""
+
+        val renderedContent = "<div class=\"nemesys roundbox\" $byteRangeDataTags>" +
+                "$editButton<div class=\"view-default\">$content</div>" +
+                "<div class=\"view-editable\" style=\"display:none;\">${renderEditableHTML()}</div>" +
+                "</div>"
+
+        return renderedContent
+    }
+
+    // html view of editable byte sequences
+    private fun renderEditableHTML(): String {
         val renderedFieldContents = mutableListOf<String>()
 
         for ((index, segment) in segments.withIndex()) {
@@ -267,7 +309,9 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
             val segmentBytes = bytes.sliceArray(start until end)
 
             // create byte-groups of two bytes
-            val groupedHex = segmentBytes.hex().chunked(2).joinToString("") { "<div class='bytegroup'>$it</div>" }
+            val groupedHex = segmentBytes.hex().chunked(2).joinToString("") {
+                "<div class='bytegroup'>$it</div>"
+            }
 
             if (end != bytes.size) {
                 renderedFieldContents.add("$groupedHex<div class='field-separator'>|</div>")
@@ -276,34 +320,36 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
             }
         }
 
-        val renderedContent = "<div class='nemesysfield roundbox'><div><div class='nemesysvalue' id=\"byteContainer\">${renderedFieldContents.joinToString("")}</div></div></div>"
+        val renderedContent = "<div class='nemesysfield roundbox'><div>" +
+                "<div class='nemesysvalue' id=\"byteContainer\">" +
+                "${renderedFieldContents.joinToString("")}</div></div></div>"
 
-        return "<div class='nemesys roundbox' $byteRangeDataTags>${renderedContent}</div>"
+        val finishButton = """<button class="finish-button">finish</button>"""
+
+        return "$renderedContent$finishButton"
     }
-    /**override fun renderHTML(): String {
-        val sourceOffset = sourceByteRange?.first ?: 0
 
-        // go through complete segment list and extract the nemesys values as useable html code
-        var renderedFieldContents = segments.mapIndexed { index, (start, fieldType) ->
-            val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
-            val segmentBytes = bytes.sliceArray(start until end)
+    override fun renderHTML(): String {
+        return renderPrettyHTML()
+    }
 
-            val valueLengthTag = " data-start='${start+sourceOffset}' data-end='${end+sourceOffset}'"
+    // update field type. e.g. check if a byte sequence is utf8 decoded
+    private fun updateFieldType(segments: List<Pair<Int, NemesysField>>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        return segments.mapIndexed { index, (start, fieldType) ->
+            if (fieldType == NemesysField.UNKNOWN) {
+                // get segmented byte sequence by using the start index and calc the end index with the following start index
+                val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
+                val segmentBytes = bytes.sliceArray(start until end)
 
-            // differ between field types
-            when (fieldType) {
-                NemesysField.STRING -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"</div>"
-                NemesysField.UNKNOWN -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+                start to checkFieldType(segmentBytes)
+            } else {
+                start to fieldType
             }
         }
+    }
 
-        // put all nemesys values in one nemesys field
-        var renderedContent = "<div class=\"nemesysfield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
-
-        if (renderedContent.isEmpty()) {
-            renderedContent = "∅"
-        }
-
-        return "<div class=\"nemesys roundbox\" $byteRangeDataTags>${renderedContent}</div>"
-    }*/
+    // get the field type of a byte sequence
+    private fun checkFieldType(bytes: ByteArray) : NemesysField{
+        return NemesysField.UNKNOWN
+    }
 }
