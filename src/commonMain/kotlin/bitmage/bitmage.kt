@@ -1,5 +1,7 @@
 package bitmage
 
+import kotlin.math.pow
+
 enum class ByteOrder {
     BIG, LITTLE
 }
@@ -94,6 +96,23 @@ fun Float.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Float {
     return Float.fromBits(Int.fromBytes(bytes, byteOrder))
 }
 
+fun Float.Companion.fromFP16Bytes(bytes: ByteArray, byteOrder: ByteOrder): Float {
+    check(bytes.size == 2) { "trying to read FP16 from incorrectly sized bytearray ${bytes.hex()}" }
+    val sign = bytes[0].toInt() shr 7
+    val exponent = (bytes[0].toInt() shr 2) and 0x1f
+    val mantissa = ((bytes[0].toInt() and 0x03) shl 8) or bytes[1].toInt()
+    val signMultiplier = if(sign == 0) 1 else -1
+
+    return when {
+        exponent == 0 && mantissa == 0 -> 0.0f
+        exponent == 0 -> signMultiplier * 0.000061035f *  (mantissa.toFloat() / 1024)
+        exponent == 31 && mantissa != 0 -> Float.NaN
+        exponent == 31 && sign == 1 -> Float.NEGATIVE_INFINITY
+        exponent == 31 && sign == 0 -> Float.POSITIVE_INFINITY
+        else -> signMultiplier * (2.0f).pow(exponent-15) * (1 + (mantissa.toFloat() / 1024))
+    }
+}
+
 fun Float.toBytes(byteOrder: ByteOrder) = this.toBits().toBytes(byteOrder)
 
 fun Double.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Double {
@@ -102,7 +121,6 @@ fun Double.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Double {
 }
 
 fun Double.toBytes(byteOrder: ByteOrder) = this.toBits().toBytes(byteOrder)
-
 
 // ByteArray reading convenience functions
 

@@ -164,4 +164,16 @@ open class ParseCompanion {
         parseOffset += size
         return int
     }
+
+    protected fun readFloat(bytes: ByteArray, byteOrder: ByteOrder = ByteOrder.BIG): Float {
+        val float = Float.fromBytes(bytes.sliceArray(parseOffset until parseOffset+4), byteOrder)
+        parseOffset += 4
+        return float
+    }
+
+    protected fun readDouble(bytes: ByteArray, byteOrder: ByteOrder = ByteOrder.BIG): Double {
+        val float = Double.fromBytes(bytes.sliceArray(parseOffset until parseOffset+8), byteOrder)
+        parseOffset += 8
+        return float
+    }
 }

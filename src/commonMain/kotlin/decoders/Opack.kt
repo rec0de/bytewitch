@@ -8,7 +8,6 @@ import currentTimestamp
 import dateFromAppleTimestamp
 import htmlEscape
 import kotlin.math.absoluteValue
-import kotlin.math.exp
 
 
 class OpackParser : ParseCompanion() {
@@ -270,6 +269,16 @@ class OPNull(bytePosition: Int) : OpackObject() {
     override fun toString() = "null"
 }
 
+class OPUndefined(bytePosition: Int) : OpackObject() {
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
+    override fun toString() = "undefined"
+}
+
+class CborEndMarker(bytePosition: Int) : OpackObject() {
+    override val sourceByteRange = Pair(bytePosition, bytePosition+1)
+    override fun toString() = "end"
+}
+
 data class OPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): OpackObject() {
     constructor(value: Int, sourceByteRange: Pair<Int, Int>) : this(value.toLong(), sourceByteRange)
     override fun toString() = value.toString()
@@ -371,7 +380,7 @@ data class OPDict(val values: Map<OpackObject, OpackObject>, override val source
 }
 
 class OPTaggedData(val value: ByteArray, val type: Int, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
-    override fun toString() = "OPData(${value.hex()})"
+    override fun toString() = "OPTaggedData($type: ${value.hex()})"
 
     override fun renderHtmlValue(): String {
         // try to decode nested stuff
@@ -379,5 +388,14 @@ class OPTaggedData(val value: ByteArray, val type: Int, override val sourceByteR
 
         val payloadHTML = decode?.renderHTML() ?: "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.second-value.size, sourceByteRange.second)}>0x${value.hex()}</div>"
         return "<div class=\"roundbox opack\" $byteRangeDataTags><div class=\"bpvalue\" ${rangeTagsFor(sourceByteRange.first, sourceByteRange.second-value.size)}>type $type</div>$payloadHTML</div>"
+    }
+}
+
+class OPTaggedParsedData(val value: OpackObject, val type: Int, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+    override fun toString() = "OPData($type: $value)"
+
+    override fun renderHtmlValue(): String {
+        val payloadHTML = value.renderHTML()
+        return "<div class=\"roundbox opack\" $byteRangeDataTags><div class=\"bpvalue\" ${rangeTagsFor(sourceByteRange.first, value.sourceByteRange!!.first)}>type $type</div>$payloadHTML</div>"
     }
 }
