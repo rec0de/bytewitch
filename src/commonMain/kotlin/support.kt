@@ -130,8 +130,8 @@ open class ParseCompanion {
         return sliced
     }
 
-    protected fun readLengthPrefixedString(bytes: ByteArray, sizePrefixLen: Int): String? {
-        val len = readInt(bytes, sizePrefixLen)
+    protected fun readLengthPrefixedString(bytes: ByteArray, sizePrefixLen: Int, byteOrder: ByteOrder = ByteOrder.BIG): String? {
+        val len = readInt(bytes, sizePrefixLen, false, byteOrder)
         return if(len == 0) null else readString(bytes, len)
     }
 
