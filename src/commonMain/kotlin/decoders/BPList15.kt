@@ -21,6 +21,21 @@ class BPList15 {
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             return BPList15().parse(data, sourceOffset)
         }
+
+        override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+            val headerPos = data.indexOfSubsequence("bplist15".encodeToByteArray())
+
+            return if(headerPos >= 0) {
+                val parser = BPList15()
+                val prefix = data.untilIndex(headerPos)
+                val parse = parser.parse(data.fromIndex(headerPos), headerPos)
+                val endPos = parse.rootByteRange!!.second
+                PartialDecode(prefix, parse, data.fromIndex(endPos), Pair(0, data.size))
+            }
+            else
+                null
+
+        }
     }
 
 
@@ -32,7 +47,7 @@ class BPList15 {
 
         val rest = bytes.fromIndex(8)
         val rootObject = parseCodable(rest, sourceOffset+8)
-        rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+        rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+lastObjectEndOffset+8)
 
         return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
             val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
@@ -47,14 +62,13 @@ class BPList15 {
         this.sourceOffset = sourceOffset
         objectMap.clear()
 
-        // bplist after bplist15:
-        // 1 byte of 0x13
-        // 4 bytes (?) of little endian length field
-        // unidentified bytes f.e. 0x00000080
-        // 5 bytes CRC f.e. 1200000000
+        val length = readObjectFromOffset(bytes, 0)
+        val second = readObjectFromOffset(bytes, lastObjectEndOffset)
+        //Logger.log(length.toString())
+        //Logger.log(second.toString())
 
         // -> skip 14 bytes
-        return readObjectFromOffset(bytes, 14)
+        return readObjectFromOffset(bytes, lastObjectEndOffset)
     }
 
     private fun readObjectFromOffset(bytes: ByteArray, offset: Int): BPListObject {
@@ -83,19 +97,18 @@ class BPList15 {
                 // some bplists contain crazy long integers for tiny numbers
                 // we'll just hope they're never used beyond actual long range
                 if(byteLen in 9..16) {
-                    val upper = Long.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.BIG)
-                    val lower = Long.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.BIG)
-
-                    if(upper != 0L) {
-                        Logger.log("Encountered very long BPInt ($byteLen B) that cannot be equivalently represented as Long")
-                        throw Exception("Overlong BPInt")
-                    }
-                    // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
-                    BPInt(lower, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    throw Exception("Overlong BPInt")
                 }
                 else {
-                    // TODO: does this mess with signs? how does bigint do it?
-                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until offset+1+byteLen), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    val intBytes = bytes.sliceArray(offset+1 until offset+1+byteLen)
+                    val intValue = Long.fromBytes(intBytes, ByteOrder.LITTLE)
+
+                    // Create a mask that clears the first bit.
+                    val mask = (1UL shl (byteLen * 8 - 1)) - 1UL
+                    val unsignedValue = (intValue and mask.toLong())
+
+                    val sign = if((intValue shr (byteLen * 8 - 1)) == 0L) -1 else 1
+                    BPInt(sign*unsignedValue, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
                 }
             }
             // Real
@@ -211,18 +224,24 @@ class BPList15 {
                 val entries = tmp.first
                 val effectiveOffset = tmp.second
 
-                val map = mutableMapOf<BPListObject, BPListObject>()
+
                 var currentOffset = effectiveOffset
 
+                val keys = mutableListOf<BPListObject>()
                 for (i in 0 until entries) {
                     val key = readObjectFromOffset(bytes, currentOffset)
                     currentOffset = lastObjectEndOffset
+                    keys.add(key)
+                }
 
+                val values = mutableListOf<BPListObject>()
+                for (i in 0 until entries) {
                     val value = readObjectFromOffset(bytes, currentOffset)
                     currentOffset = lastObjectEndOffset
-
-                    map[key] = value
+                    values.add(value)
                 }
+
+                val map = keys.zip(values).toMap()
 
                 lastObjectEndOffset = currentOffset
                 BPDict(map, Pair(sourceOffset + offset, sourceOffset+currentOffset))
