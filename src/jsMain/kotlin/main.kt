@@ -31,18 +31,17 @@ var currentHighlight: Element? = null
 
 fun main() {
     window.addEventListener("load", {
-        val input = document.getElementById("data") as HTMLTextAreaElement
+        val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
         val tryhardBtn = document.getElementById("tryhard") as HTMLButtonElement
         val uploadBtn = document.getElementById("upload") as HTMLButtonElement
+        val uploadMoreBtn = document.getElementById("upload_more") as HTMLButtonElement
 
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
 
-        input.oninput = {
-            if (liveDecodeEnabled)
-                decode(false)
-        }
+        // input listener for text areas
+        applyLiveDecodeListeners()
 
         decodeBtn.onclick = {
             decode(false)
@@ -56,16 +55,22 @@ fun main() {
             val fileInput = document.createElement("input") as HTMLInputElement
             fileInput.type = "file"
             fileInput.accept = "*" // Accept any file type
+            fileInput.multiple = true // to upload multiple files
 
             fileInput.onchange = {
-                val file = fileInput.files?.item(0)
-                if (file != null) {
-                    if (file.type == "text/plain") {
-                        // Handle .txt files
-                        readFile(file)
-                    } else {
-                        // Handle binary files
-                        readBinaryFile(file)
+                val files = fileInput.files
+                if (files != null) {
+                    for (i in 0 until files.length) {
+                        val file = files.item(i)
+                        if (file != null) {
+                            if (file.type == "text/plain") {
+                                // Handle .txt files
+                                readFile(file)
+                            } else {
+                                // Handle binary files
+                                readBinaryFile(file)
+                            }
+                        }
                     }
                 }
             }
@@ -74,50 +79,100 @@ fun main() {
             fileInput.click()
         }
 
+        // to add more text areas for protocols
+        uploadMoreBtn.onclick = {
+            val newTextarea = document.createElement("textarea") as HTMLTextAreaElement
+            newTextarea.className = "data"
+            dataContainer.appendChild(newTextarea)
+
+            // TODO need a remove button to delete text areas
+
+            // for live decode
+            if (liveDecodeEnabled) {
+                newTextarea.oninput = {
+                    decode(false)
+                }
+            }
+        }
+
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
+            applyLiveDecodeListeners()
             0.0
         }
     })
 }
 
+// input listener for live decode of all text areas
+fun applyLiveDecodeListeners() {
+    val textareas = document.querySelectorAll(".data")
+    for (i in 0 until textareas.length) {
+        val ta = textareas[i] as HTMLTextAreaElement
+        ta.oninput = {
+            if (liveDecodeEnabled)
+                decode(false)
+        }
+    }
+}
+
 fun decode(tryhard: Boolean) {
-    val input = document.getElementById("data") as HTMLTextAreaElement
     val output = document.getElementById("output") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
-    val result = ByteWitch.analyze(bytes, tryhard)
+    // reset output
+    output.clear()
+    floatview.innerHTML = ""
+    bytefinder.style.display = "none"
 
-    if(result.isNotEmpty()) {
-        output.clear()
-        floatview.innerText = bytes.hex()
-        bytefinder.style.display = "flex"
+    // decode all inputs
+    val textareas = document.querySelectorAll(".data")
+    for (i in 0 until textareas.length) {
+        val textarea = textareas[i] as HTMLTextAreaElement
+        val inputText = textarea.value.trim()
+        if (inputText.isEmpty()) continue // only decode input text areas that are in use
 
-        result.forEach {
-            val parseResult = document.createElement("DIV") as HTMLDivElement
+        // decode input
+        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+        val result = ByteWitch.analyze(bytes, tryhard)
 
-            val parseName = document.createElement("H3") as HTMLHeadingElement
-            parseName.innerText = it.first
+        if (result.isNotEmpty()) {
+            bytefinder.style.display = "flex"
 
-            val parseContent = document.createElement("DIV") as HTMLDivElement
-            parseContent.classList.add("parsecontent")
-            parseContent.innerHTML = it.second.renderHTML()
+            /**
+            // add title to floatview
+            val floatviewTitle = document.createElement("H3") as HTMLHeadingElement
+            floatviewTitle.innerText = "Message ${i + 1} Bytes"
+            floatview.appendChild(floatviewTitle)*/
 
-            attachNemesysButtons(parseContent, bytes)
+            val floatviewBlock = document.createElement("DIV") as HTMLDivElement
+            floatviewBlock.innerText = bytes.hex()
+            floatview.appendChild(floatviewBlock)
 
-            parseContent.children.asList().forEach { child ->
-                attachRangeListeners(child)
+            result.forEach {
+                val parseResult = document.createElement("DIV") as HTMLDivElement
+
+                val parseName = document.createElement("H3") as HTMLHeadingElement
+                parseName.innerText = "Message ${i + 1}: ${it.first}"
+
+                val parseContent = document.createElement("DIV") as HTMLDivElement
+                parseContent.classList.add("parsecontent")
+                parseContent.innerHTML = it.second.renderHTML()
+
+                attachNemesysButtons(parseContent, bytes)
+
+                parseContent.children.asList().forEach { child ->
+                    attachRangeListeners(child)
+                }
+
+                parseResult.appendChild(parseName)
+                parseResult.appendChild(parseContent)
+                output.appendChild(parseResult)
             }
-
-            parseResult.appendChild(parseName)
-            parseResult.appendChild(parseContent)
-
-            output.appendChild(parseResult)
         }
     }
 }
+
 
 // attach button handlers for nemesys
 fun attachNemesysButtons(parseContent: Element, bytes: ByteArray) {
@@ -136,7 +191,7 @@ fun rebuildSegmentsFromDOM(container: HTMLElement): List<Pair<Int, NemesysField>
         val el = byteElements[i] as HTMLElement
 
         if (el.classList.contains("bytegroup")) {
-            byteOffset += 1 // every bytegroup = 1 Chunk = 1x 2 Hex = 1 Byte
+            byteOffset += 1 // every bytegroup = 2 Hex = 1 Byte
         }
 
         if (el.classList.contains("field-separator")) {
@@ -212,7 +267,10 @@ fun attachEditButtonHandler(container: Element) {
     }
 }
 
+// separator handler to change boundaries of nemesys content
 fun attachNemesysSeparatorHandlers() {
+    // TODO need a way to add more separators
+
     // get all separators
     val separators = document.querySelectorAll(".field-separator")
 
@@ -329,6 +387,7 @@ fun attachRangeListeners(element: Element) {
         val end =  element.getAttribute("data-end")!!.toInt()
         element.addEventListener("click", { evt ->
             console.log("$start to $end")
+            // TODO floatview doesn't work for multiple messages. Somehow we need an offset attribute to skip previous messages
             val floatview = document.getElementById("floatview")!!
             floatview.innerHTML = floatview.textContent!! // re-set previous highlights
             val text = floatview.childNodes[0]!!
@@ -355,15 +414,16 @@ fun attachRangeListeners(element: Element) {
     element.children.asList().forEach { attachRangeListeners(it) }
 }
 
+// read binary file and add content to textarea
 fun readBinaryFile(file: File) {
-    val input = document.getElementById("data") as HTMLTextAreaElement
     val reader = FileReader()
 
     reader.onload = {
         val arrayBuffer = reader.result as? ArrayBuffer
         if (arrayBuffer != null) {
             val hexContent = arrayBufferToHex(arrayBuffer) // Convert binary data to hex
-            input.value = hexContent // Display hex content in the textarea
+            // Display hex content in the textarea
+            appendTextareaWithContent(hexContent)
         } else {
             console.error("Failed to read binary file content")
         }
@@ -376,14 +436,15 @@ fun readBinaryFile(file: File) {
     reader.readAsArrayBuffer(file) // Read binary data in the file
 }
 
+// read txt file and append to textarea
 fun readFile(file: File) {
-    val input = document.getElementById("data") as HTMLTextAreaElement
     val reader = FileReader()
 
     reader.onload = {
         val content = reader.result?.toString() // Safely convert `result` to a string
         if (content != null) {
-            input.value = content // Write the file content to the textarea
+            // Write the file content to the textarea
+            appendTextareaWithContent(content)
         } else {
             console.error("File content is null")
         }
@@ -394,6 +455,34 @@ fun readFile(file: File) {
     }
 
     reader.readAsText(file) // Read the file content as text
+}
+
+// add content to textarea
+fun appendTextareaWithContent(content: String) {
+    val container = document.getElementById("data_container")!!
+    val textareas = container.querySelectorAll(".data")
+
+    // check if an empty text area already exists
+    for (i in 0 until textareas.length) {
+        val ta = textareas[i] as HTMLTextAreaElement
+        if (ta.value.trim().isEmpty()) {
+            // write content in empty text area
+            ta.value = content
+            return
+        }
+    }
+
+    // create new textarea if no empty one exists
+    val textarea = document.createElement("textarea") as HTMLTextAreaElement
+    textarea.className = "data"
+    textarea.value = content
+    container.appendChild(textarea)
+
+    if (liveDecodeEnabled) {
+        textarea.oninput = {
+            decode(false)
+        }
+    }
 }
 
 fun arrayBufferToHex(buffer: ArrayBuffer): String {

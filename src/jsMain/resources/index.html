@@ -111,13 +111,20 @@
             max-width: 100%;
         }
 
-        .container > textarea {
+        #data_container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem; /* gap between textareas */
+        }
+
+        #data_container > textarea {
             font-family: monospace;
             max-width: 100%;
             width: 800px;
             height: 250px;
             max-height: 20vh;
         }
+
 
         .container > span {
             padding-top:  0.5rem;
@@ -390,13 +397,16 @@
     <div class="legend">
         <div class="bplist">bplist</div><div class="protobuf">protobuf</div><div class="opack">opack</div><div class="nsarchive">nsarchive</div><div class="asn1">asn.1</div><div class="generic">generic</div>
     </div>
-    <textarea id="data"></textarea>
+    <div id="data_container">
+        <textarea class="data"></textarea>
+    </div>
     <div class="parsebuttons">
         <span>
             <input type="checkbox" id="livedecode" checked />
             <label for="livedecode">live decode</label>
         </span>
         <div></div>
+        <button id="upload_more">upload more</button>
         <button id="upload">upload file</button>
         <button id="decode">decode</button>
         <button id="tryhard">try harder</button>
