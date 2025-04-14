@@ -89,6 +89,12 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
             return decode(thing as BPDict)
 
         return when (thing) {
+            is BPAsciiString -> {
+                if(thing.value == "\$null")
+                    BPNull
+                else
+                    thing
+            }
             is BPArray -> {
                 val transformedValues = thing.values.map { transformSupportedClasses(it) }
                 BPArray(transformedValues, thing.sourceByteRange)

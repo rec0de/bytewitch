@@ -42,6 +42,27 @@ fun ByteArray.indexOfSubsequence(target: ByteArray): Int {
     return targetPosition
 }
 
+fun ByteArray.indicesOfAllSubsequences(target: ByteArray): Set<Int> {
+    var offset = 0
+    var matchIndex = 0
+    val matches = mutableSetOf<Int>()
+
+    while(offset < size) {
+        if(this[offset] == target[matchIndex]) {
+            matchIndex += 1
+            if(matchIndex == target.size) {
+                matches.add(offset - target.size + 1)
+                matchIndex = 0
+            }
+        }
+        else
+            matchIndex = 0
+        offset++
+    }
+
+    return matches
+}
+
 // Integers
 
 fun ULong.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): ULong {

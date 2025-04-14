@@ -35,23 +35,41 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
             val prefix = data.sliceArray(0 until headerPosition)
             var remainder = data.fromIndex(headerPosition)
+            val remainderSize = remainder.size
+
+            val nestedBplistPositions = remainder.indicesOfAllSubsequences("bplist0".encodeToByteArray()).toMutableList()
+            nestedBplistPositions.remove(0)
 
             // find plausible footer
             var footerEnd = -1
             var alreadySearchedOffset = 0
-            while(footerEnd < remainder.size) {
+            while(alreadySearchedOffset < remainderSize) {
                 val footerCandidatePosition = remainder.indexOfSubsequence("0000000000".fromHex())
                 if(footerCandidatePosition == -1 || remainder.size - footerCandidatePosition < 32)
                     return null
+
                 val tableSize = remainder[footerCandidatePosition + 6]
                 val refSize = remainder[footerCandidatePosition + 7]
                 val objCount = remainder.fromIndex(footerCandidatePosition + 8).readLong(ByteOrder.BIG)
                 val topOffset = remainder.fromIndex(footerCandidatePosition + 16).readLong(ByteOrder.BIG)
                 val tablePosition = remainder.fromIndex(footerCandidatePosition + 24).readLong(ByteOrder.BIG)
 
-                if(tableSize < 4 && refSize < 4 && objCount < 10000 && topOffset < 10000 && tablePosition < footerCandidatePosition) {
+                if(tableSize in 1..3 && refSize in 1..3 && objCount < 10000 && topOffset < 10000 && tablePosition < alreadySearchedOffset+footerCandidatePosition) {
                     footerEnd = alreadySearchedOffset + footerCandidatePosition + 32
-                    break
+                    // footer belongs to nested bplist
+                    if(nestedBplistPositions.any { it < footerEnd }) {
+                        // remove closest preceding header from consideration
+                        val matchingHeader = nestedBplistPositions.filter { it < footerEnd }.max()
+                        nestedBplistPositions.remove(matchingHeader)
+
+                        // skip ahead to end of recognized footer
+                        remainder = remainder.fromIndex(footerEnd)
+                        alreadySearchedOffset = footerEnd
+                        continue
+                    }
+                    else {
+                        break
+                    }
                 }
 
                 remainder = remainder.fromIndex(footerCandidatePosition+1)
