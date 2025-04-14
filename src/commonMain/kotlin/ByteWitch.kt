@@ -55,10 +55,18 @@ object ByteWitch {
         }
     }
 
-    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? = decoders.firstOrNull {
-        val confidence = it.confidence(data)
-        confidence > 0.75
-    }?.decode(data, sourceOffset, inlineDisplay = true)
+    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
+        try {
+            return decoders.firstOrNull {
+                val confidence = it.confidence(data)
+                confidence > 0.75
+            }?.decode(data, sourceOffset, inlineDisplay = true)
+        } catch(e: Exception) {
+            Logger.log("Quick decode failed with exception: ${e.message}")
+            e.printStackTrace()
+            return null
+        }
+    }
 
     private fun decodeHexdump(hexdumpData: String): ByteArray {
         var collectedBytes = byteArrayOf()

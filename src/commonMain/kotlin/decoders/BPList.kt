@@ -255,7 +255,11 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
                 }
 
-                BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
+                val dict = BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
+                if(KeyedArchiveDecoder.isKeyedArchive(dict))
+                    KeyedArchiveDecoder.decode(dict)
+                else
+                    dict
             }
             else -> throw Exception("Unknown object type byte 0b${objectByte.toString(2)}")
         }
