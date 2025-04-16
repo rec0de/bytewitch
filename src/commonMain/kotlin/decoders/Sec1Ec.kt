@@ -8,6 +8,7 @@ import com.ionspin.kotlin.bignum.integer.Sign
 import com.ionspin.kotlin.bignum.integer.toBigInteger
 import com.ionspin.kotlin.bignum.modular.ModularBigInteger
 import kotlin.math.ceil
+import kotlin.math.log2
 
 /*
  * Elliptic curve parameters from https://safecurves.cr.yp.to/
@@ -160,6 +161,20 @@ object ECCurves : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        // check that payload is plausibly high-entropy
+        val nibbleCounts = IntArray(16){ 0 }
+        data.forEach { byte ->
+            val lowerNibble = (byte.toUByte().toInt() and 0x0F)
+            val upperNibble = (byte.toUByte().toInt() and 0xF0) ushr 4
+            nibbleCounts[lowerNibble] += 1
+            nibbleCounts[upperNibble] += 1
+        }
+
+        // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
+        val entropyNibbles = nibbleCounts.map { it.toDouble() / (data.size*2) }.filter { it > 0 }.sumOf { - it * log2(it) }
+
+        check(entropyNibbles > 3.5) { "unreasonably low entropy for an EC point" }
+
         // little endian format seems to be more prevalent, let's default to that
         var curves = whichCurves(data.reversedArray(), errorOnInvalidSize = true)
         var littleEndian = true
@@ -286,7 +301,6 @@ object EdDSA : ByteWitchDecoder {
         val sign = data.last().toInt() and 0x80
         reordered[0] = (reordered[0].toInt() and 0x7F).toByte()
 
-        println(reordered.hex())
         val curves = ECCurves.whichCurves(reordered, includeUncompressed = false)
 
         if("Ed25519" !in curves)
