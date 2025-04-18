@@ -173,7 +173,7 @@ object ECCurves : ByteWitchDecoder {
         // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
         val entropyNibbles = nibbleCounts.map { it.toDouble() / (data.size*2) }.filter { it > 0 }.sumOf { - it * log2(it) }
 
-        check(entropyNibbles > 3.5) { "unreasonably low entropy for an EC point" }
+        check(entropyNibbles > 3.7) { "unreasonably low entropy for an EC point" }
 
         // little endian format seems to be more prevalent, let's default to that
         var curves = whichCurves(data.reversedArray(), errorOnInvalidSize = true)

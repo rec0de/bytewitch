@@ -349,7 +349,7 @@ class OPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>)
 }
 
 data class OPString(val value: String, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
-    override fun toString() = "\"$value\""
+    override fun toString() = "\"${htmlEscape(value)}\""
 }
 
 data class OPArray(val values: List<OpackObject>, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {

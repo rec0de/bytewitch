@@ -160,6 +160,14 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                             NSDate(Date((timestamp.value * 1000).toLong() + 978307200000), timestamp.sourceByteRange)
                         }
 
+                        /*"NSURL" -> {
+                            val base = thing.values[BPAsciiString("NS.base")]!!
+                            val relative = thing.values[BPAsciiString("NS.relative")] as BPString
+
+                            val url = if(base is BPString) base.value + relative.value else relative.value
+                            NSURL(url, relative.sourceByteRange!!)
+                        }*/
+
                         "NSUUID" -> {
                             val uuidData = thing.values[BPAsciiString("NS.uuidbytes")]!! as BPData
                             NSUUID(uuidData.value, uuidData.sourceByteRange)

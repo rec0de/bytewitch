@@ -381,7 +381,7 @@ abstract class BPString : BPListObject() {
 
     override fun renderHtmlValue(): String {
         val veryLong = if(value.length > 300) "data" else ""
-        return "<div class=\"bpvalue stringlit $veryLong\" $byteRangeDataTags>\"$value\"</div>"
+        return "<div class=\"bpvalue stringlit $veryLong\" $byteRangeDataTags>\"${htmlEscape(value)}\"</div>"
     }
 }
 data class BPAsciiString(override val value: String, override val sourceByteRange: Pair<Int, Int>? = null) : BPString() {
@@ -491,6 +491,10 @@ data class NSDate(val value: Date, override val sourceByteRange: Pair<Int, Int>)
 
 data class NSUUID(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = value.hex() // for now
+}
+
+data class NSURL(val value: String, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
+    override fun toString() = value // for now
 }
 
 data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
