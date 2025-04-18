@@ -124,58 +124,6 @@ fun applyLiveDecodeListeners() {
     }
 }
 
-/*fun decode(tryhard: Boolean) {
-    val output = document.getElementById("output") as HTMLDivElement
-    val floatview = document.getElementById("floatview") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
-
-    // reset output
-    output.clear()
-    floatview.innerHTML = ""
-    bytefinder.style.display = "none"
-
-    // decode all inputs
-    val textareas = document.querySelectorAll(".data")
-    for (i in 0 until textareas.length) {
-        val textarea = textareas[i] as HTMLTextAreaElement
-        val inputText = textarea.value.trim()
-        if (inputText.isEmpty()) continue // only decode input text areas that are in use
-
-        // decode input
-        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
-        val result = ByteWitch.analyze(bytes, tryhard)
-
-        if (result.isNotEmpty()) {
-            bytefinder.style.display = "flex"
-
-            val floatviewBlock = document.createElement("DIV") as HTMLDivElement
-            floatviewBlock.innerText = bytes.hex()
-            floatview.appendChild(floatviewBlock)
-
-            result.forEach {
-                val parseResult = document.createElement("DIV") as HTMLDivElement
-
-                val parseName = document.createElement("H3") as HTMLHeadingElement
-                parseName.innerText = "Message ${i + 1}: ${it.first}"
-
-                val parseContent = document.createElement("DIV") as HTMLDivElement
-                parseContent.classList.add("parsecontent")
-                parseContent.innerHTML = it.second.renderHTML()
-
-                attachNemesysButtons(parseContent, bytes)
-
-                parseContent.children.asList().forEach { child ->
-                    attachRangeListeners(child)
-                }
-
-                parseResult.appendChild(parseName)
-                parseResult.appendChild(parseContent)
-                output.appendChild(parseResult)
-            }
-        }
-    }
-}*/
-
 fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -201,17 +149,12 @@ fun decode(tryhard: Boolean) {
             bytefinder.style.display = "flex"
 
             // add byte sequence for float view
-            floatviewMessages[i] = bytes.hex()
+            val msgIndex = i
+            floatviewMessages[msgIndex] = bytes.hex()
 
             // create a container for this message
             val messageBox = document.createElement("DIV") as HTMLDivElement
             messageBox.classList.add("message-output")
-
-            // Bytes block
-            /*val floatviewBlock = document.createElement("DIV") as HTMLDivElement
-            floatviewBlock.classList.add("byteview-block")
-            floatviewBlock.innerText = bytes.hex()
-            messageBox.appendChild(floatviewBlock)*/
 
             result.forEach {
                 val parseResult = document.createElement("DIV") as HTMLDivElement
@@ -223,17 +166,9 @@ fun decode(tryhard: Boolean) {
                 parseContent.classList.add("parsecontent")
                 parseContent.innerHTML = it.second.renderHTML()
 
-                attachNemesysButtons(parseContent, bytes)
+                attachNemesysButtons(parseContent, bytes, msgIndex)
 
-                /*parseContent.children.asList().forEach { child ->
-                    attachRangeListeners(child)
-                }*/
-
-                parseContent.children.asList().forEach { child ->
-                    child.setAttribute("data-msgindex", i.toString()) // this is needed to identify bytes for the float view
-                    attachRangeListeners(child)
-                }
-
+                attachRangeListeners(parseContent, msgIndex)
 
                 parseResult.appendChild(parseName)
                 parseResult.appendChild(parseContent)
@@ -246,9 +181,9 @@ fun decode(tryhard: Boolean) {
 }
 
 // attach button handlers for nemesys
-fun attachNemesysButtons(parseContent: Element, bytes: ByteArray) {
+fun attachNemesysButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
     attachEditButtonHandler(parseContent)
-    attachFinishButtonHandler(parseContent, bytes)
+    attachFinishButtonHandler(parseContent, bytes, msgIndex)
 }
 
 
@@ -279,7 +214,7 @@ fun rebuildSegmentsFromDOM(container: HTMLElement): List<Pair<Int, NemesysField>
 }
 
 // attach finish button handler for editable nemesys content
-fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray) {
+fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgIndex: Int) {
     container.querySelectorAll(".finish-button").asList().forEach { btnElement ->
         val button = btnElement as HTMLElement
         button.addEventListener("click", {
@@ -296,6 +231,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray) {
 
             // create new nemesys object with new segments
             val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd)
+            Logger.log(newObject)
             val newHTML = newObject.renderHTML()
 
             val temp = document.createElement("div") as HTMLDivElement
@@ -311,9 +247,9 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray) {
             oldWrapper.replaceWith(newWrapper)
 
             // attach new button handlers
-            attachRangeListeners(newWrapper)
+            attachRangeListeners(newWrapper, msgIndex)
             attachEditButtonHandler(newWrapper)
-            attachFinishButtonHandler(newWrapper, originalBytes)
+            attachFinishButtonHandler(newWrapper, originalBytes, msgIndex)
         })
     }
 }
@@ -339,8 +275,6 @@ fun attachEditButtonHandler(container: Element) {
 
 // separator handler to change boundaries of nemesys content
 fun attachNemesysSeparatorHandlers() {
-    // TODO need a way to add more separators
-
     // get all separators
     val separators = document.querySelectorAll(".field-separator")
 
@@ -349,20 +283,37 @@ fun attachNemesysSeparatorHandlers() {
 
         var isDragging = false // to check if the user clicks on a separator right now
         var startX = 0.0 // save x position of dragged separator
+        var startY = 0.0 // save y position of dragged separator
+        var offsetX = 0.0 // needed to move separator with the cursor
+        var offsetY = 0.0 // needed to move separator with the cursor
         var currentSeparator: HTMLElement? = null // the separator that is currently pressed by the user
         var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator
-        var separatorTop: Double = 0.0 // needed to make sure that separator is only moved in the same line
 
         // start dragging separator when mouse is pressed down. remember separator, start position, ...
         separator.addEventListener("mousedown", { event ->
             event as MouseEvent
             isDragging = true
-            startX = event.clientX.toDouble()
-            separatorTop = separator.getBoundingClientRect().top
             currentSeparator = separator
-            separator.style.zIndex = "100"
-            separator.style.position = "relative"
-            document.body?.style?.cursor = "ew-resize" // change cursor of mouse
+            startX = event.clientX.toDouble()
+            startY = event.clientY.toDouble()
+
+            val rect = separator.getBoundingClientRect()
+            val parentRect = separator.offsetParent?.getBoundingClientRect() ?: rect
+
+            offsetX = startX - rect.left
+            offsetY = startY - rect.top
+
+            // set separator style for dragging
+            separator.classList.add("dragging")
+            separator.style.position = "absolute"
+            separator.style.zIndex = "1000"
+            separator.style.width = "${rect.width}px"
+            separator.style.height = "${rect.height}px"
+            separator.style.left = "${rect.left - parentRect.left}px"
+            separator.style.top = "${rect.top - parentRect.top}px"
+
+            document.body?.style?.cursor = "move"
+
             event.preventDefault()
         })
 
@@ -371,24 +322,25 @@ fun attachNemesysSeparatorHandlers() {
             if (!isDragging) return@addEventListener // do nothing if no separator is selected
             event as MouseEvent
 
-            val dx = event.clientX - startX
-            currentSeparator?.style?.transform = "translateX(${dx}px)"
+            val parentRect = currentSeparator?.offsetParent?.getBoundingClientRect()
+            if (parentRect != null) {
+                val newX = event.clientX - parentRect.left - offsetX
+                val newY = event.clientY - parentRect.top - offsetY
+                currentSeparator?.style?.left = "${newX}px"
+                currentSeparator?.style?.top = "${newY}px"
+            }
 
-            // only look at bytegroups on the same line (y-position)
+            // find new position
             val byteGroups = document.querySelectorAll(".bytegroup")
             for (j in 0 until byteGroups.length) {
                 val bg = byteGroups[j] as HTMLElement
                 val rect = bg.getBoundingClientRect()
+                val withinX = event.clientX >= rect.left && event.clientX <= rect.right
+                val withinY = event.clientY >= rect.top && event.clientY <= rect.bottom
 
-                val sameLine = kotlin.math.abs(rect.top - separatorTop) < 10 // tolerance in px
-                if (!sameLine) continue
-
-                val tolerance = rect.width * 0.3
-                val within = event.clientX >= rect.left - tolerance && event.clientX <= rect.right + tolerance
-
-                if (within) {
-                    // update bytegroup to highlightbyte
-                    hoverTarget?.let { it.classList.remove("highlightbyte") }
+                // update bytegroup to highlightbyte
+                if (withinX && withinY) {
+                    hoverTarget?.classList?.remove("highlightbyte")
                     hoverTarget = bg
                     bg.classList.add("highlightbyte")
                     break
@@ -404,23 +356,31 @@ fun attachNemesysSeparatorHandlers() {
             document.body?.style?.cursor = "default"
 
             val dx = event.clientX - startX
-            currentSeparator?.style?.transform = "translateX(0px)"
-            currentSeparator?.style?.zIndex = "10"
+            val dy = event.clientY - startY
+            val totalMovement = kotlin.math.sqrt((dx * dx + dy * dy).toDouble())
 
-            val target = hoverTarget
             val separator = currentSeparator
+            val target = hoverTarget
+
+            // reset separator style after moving it
+            separator?.classList?.remove("dragging")
+            separator?.style?.position = ""
+            separator?.style?.zIndex = ""
+            separator?.style?.width = ""
+            separator?.style?.height = ""
+            separator?.style?.left = ""
+            separator?.style?.top = ""
 
             // check how far the separator has been moved. 3 is just a threshold in px
-            if (separator != null && kotlin.math.abs(dx) < 3) {
-                // delete if it was just a click (with a little animation)
-                deleteSeparator(separator)
-            } else if (target != null && separator != null) {
+            if (separator != null && totalMovement < 3) {
+                // delete if it was just a click
+                separator.parentElement?.removeChild(separator)
+            } else if (separator != null && target != null) {
                 // move if it was dragged over a valid target
-                moveSeparatorToTarget(separator, target)
-
+                moveSeparatorToTarget(separator, target, event.clientX.toDouble())
             }
 
-            hoverTarget?.let { it.classList.remove("highlightbyte") }
+            hoverTarget?.classList?.remove("highlightbyte")
             hoverTarget = null
             currentSeparator = null
         })
@@ -428,52 +388,51 @@ fun attachNemesysSeparatorHandlers() {
 }
 
 // move separator to specific target element
-fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement) {
+fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement, mouseX: Double) {
     val parent = separator.parentElement!!
     val targetParent = target.parentElement!!
 
     if (parent == targetParent) {
+        // check the middle point of the byegroup and then choose whether to set the separator before or after the bytegroup
+        val rect = target.getBoundingClientRect()
+        val midpoint = rect.left + rect.width / 2
+
+        val insertBefore = mouseX < midpoint
+
         parent.removeChild(separator)
-        if (target.nextSibling != null) {
-            parent.insertBefore(separator, target.nextSibling)
-        } else {
-            parent.appendChild(separator)
+
+        // insert separator before the bytegroup
+        if (insertBefore) {
+            parent.insertBefore(separator, target)
+        } else { // insert separator after the bytegroup
+            if (target.nextSibling != null) {
+                parent.insertBefore(separator, target.nextSibling)
+            } else {
+                parent.appendChild(separator)
+            }
         }
     }
 }
 
-// delete separator with a smooth animation
-fun deleteSeparator(separator: HTMLElement) {
-    separator.classList.add("remove-animate")
-    window.setTimeout({
-        separator.parentElement?.removeChild(separator) }, 200)
-}
 
-
-fun attachRangeListeners(element: Element) {
-    if (element.hasAttribute("data-start") && element.hasAttribute("data-end") && element.hasAttribute("data-msgindex")) {
+// attach range listener for float view
+fun attachRangeListeners(element: Element, msgIndex: Int) {
+    if (element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
         val start = element.getAttribute("data-start")!!.toInt()
         val end = element.getAttribute("data-end")!!.toInt()
-        val msgIndex = element.getAttribute("data-msgindex")!!.toInt()
 
         element.addEventListener("click", { evt ->
             val floatview = document.getElementById("floatview")!!
 
             // set byte sequence
             val hex = floatviewMessages[msgIndex] ?: return@addEventListener
-            floatview.innerHTML = ""
-            val textNode = document.createTextNode(hex)
-            floatview.appendChild(textNode)
+            floatview.innerHTML = hex
 
-            // Apply highlight
+            // apply highlighting
             val range = document.createRange()
-            range.setStart(textNode, start * 2)
-            range.setEnd(textNode, end * 2)
+            range.setStart(floatview.firstChild!!, start * 2)
+            range.setEnd(floatview.firstChild!!, end * 2)
             range.surroundContents(document.createElement("span"))
-
-            console.log("Node")
-            console.log(textNode)
-            console.log(range)
 
             evt.stopPropagation()
         })
@@ -491,46 +450,9 @@ fun attachRangeListeners(element: Element) {
         }
     }
 
-    element.children.asList().forEach { attachRangeListeners(it) }
+    // also attach range listeners to child items
+    element.children.asList().forEach { attachRangeListeners(it, msgIndex) }
 }
-
-
-/*fun attachRangeListeners(element: Element) {
-    if (element.hasAttribute("data-start") && element.hasAttribute("data-end") && element.hasAttribute("data-msgindex")) {
-        val start = element.getAttribute("data-start")!!.toInt()
-        val end =  element.getAttribute("data-end")!!.toInt()
-        val msgIndex = element.getAttribute("data-msgindex")!!.toInt()
-
-        element.addEventListener("click", { evt ->
-            val floatview = document.getElementById("floatview")!!
-            //floatview.innerHTML = floatview.textContent!! // re-set previous highlights
-            // set byte sequence
-            val hex = floatviewMessages[msgIndex] ?: return@addEventListener
-            floatview.innerHTML = hex
-
-            val text = floatview.childNodes[0]!!
-            val range = document.createRange()
-            range.setStart(text, start*2);
-            range.setEnd(text, end*2);
-            range.surroundContents(document.createElement("span"))
-
-            evt.stopPropagation()
-        })
-
-        // highlightable elements
-        if(listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack", "nemesys").any { element.classList.contains(it) }) {
-            element.addEventListener("mouseover", { evt ->
-                if(currentHighlight != null)
-                    currentHighlight!!.classList.remove("highlight")
-
-                element.classList.add("highlight")
-                currentHighlight = element
-                evt.stopPropagation()
-            })
-        }
-    }
-    element.children.asList().forEach { attachRangeListeners(it) }
-}*/
 
 // read binary file and add content to textarea
 fun readBinaryFile(file: File) {

@@ -214,6 +214,8 @@
             padding: var(--rowgap);
             border-radius: 0.3rem;
             background: rgba(255, 255, 255, 0.5);
+
+            position: relative;
         }
 
         .bytegroup {
@@ -232,7 +234,7 @@
             margin: 0;
             font-weight: bold;
             color: black;
-            cursor: ew-resize;
+            cursor: move;
             user-select: none;
             position: relative;
             z-index: 10;
@@ -248,10 +250,6 @@
                 opacity: 0;
                 transform: scale(0.8);
             }
-        }
-
-        .field-separator.remove-animate {
-            animation: fadeOutShrink 0.2s ease-out forwards;
         }
 
         .field-separator.dragging {
