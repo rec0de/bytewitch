@@ -341,7 +341,12 @@
         }
 
         #output {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
             gap: 1rem;
+            justify-content: center;
+            align-items: flex-start;
         }
 
         #bytefinder {
@@ -385,6 +390,82 @@
         .generic.highlight {
             background: var(--generic-highlight);
         }
+
+        .icon-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .icon {
+            width: 28px;
+            height: 28px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .icon:hover {
+            transform: scale(1.1);
+        }
+
+        .icon-add {
+            background-image: url("icon_add_red.png");
+        }
+
+        .icon-add:hover {
+            background-image: url("icon_add_red_filled.png");
+        }
+
+        .icon-delete {
+            background-image: url("icon_delete_red.png");
+        }
+
+        .icon-delete:hover {
+            background-image: url("icon_delete_red_filled.png");
+        }
+
+        .icon-edit {
+            background-image: url("icon_edit_white.png");
+            margin-bottom: 4px;
+        }
+
+        .icon-edit:hover {
+            background-image: url("icon_edit_white_filled.png");
+        }
+
+        .icon-finish {
+            background-image: url("icon_finish_white.png");
+            margin-bottom: 4px;
+        }
+
+        .icon-finish:hover {
+            background-image: url("icon_finish_white_filled.png");
+        }
+
+        .message-output {
+            flex: 1 1 calc(33.333% - 1rem); /* put three messages next to each other with a little gap */
+            box-sizing: border-box;
+            border: 2px solid #999;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .byteview-block {
+            font-family: var(--mono);
+            overflow-wrap: anywhere;
+            background: #fff;
+            padding: 0.5rem;
+            border-radius: 0.3rem;
+            border: 1px solid #ccc;
+        }
     </style>
 </head>
 <body>
@@ -400,13 +481,16 @@
     <div id="data_container">
         <textarea class="data"></textarea>
     </div>
+    <div class="icon-buttons">
+        <div class="icon icon-add" id="add_data"></div>
+        <div class="icon icon-delete" id="delete_data"></div>
+    </div>
     <div class="parsebuttons">
         <span>
             <input type="checkbox" id="livedecode" checked />
             <label for="livedecode">live decode</label>
         </span>
         <div></div>
-        <button id="upload_more">upload more</button>
         <button id="upload">upload file</button>
         <button id="decode">decode</button>
         <button id="tryhard">try harder</button>

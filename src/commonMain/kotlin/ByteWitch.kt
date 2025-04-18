@@ -4,10 +4,11 @@ import decoders.*
 
 object ByteWitch {
 
+    private val nemesysDecoder = NemesysParser
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, EdDSA, ECCurves,
-        NemesysParser, EntropyDetector, HeuristicSignatureDetector, Nemesys
+        EntropyDetector, HeuristicSignatureDetector//, NemesysParser // Nemesys
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
@@ -31,9 +32,11 @@ object ByteWitch {
     }
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
+        val allDecoders = decoders + nemesysDecoder // add nemesys
+
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
-            return decoders.mapNotNull {
+            return allDecoders.mapNotNull {
                 val decode = it.tryhardDecode(data)
                 Logger.log("decode with ${it.name} yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
@@ -42,7 +45,7 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = decoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+            val possibleDecoders = allDecoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
 
             return possibleDecoders.mapNotNull {
                 try {

@@ -182,10 +182,16 @@ class NemesysParser {
 
     // merge consecutive fields together if both are printable char values
     fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
-        if (boundaries.isEmpty()) return listOf<Pair<Int, NemesysField>>()
+        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
+
+        // if no boundary detected set start boundary to 0
+        if (boundaries.isEmpty()) {
+            mergedBoundaries.add(Pair(0, NemesysField.UNKNOWN))
+            return mergedBoundaries
+        }
+
         boundaries.add(0, 0)
 
-        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
         var i = 0
 
         while (i < boundaries.size) {
@@ -224,7 +230,7 @@ class NemesysParser {
         // sigma should depend on the field length: Nemesys paper on page 5
         val smoothedDeltaBC = applyGaussianFilter(deltaBC, 0.6)
 
-        // Safety check
+        // Safety check (it mostly enters if the bytes are too short)
         if (smoothedDeltaBC.isEmpty()) return listOf<Pair<Int, NemesysField>>()
 
         // find extrema of smoothedDeltaBC
@@ -277,7 +283,7 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
                     val decode = ByteWitch.quickDecode(segmentBytes, start+sourceOffset)
 
                     // if it's a nemesys object again, just show the hex output
-                    if (decode == null || decode is NemesysObject) {
+                    if (decode == null || decode is NemesysObject) { // settings changed so it can't be a NemesysObject anymore but it can be null
                         // TODO maybe wrap it as in Protobuf.kt by using <div class="nemesysfield roundbox">
                         "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
                     } else {
@@ -289,10 +295,10 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
 
         val content = "<div class=\"nemesysfield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
 
-        val editButton = """<button class="edit-button">edit</button>"""
+        val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
 
         val renderedContent = "<div class=\"nemesys roundbox\" $byteRangeDataTags>" +
-                "$editButton<div class=\"view-default\">$content</div>" +
+                "<div class=\"view-default\">$editButton$content</div>" +
                 "<div class=\"view-editable\" style=\"display:none;\">${renderEditableHTML()}</div>" +
                 "</div>"
 
@@ -320,13 +326,13 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
             }
         }
 
+        val finishButton = "<div class=\"icon icon-finish finish-button\"></div>"
+
         val renderedContent = "<div class='nemesysfield roundbox'><div>" +
                 "<div class='nemesysvalue' id=\"byteContainer\">" +
                 "${renderedFieldContents.joinToString("")}</div></div></div>"
 
-        val finishButton = """<button class="finish-button">finish</button>"""
-
-        return "$renderedContent$finishButton"
+        return "$finishButton$renderedContent"
     }
 
     override fun renderHTML(): String {
