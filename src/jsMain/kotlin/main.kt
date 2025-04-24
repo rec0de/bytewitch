@@ -1,6 +1,7 @@
 import bitmage.hex
 import decoders.NemesysField
 import decoders.NemesysObject
+import decoders.NemesysSequenceAlignment
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
@@ -28,9 +29,8 @@ import org.w3c.dom.*
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
-val floatviewMessages = mutableMapOf<Int, String>()
-
-
+val floatviewMessages = mutableMapOf<Int, ByteArray>()
+val nemesysSegments = mutableMapOf<Int, List<Pair<Int, NemesysField>>>()
 
 fun main() {
     window.addEventListener("load", {
@@ -150,12 +150,13 @@ fun decode(tryhard: Boolean) {
 
             // add byte sequence for float view
             val msgIndex = i
-            floatviewMessages[msgIndex] = bytes.hex()
+            floatviewMessages[msgIndex] = bytes
 
             // create a container for this message
             val messageBox = document.createElement("DIV") as HTMLDivElement
             messageBox.classList.add("message-output")
 
+            // TODO currently if an input changes it reloads all parser
             result.forEach {
                 val parseResult = document.createElement("DIV") as HTMLDivElement
 
@@ -165,6 +166,12 @@ fun decode(tryhard: Boolean) {
                 val parseContent = document.createElement("DIV") as HTMLDivElement
                 parseContent.classList.add("parsecontent")
                 parseContent.innerHTML = it.second.renderHTML()
+
+                // save segments of nemesysObject
+                if (it.second is NemesysObject) {
+                    val segments = (it.second as NemesysObject).getSegments()
+                    nemesysSegments[msgIndex] = segments
+                }
 
                 attachNemesysButtons(parseContent, bytes, msgIndex)
 
@@ -178,6 +185,10 @@ fun decode(tryhard: Boolean) {
             output.appendChild(messageBox)
         }
     }
+
+    // TODO implement sequence alignment
+    val alignedSegment = NemesysSequenceAlignment.alignSegments(floatviewMessages, nemesysSegments)
+    Logger.log(alignedSegment)
 }
 
 // attach button handlers for nemesys
@@ -425,8 +436,8 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
             val floatview = document.getElementById("floatview")!!
 
             // set byte sequence
-            val hex = floatviewMessages[msgIndex] ?: return@addEventListener
-            floatview.innerHTML = hex
+            val message = floatviewMessages[msgIndex] ?: return@addEventListener
+            floatview.innerHTML = message.hex()
 
             // apply highlighting
             val range = document.createRange()

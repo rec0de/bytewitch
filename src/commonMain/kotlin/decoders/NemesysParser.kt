@@ -358,4 +358,153 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
     private fun checkFieldType(bytes: ByteArray) : NemesysField{
         return NemesysField.UNKNOWN
     }
+
+    // returns segments of the nemesys object
+    fun getSegments(): List<Pair<Int, NemesysField>> {
+        return segments
+    }
 }
+
+// class for sequence alignment of nemesys object
+object NemesysSequenceAlignment {
+
+    // main function for sequence alignment
+    fun alignSegments(
+        floatviewMessages: Map<Int, ByteArray>,
+        nemesysSegments: Map<Int, List<Pair<Int, NemesysField>>>
+    ): List<AlignedSegment> {
+        val alignments = mutableListOf<AlignedSegment>()
+
+        // got through all messages
+        for (i in floatviewMessages.keys) {
+            for (j in floatviewMessages.keys) {
+                if (i >= j) continue // to not compare messages twice
+
+                // extract segments and bytes from list
+                val segmentsA = nemesysSegments[i] ?: continue
+                val segmentsB = nemesysSegments[j] ?: continue
+                val bytesA = floatviewMessages[i] ?: continue
+                val bytesB = floatviewMessages[j] ?: continue
+
+                // compare all segments form A with all segments of B
+                for (segmentAIndex in segmentsA.indices) {
+                    // extract bytes from segmentA
+                    val (startA, _) = segmentsA[segmentAIndex]
+                    val endA = if (segmentAIndex + 1 < segmentsA.size) segmentsA[segmentAIndex + 1].first else bytesA.size
+                    val segmentBytesA = bytesA.sliceArray(startA until endA)
+
+
+
+
+                    // only save best match for segmentA
+                    var bestMatch: AlignedSegment? = null
+
+                    for (segmentBIndex in segmentsB.indices) {
+                        // extract bytes from segmentB
+                        val (startB, _) = segmentsB[segmentBIndex]
+                        val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].first else bytesB.size
+                        val segmentBytesB = bytesB.sliceArray(startB until endB)
+
+                        val dmValue = calculateDissimilarity(segmentBytesA, segmentBytesB, startA, startB)
+                        val current = AlignedSegment(i, j, segmentAIndex, segmentBIndex, dmValue)
+
+                        // check if current match is better than the best match
+                        if (bestMatch == null || dmValue < bestMatch.dissimilarity) {
+                            bestMatch = current
+                        }
+                    }
+
+                    // save best match for segmentA
+                    bestMatch?.let { alignments.add(it) }
+                }
+            }
+        }
+
+        return alignments.sortedBy { it.dissimilarity } // sort by dissimilarity (smallest value first)
+    }
+
+
+    // calculate dissimilarity between two segments
+    private fun calculateDissimilarity(segmentA: ByteArray, segmentB: ByteArray, startA: Int, startB: Int): Double {
+        // check if segments have the same size
+        val baseDm = if (segmentA.size == segmentB.size) {
+            canberraDistance(segmentA, segmentB) / segmentA.size
+        } else {
+            // need sliding window approach (Canberra-Ulm Dissimilarity) if segments have different sizes
+            canberraUlmDissimilarity(segmentA, segmentB)
+        }
+
+        // advanced position penalty
+        val positionPenalty = computePositionPenalty(startA, startB, segmentA.size, segmentB.size)
+
+        return baseDm + positionPenalty
+    }
+
+    // Canberra Distance for segments of the same size
+    private fun canberraDistance(segmentA: ByteArray, segmentB: ByteArray): Double {
+        var sum = 0.0
+        for (i in segmentA.indices) {
+            val ai = segmentA[i].toInt() and 0xFF
+            val bi = segmentB[i].toInt() and 0xFF
+            val denominator = ai + bi
+            if (denominator != 0) {
+                sum += kotlin.math.abs(ai - bi).toDouble() / denominator
+            }
+        }
+        return sum
+    }
+
+    // Canberra-Ulm Dissimilarity for segments of different sizes (sliding window approach)
+    private fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray): Double {
+        val shortSegment = if (segmentS.size <= segmentT.size) segmentS else segmentT
+        val longSegment = if (segmentS.size > segmentT.size) segmentS else segmentT
+
+        var minD = Double.MAX_VALUE
+
+        // sliding window to search for the lowest dissimilarity
+        for (offset in 0..(longSegment.size - shortSegment.size)) {
+            val window = longSegment.sliceArray(offset until (offset + shortSegment.size))
+            val dC = canberraDistance(shortSegment, window) / shortSegment.size
+            if (dC < minD) {
+                minD = dC
+            }
+        }
+
+        val r = (longSegment.size - shortSegment.size).toDouble() / longSegment.size
+        val pf = 1.0 // hyper parameter to set the non-linear penalty
+
+        val dm = (shortSegment.size.toDouble() / longSegment.size.toDouble()) * minD +
+                r +
+                (1 - minD) * r * (shortSegment.size / (longSegment.size * longSegment.size) - pf)
+
+        return dm
+    }
+
+    // position penalty for absolute and relative difference
+    private fun computePositionPenalty(startA: Int, startB: Int, lenA: Int, lenB: Int): Double {
+        val alpha = 0.02 // hyper parameter for absolute difference
+        val beta = 0.03  // hyper parameter for relative difference
+
+        // calc penalty for absolute difference
+        val maxLen = maxOf(lenA, lenB).toDouble()
+        val positionDiffAbs = kotlin.math.abs(startA - startB).toDouble()
+        val penaltyAbs = positionDiffAbs / maxLen
+
+        // calc penalty for relative difference
+        val relativePosA = startA.toDouble() / lenA
+        val relativePosB = startB.toDouble() / lenB
+        val penaltyRel = kotlin.math.abs(relativePosA - relativePosB)
+
+        return alpha * penaltyAbs + beta * penaltyRel
+    }
+
+}
+
+// aligned segment for Nemesys
+data class AlignedSegment(
+    val protocolA: Int,
+    val protocolB: Int,
+    val segmentIndexA: Int,
+    val segmentIndexB: Int,
+    val dissimilarity: Double
+)
