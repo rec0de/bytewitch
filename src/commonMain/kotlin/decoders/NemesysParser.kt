@@ -431,7 +431,10 @@ object NemesysSequenceAlignment {
             canberraDistance(segmentA, segmentB) / segmentA.size
         } else {
             // need sliding window approach (Canberra-Ulm Dissimilarity) if segments have different sizes
-            canberraUlmDissimilarity(segmentA, segmentB)
+            // canberraUlmDissimilarity(segmentA, segmentB)
+
+            // my own alternative
+            canberraDissimilarityWithPooling(segmentA, segmentB)
         }
 
         // advanced position penalty
@@ -479,6 +482,51 @@ object NemesysSequenceAlignment {
 
         return dm
     }
+
+    // Canberra Dissimilarity for segments of different sizes (using pooling)
+    private fun canberraDissimilarityWithPooling(segmentA: ByteArray, segmentB: ByteArray): Double {
+        val shortSegment: ByteArray
+        val longSegment: ByteArray
+
+        // determine longer and shorter segment
+        if (segmentA.size <= segmentB.size) {
+            shortSegment = segmentA
+            longSegment = segmentB
+        } else {
+            shortSegment = segmentB
+            longSegment = segmentA
+        }
+
+        // pool longer segment
+        val pooledSegment = averagePoolSegment(longSegment, shortSegment.size)
+
+        // now just use the regular canberraDistance with pooledSegment
+        return canberraDistance(shortSegment, pooledSegment) / shortSegment.size
+    }
+
+    // average pooling of a segment to transform it in a lower dimension
+    private fun averagePoolSegment(segment: ByteArray, targetSize: Int): ByteArray {
+        val pooled = ByteArray(targetSize)
+        val chunkSize = segment.size.toDouble() / targetSize
+
+        for (i in 0 until targetSize) {
+            // chunk that we need to pool
+            val start = (i * chunkSize).toInt()
+            val end = ((i + 1) * chunkSize).toInt().coerceAtMost(segment.size)
+            val chunk = segment.sliceArray(start until end)
+
+            val avgValue = if (chunk.isNotEmpty()) {
+                chunk.map { it.toInt() and 0xFF }.average().toInt() // calc average value
+            } else {
+                0
+            }
+
+            pooled[i] = avgValue.toByte()
+        }
+
+        return pooled
+    }
+
 
     // position penalty for absolute and relative difference
     private fun computePositionPenalty(startA: Int, startB: Int, lenA: Int, lenB: Int): Double {
