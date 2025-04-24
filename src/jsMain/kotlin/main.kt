@@ -86,7 +86,7 @@ fun main() {
         // to add more text areas for protocols
         addDataBox.onclick = {
             val newTextarea = document.createElement("textarea") as HTMLTextAreaElement
-            newTextarea.className = "data"
+            newTextarea.className = "data input_area"
             dataContainer.appendChild(newTextarea)
 
             // for live decode
@@ -114,7 +114,7 @@ fun main() {
 
 // input listener for live decode of all text areas
 fun applyLiveDecodeListeners() {
-    val textareas = document.querySelectorAll(".data")
+    val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         val ta = textareas[i] as HTMLTextAreaElement
         ta.oninput = {
@@ -135,7 +135,7 @@ fun decode(tryhard: Boolean) {
     bytefinder.style.display = "none"
 
     // decode all inputs
-    val textareas = document.querySelectorAll(".data")
+    val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         val textarea = textareas[i] as HTMLTextAreaElement
         val inputText = textarea.value.trim()
@@ -500,7 +500,7 @@ fun readFile(file: File) {
 // add content to textarea
 fun appendTextareaWithContent(content: String) {
     val container = document.getElementById("data_container")!!
-    val textareas = container.querySelectorAll(".data")
+    val textareas = container.querySelectorAll(".input_area")
 
     // check if an empty text area already exists
     for (i in 0 until textareas.length) {
@@ -514,7 +514,7 @@ fun appendTextareaWithContent(content: String) {
 
     // create new textarea if no empty one exists
     val textarea = document.createElement("textarea") as HTMLTextAreaElement
-    textarea.className = "data"
+    textarea.className = "data input_area"
     textarea.value = content
     container.appendChild(textarea)
 
