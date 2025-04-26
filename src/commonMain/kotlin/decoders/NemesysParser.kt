@@ -277,17 +277,27 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
 
             // differentiate between field types
             when (fieldType) {
-                NemesysField.STRING -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"</div>"
-                // NemesysField.UNKNOWN -> "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+                // TODO maybe we shouldn't work with NemesysField.STRING because it is automatically detected as a string anyway by the quickDecoder
+                NemesysField.STRING ->
+                    "<div class=\"nemesysfield roundbox data\" $valueLengthTag>" +
+                        "<div class=\"nemesysvalue\" $valueLengthTag>" +
+                            "${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"" +
+                        "</div>" +
+                    "</div>"
+
                 NemesysField.UNKNOWN -> {
                     val decode = ByteWitch.quickDecode(segmentBytes, start+sourceOffset)
 
+                    // check if we have to wrap content
+                    val requiresWrapping = decode == null || decode is NemesysObject || decode is BWString || decode is BWAnnotatedData
+                    val prePayload = if(requiresWrapping) "<div class=\"nemesysfield roundbox data\" $valueLengthTag>" else ""
+                    val postPayload = if(requiresWrapping) "</div>" else ""
+
                     // if it's a nemesys object again, just show the hex output
                     if (decode == null || decode is NemesysObject) { // settings changed so it can't be a NemesysObject anymore but it can be null
-                        // TODO maybe wrap it as in Protobuf.kt by using <div class="nemesysfield roundbox">
-                        "<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>"
+                        "$prePayload<div class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>$postPayload"
                     } else {
-                        decode.renderHTML()
+                        "$prePayload${decode.renderHTML()}$postPayload"
                     }
                 }
             }
