@@ -290,6 +290,8 @@ fun attachNemesysSeparatorHandlers() {
         var currentSeparator: HTMLElement? = null // the separator that is currently pressed by the user
         var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator
 
+        var clickStartTime = 0.0 // count click time to interpret is as deleted
+
         // start dragging separator when mouse is pressed down. remember separator, start position, ...
         separator.addEventListener("mousedown", { event ->
             event as MouseEvent
@@ -297,6 +299,7 @@ fun attachNemesysSeparatorHandlers() {
             currentSeparator = separator
             startX = event.clientX.toDouble()
             startY = event.clientY.toDouble()
+            clickStartTime = window.performance.now() // remember start time
 
             val rect = separator.getBoundingClientRect()
             val parentRect = separator.offsetParent?.getBoundingClientRect() ?: rect
@@ -356,6 +359,9 @@ fun attachNemesysSeparatorHandlers() {
             event as MouseEvent
             document.body?.style?.cursor = "default"
 
+            val clickEndTime = window.performance.now()
+            val timeDiff = clickEndTime - clickStartTime
+
             val dx = event.clientX - startX
             val dy = event.clientY - startY
             val totalMovement = kotlin.math.sqrt((dx * dx + dy * dy).toDouble())
@@ -373,7 +379,9 @@ fun attachNemesysSeparatorHandlers() {
             separator?.style?.top = ""
 
             // check how far the separator has been moved. 3 is just a threshold in px
-            if (separator != null && totalMovement < 3) {
+            // if (separator != null && totalMovement < 3) {
+            // check if it's just a short click or a long movement
+            if (separator != null && timeDiff < 200 && totalMovement < 3) {
                 // delete if it was just a click and replace it with a separator-placeholder
                 val placeholder = document.createElement("div") as HTMLElement
                 placeholder.className = "separator-placeholder"
