@@ -223,6 +223,7 @@
             padding: 5px;
             border: 1px solid #ccc;
             background: white;
+            vertical-align: middle;
         }
 
         .highlightbyte {
@@ -463,6 +464,35 @@
             padding: 0.5rem;
             border-radius: 0.3rem;
             border: 1px solid #ccc;
+        }
+
+
+
+
+        .separator-placeholder {
+            display: inline-block;
+            height: 22px;
+            background-color: transparent;
+            cursor: pointer;
+            vertical-align: middle;
+            position: relative;
+        }
+
+        .separator-placeholder::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -2px;
+            width: 5px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            transition: background 0.2s ease, border-radius 0.2s ease;
+            z-index: 1;
+            border-radius: 2px; /* <--- hier runden wir */
+        }
+
+        .separator-placeholder:hover::before {
+            background: #999999;
         }
     </style>
 </head>

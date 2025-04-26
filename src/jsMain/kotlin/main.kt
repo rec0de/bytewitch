@@ -269,6 +269,7 @@ fun attachEditButtonHandler(container: Element) {
 
             // this is needed to work with the separator
             attachNemesysSeparatorHandlers()
+            attachSeparatorPlaceholderClickHandlers()
         })
     }
 }
@@ -373,8 +374,11 @@ fun attachNemesysSeparatorHandlers() {
 
             // check how far the separator has been moved. 3 is just a threshold in px
             if (separator != null && totalMovement < 3) {
-                // delete if it was just a click
-                separator.parentElement?.removeChild(separator)
+                // delete if it was just a click and replace it with a separator-placeholder
+                val placeholder = document.createElement("div") as HTMLElement
+                placeholder.className = "separator-placeholder"
+                separator.parentElement?.replaceChild(placeholder, separator)
+                attachSeparatorPlaceholderClickHandlers()
             } else if (separator != null && target != null) {
                 // move if it was dragged over a valid target
                 moveSeparatorToTarget(separator, target, event.clientX.toDouble())
@@ -389,30 +393,49 @@ fun attachNemesysSeparatorHandlers() {
 
 // move separator to specific target element
 fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement, mouseX: Double) {
-    val parent = separator.parentElement!!
-    val targetParent = target.parentElement!!
+    val parent = separator.parentElement ?: return
+    val targetParent = target.parentElement ?: return
 
+    // check that separator hasn't moved into another editable nemesys field
     if (parent == targetParent) {
-        // check the middle point of the byegroup and then choose whether to set the separator before or after the bytegroup
+        // calc target position
         val rect = target.getBoundingClientRect()
-        val midpoint = rect.left + rect.width / 2
+        val insertBefore = mouseX < rect.left + rect.width / 2
+        val targetSibling = if (insertBefore) target.previousElementSibling else target.nextElementSibling // targetSibling = should be placeholder
 
-        val insertBefore = mouseX < midpoint
+        // return if no placeholder exists at target position (e.g. end of sequence, separator hasn't moved, is already another field-separator)
+        if (targetSibling !is HTMLElement || !targetSibling.classList.contains("separator-placeholder")) return
 
-        parent.removeChild(separator)
+        // replace old separator with placeholder
+        val placeholderClone = document.createElement("div") as HTMLElement
+        placeholderClone.className = "separator-placeholder"
+        parent.replaceChild(placeholderClone, separator)
 
-        // insert separator before the bytegroup
-        if (insertBefore) {
-            parent.insertBefore(separator, target)
-        } else { // insert separator after the bytegroup
-            if (target.nextSibling != null) {
-                parent.insertBefore(separator, target.nextSibling)
-            } else {
-                parent.appendChild(separator)
-            }
-        }
+        // replace target placeholder with separator
+        targetParent.replaceChild(separator, targetSibling)
+
+        attachSeparatorPlaceholderClickHandlers()
     }
 }
+
+// replace placeholder with separator if clicked
+fun attachSeparatorPlaceholderClickHandlers() {
+    val placeholders = document.querySelectorAll(".separator-placeholder")
+
+    for (i in 0 until placeholders.length) {
+        val placeholder = placeholders[i] as HTMLElement
+        placeholder.addEventListener("click", {
+            val fieldSeparator = document.createElement("div") as HTMLElement
+            fieldSeparator.className = "field-separator"
+            fieldSeparator.innerText = "|"
+
+            placeholder.parentElement?.replaceChild(fieldSeparator, placeholder)
+            attachNemesysSeparatorHandlers()
+            attachSeparatorPlaceholderClickHandlers()
+        })
+    }
+}
+
 
 
 // attach range listener for float view
