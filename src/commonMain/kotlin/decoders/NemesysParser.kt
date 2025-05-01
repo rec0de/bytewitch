@@ -370,21 +370,102 @@ object NemesysSequenceAlignment {
 
     // main function for sequence alignment
     fun alignSegments(
-        floatviewMessages: Map<Int, ByteArray>,
+        messages: Map<Int, ByteArray>,
         nemesysSegments: Map<Int, List<Pair<Int, NemesysField>>>
     ): List<AlignedSegment> {
         val alignments = mutableListOf<AlignedSegment>()
+        val tresholdAlignedSegment = 0.17
 
-        // got through all messages
-        for (i in floatviewMessages.keys) {
-            for (j in floatviewMessages.keys) {
-                if (i >= j) continue // to not compare messages twice
+        // get dissimilarity matrix (by using canberra-ulm dissimilarity)
+        val sparseMatrixData = calcSparseSimilarityMatrix(messages, nemesysSegments, tresholdAlignedSegment)
+
+        for ((pair, matrixS) in sparseMatrixData) {
+            val (protoA, protoB) = pair
+
+            // get maximum amount of segments in each protocol
+            val maxA = matrixS.keys.maxOf { it.first } + 1
+            val maxB = matrixS.keys.maxOf { it.second } + 1
+
+            val gapPenalty = -1.0
+            val matrixNW = calcNeedlemanWunschMatrix(maxA, maxB, matrixS, gapPenalty)
+
+            // traceback
+            var i = maxA
+            var j = maxB
+            while (i > 0 && j > 0) {
+                val score = matrixNW[i][j]
+                val diag = matrixNW[i - 1][j - 1]
+                val up = matrixNW[i - 1][j]
+                // val left = matrixNW[i][j - 1]
+
+                val sim = matrixS[i - 1 to j - 1] ?: Double.NEGATIVE_INFINITY
+                if (score == diag + sim) {
+                    if (1.0 - sim < tresholdAlignedSegment) {
+                        alignments.add(AlignedSegment(protoA, protoB, i - 1, j - 1, 1.0 - sim))
+                    }
+
+                    i--
+                    j--
+                } else if (score == up + gapPenalty) {
+                    i--
+                } else { // if (score == left + gapPenalty)
+                    j--
+                }
+            }
+        }
+
+        return alignments
+    }
+
+    // calc Needleman-Wunsch Matrix NW
+    private fun calcNeedlemanWunschMatrix(m: Int, n:Int, matrixS: Map<Pair<Int, Int>, Double>, gapPenalty: Double): Array<DoubleArray> {
+        val matrixNW = Array(m + 1) { DoubleArray(n + 1) }
+
+        // init matrix
+        for (i in 0..m) matrixNW[i][0] = i * gapPenalty
+        for (j in 0..n) matrixNW[0][j] = j * gapPenalty
+
+        // fill matrix
+        for (i in 1..m) {
+            for (j in 1..n) {
+                // if no entry in matrixS so choose Double.NEGATIVE_INFINITY (because matrixS in a sparse Matrix)
+                val sim = matrixS[i - 1 to j - 1] ?: Double.NEGATIVE_INFINITY
+
+                val match = matrixNW[i - 1][j - 1] + sim
+                // no 'mismatch' value needed because that's already included in matrixS by having a lower score
+                val delete = matrixNW[i - 1][j] + gapPenalty
+                val insert = matrixNW[i][j - 1] + gapPenalty
+                matrixNW[i][j] = maxOf(match, delete, insert)
+            }
+        }
+
+        return matrixNW
+    }
+
+    /**
+     * calculate sparse dissimilarity matrix for field pairs between protocols
+     *
+     * @return Map< Pair(protocolA_ID, protocolB_ID) -> Map<Pair(segmentIndexA, segmentIndexB) -> similarityValue> >
+     */
+    private fun calcSparseSimilarityMatrix(
+        messages: Map<Int, ByteArray>,
+        nemesysSegments: Map<Int, List<Pair<Int, NemesysField>>>,
+        similarityThreshold: Double
+    ): Map<Pair<Int, Int>, Map<Pair<Int, Int>, Double>> {
+        val result = mutableMapOf<Pair<Int, Int>, MutableMap<Pair<Int, Int>, Double>>()
+
+        // go through all messages
+        for (i in messages.keys) {
+            for (j in messages.keys) {
+                if (i >= j) continue // do not compare messages twice
 
                 // extract segments and bytes from list
                 val segmentsA = nemesysSegments[i] ?: continue
                 val segmentsB = nemesysSegments[j] ?: continue
-                val bytesA = floatviewMessages[i] ?: continue
-                val bytesB = floatviewMessages[j] ?: continue
+                val bytesA = messages[i] ?: continue
+                val bytesB = messages[j] ?: continue
+
+                val simMap = mutableMapOf<Pair<Int, Int>, Double>()
 
                 // compare all segments form A with all segments of B
                 for (segmentAIndex in segmentsA.indices) {
@@ -393,34 +474,29 @@ object NemesysSequenceAlignment {
                     val endA = if (segmentAIndex + 1 < segmentsA.size) segmentsA[segmentAIndex + 1].first else bytesA.size
                     val segmentBytesA = bytesA.sliceArray(startA until endA)
 
-
-
-
-                    // only save best match for segmentA
-                    var bestMatch: AlignedSegment? = null
-
                     for (segmentBIndex in segmentsB.indices) {
                         // extract bytes from segmentB
                         val (startB, _) = segmentsB[segmentBIndex]
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].first else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        val dmValue = calculateDissimilarity(segmentBytesA, segmentBytesB, startA, startB)
-                        val current = AlignedSegment(i, j, segmentAIndex, segmentBIndex, dmValue)
+                        val dissim = calculateDissimilarity(segmentBytesA, segmentBytesB, startA, startB)
+                        val sim = 1.0 - dissim
 
-                        // check if current match is better than the best match
-                        if (bestMatch == null || dmValue < bestMatch.dissimilarity) {
-                            bestMatch = current
+                        if (sim >= similarityThreshold) {
+                            // save matches for segmentA
+                            simMap[segmentAIndex to segmentBIndex] = sim
                         }
                     }
+                }
 
-                    // save best match for segmentA
-                    bestMatch?.let { alignments.add(it) }
+                if (simMap.isNotEmpty()) {
+                    result[i to j] = simMap
                 }
             }
         }
 
-        return alignments.sortedBy { it.dissimilarity } // sort by dissimilarity (smallest value first)
+        return result
     }
 
 
@@ -431,16 +507,16 @@ object NemesysSequenceAlignment {
             canberraDistance(segmentA, segmentB) / segmentA.size
         } else {
             // need sliding window approach (Canberra-Ulm Dissimilarity) if segments have different sizes
-            // canberraUlmDissimilarity(segmentA, segmentB)
+            canberraUlmDissimilarity(segmentA, segmentB)
 
             // my own alternative
-            canberraDissimilarityWithPooling(segmentA, segmentB)
+            // canberraDissimilarityWithPooling(segmentA, segmentB)
         }
 
         // advanced position penalty
-        val positionPenalty = computePositionPenalty(startA, startB, segmentA.size, segmentB.size)
+        // val positionPenalty = computePositionPenalty(startA, startB, segmentA.size, segmentB.size)
 
-        return baseDm + positionPenalty
+        return baseDm // + positionPenalty
     }
 
     // Canberra Distance for segments of the same size

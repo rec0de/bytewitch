@@ -29,7 +29,7 @@ import org.w3c.dom.*
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
-val floatviewMessages = mutableMapOf<Int, ByteArray>()
+val messages = mutableMapOf<Int, ByteArray>()
 val nemesysSegments = mutableMapOf<Int, List<Pair<Int, NemesysField>>>()
 
 fun main() {
@@ -150,7 +150,7 @@ fun decode(tryhard: Boolean) {
 
             // add byte sequence for float view
             val msgIndex = i
-            floatviewMessages[msgIndex] = bytes
+            messages[msgIndex] = bytes
 
             // create a container for this message
             val messageBox = document.createElement("DIV") as HTMLDivElement
@@ -187,7 +187,7 @@ fun decode(tryhard: Boolean) {
     }
 
     // TODO implement sequence alignment
-    val alignedSegment = NemesysSequenceAlignment.alignSegments(floatviewMessages, nemesysSegments)
+    val alignedSegment = NemesysSequenceAlignment.alignSegments(messages, nemesysSegments)
     Logger.log(alignedSegment)
 }
 
@@ -436,7 +436,7 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
             val floatview = document.getElementById("floatview")!!
 
             // set byte sequence
-            val message = floatviewMessages[msgIndex] ?: return@addEventListener
+            val message = messages[msgIndex] ?: return@addEventListener
             floatview.innerHTML = message.hex()
 
             // apply highlighting
