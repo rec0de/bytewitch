@@ -325,7 +325,7 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
             val segmentBytes = bytes.sliceArray(start until end)
 
             // create byte-groups of two bytes
-            val groupedHex = segmentBytes.hex().chunked(2).joinToString("") {
+            val groupedHex = segmentBytes.hex().chunked(2).joinToString("<div class=\"separator-placeholder\"></div>") {
                 "<div class='bytegroup'>$it</div>"
             }
 
