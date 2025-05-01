@@ -239,10 +239,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
 
             // read out new segment structure based on separators
             val newSegments = rebuildSegmentsFromDOM(byteContainer)
+            nemesysSegments[msgIndex] = newSegments
 
             // create new nemesys object with new segments
             val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd)
-            Logger.log(newObject)
             val newHTML = newObject.renderHTML()
 
             val temp = document.createElement("div") as HTMLDivElement
