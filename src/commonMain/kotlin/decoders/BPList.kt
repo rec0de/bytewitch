@@ -17,6 +17,8 @@ class BPListParser(private val nestedDecode: Boolean = true) {
     private var offsetTable = byteArrayOf()
     private var sourceOffset = 0
 
+    private val decodeKeyedArchives = true
+
     companion object : ByteWitchDecoder {
         override val name = "bplist"
         override fun decodesAsValid(data: ByteArray): Pair<Boolean,ByteWitchResult?> {
@@ -98,16 +100,22 @@ class BPListParser(private val nestedDecode: Boolean = true) {
         val rootObject = parseCodable(bytes, sourceOffset)
         rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
 
-        return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
+        if(KeyedArchiveDecoder.isKeyedArchive(rootObject) && decodeKeyedArchives) {
+            try {
+                Logger.log("interpreting bplist as keyed archive")
                 val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
                 archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
-                archive
+                return archive
             }
-            else
-                rootObject
+            catch (e: Exception) {
+                Logger.log("tried to interpret as NSKeyedArchive but got error: $e: ${e.message}")
+            }
+        }
+
+        return rootObject
     }
 
-    fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
+    private fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
         this.sourceOffset = sourceOffset
         objectMap.clear()
 
@@ -274,8 +282,15 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 }
 
                 val dict = BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
-                if(KeyedArchiveDecoder.isKeyedArchive(dict))
-                    KeyedArchiveDecoder.decode(dict)
+                if(KeyedArchiveDecoder.isKeyedArchive(dict) && decodeKeyedArchives) {
+                    try {
+                        KeyedArchiveDecoder.decode(dict)
+                    }
+                    catch (e: Exception) {
+                        Logger.log("tried to interpret as NSKeyedArchive but got error: $e: ${e.message}")
+                        dict
+                    }
+                }
                 else
                     dict
             }
@@ -508,7 +523,7 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
         // for nested decodes of different types we can omit it for cleaner display
         val requiresWrapping = decodeAttempt == null || decodeAttempt is NSObject
 
-        val prePayload = if(requiresWrapping) "<div class=\"nsvalue data\" $byteRangeDataTags>" else ""
+        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $byteRangeDataTags>" else ""
         val postPayload = if(requiresWrapping) "</div>" else ""
         val payloadHTML = decodeAttempt?.renderHTML() ?: "0x${value.hex()}"
 
