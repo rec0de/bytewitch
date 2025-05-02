@@ -44,6 +44,7 @@ class ASN1BER : ParseCompanion() {
     }
 
     private fun decode(bytes: ByteArray, sourceOffset: Int) : ASN1Result {
+        val start = parseOffset + sourceOffset
         val tag = readIdentifier(bytes)
 
         checkPlausibleTag(tag)
@@ -54,7 +55,7 @@ class ASN1BER : ParseCompanion() {
 
         val payloadStartOffset = parseOffset
         val payload = readBytes(bytes, len)
-        val byteRange = Pair(sourceOffset, sourceOffset+parseOffset)
+        val byteRange = Pair(start, sourceOffset+parseOffset)
 
 
         //Logger.log("Payload size: $len")
