@@ -1,7 +1,5 @@
 import bitmage.hex
-import decoders.NemesysField
-import decoders.NemesysObject
-import decoders.NemesysSequenceAlignment
+import decoders.*
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
@@ -24,13 +22,19 @@ import kotlin.math.roundToInt
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
+import org.w3c.dom.events.Event
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
+// save byte messages and nemesys segments
 val messages = mutableMapOf<Int, ByteArray>()
 val nemesysSegments = mutableMapOf<Int, List<Pair<Int, NemesysField>>>()
+
+// global values for SequenceAlignment listeners
+val alignmentMouseEnterListeners = mutableMapOf<String, (Event) -> Unit>()
+val alignmentMouseLeaveListeners = mutableMapOf<String, (Event) -> Unit>()
 
 fun main() {
     window.addEventListener("load", {
@@ -100,7 +104,8 @@ fun main() {
         // to delete last text area
         deleteDataBox.onclick = {
             if (dataContainer.children.length > 1) { // there need to be at least one data container left
-                dataContainer.removeChild(dataContainer.lastElementChild!!)
+                removeTextArea(dataContainer)
+
             }
         }
 
@@ -111,6 +116,25 @@ fun main() {
         }
     })
 }
+
+// remove text area from view and corresponding listeners
+fun removeTextArea(dataContainer: Element) {
+    val lastIndex = dataContainer.children.length - 1
+    if (lastIndex < 0) return
+
+    // delete text area from view
+    dataContainer.removeChild(dataContainer.lastElementChild!!)
+
+    messages.remove(lastIndex)
+    nemesysSegments.remove(lastIndex)
+
+    // TODO need to remove alignment listeners
+
+    // delete from output view
+    val output = document.getElementById("output") as HTMLDivElement
+    output.removeChild(output.lastElementChild!!)
+}
+
 
 // input listener for live decode of all text areas
 fun applyLiveDecodeListeners() {
@@ -167,14 +191,6 @@ fun decode(tryhard: Boolean) {
                 parseContent.classList.add("parsecontent")
                 parseContent.innerHTML = it.second.renderHTML()
 
-                // save segments of nemesysObject
-                if (it.second is NemesysObject) {
-                    val segments = (it.second as NemesysObject).getSegments()
-                    nemesysSegments[msgIndex] = segments
-                }
-
-                attachNemesysButtons(parseContent, bytes, msgIndex)
-
                 attachRangeListeners(parseContent, msgIndex)
 
                 parseResult.appendChild(parseName)
@@ -182,14 +198,101 @@ fun decode(tryhard: Boolean) {
                 messageBox.appendChild(parseResult)
             }
 
+            // for nemesys
+            val nemesysObj = NemesysParser().parse(bytes, 0, msgIndex)
+            nemesysSegments[msgIndex] = nemesysObj.getSegments()
+
+            val nemesysResult = document.createElement("DIV") as HTMLDivElement
+            val nemesysName = document.createElement("H3") as HTMLHeadingElement
+            nemesysName.innerText = "nemesysparser"
+
+            val nemesysContent = document.createElement("DIV") as HTMLDivElement
+            nemesysContent.classList.add("parsecontent")
+            nemesysContent.innerHTML = nemesysObj.renderHTML()
+
+            attachRangeListeners(nemesysContent, msgIndex)
+            attachNemesysButtons(nemesysContent, bytes, msgIndex)
+
+            nemesysResult.appendChild(nemesysName)
+            nemesysResult.appendChild(nemesysContent)
+            messageBox.appendChild(nemesysResult)
+
+
             output.appendChild(messageBox)
         }
     }
 
-    // TODO implement sequence alignment
     val alignedSegment = NemesysSequenceAlignment.alignSegments(messages, nemesysSegments)
-    Logger.log(alignedSegment)
+    attachSequenceAlignmentListeners(alignedSegment)
 }
+
+// attach sequence alignment listeners
+fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
+    // remove old sequence alignment listeners
+    removeAllSequenceAlignmentListeners()
+
+    // group all aligned segments
+    // for example: if AlignedSegment(0, 1, 3, 2, 0.05) is given
+    // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
+    val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
+    for (segment in alignedSegments) {
+        val idA = "${segment.protocolA}-${segment.segmentIndexA}"
+        val idB = "${segment.protocolB}-${segment.segmentIndexB}"
+
+        alignmentGroups.getOrPut(idA) { mutableSetOf() }.add(idB)
+        alignmentGroups.getOrPut(idB) { mutableSetOf() }.add(idA)
+        alignmentGroups[idA]!!.add(idA)
+        alignmentGroups[idB]!!.add(idB)
+    }
+
+    // set up event listeners for every value-align-id
+    for (id in alignmentGroups.keys) {
+        val el = document.querySelector("[value-align-id='${id}']") as? HTMLElement ?: continue
+
+        val mouseEnterHandler: (Event) -> Unit = {
+            alignmentGroups[id]?.forEach { linkedId ->
+                val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
+                for (i in 0 until elements.length) {
+                    (elements[i] as HTMLElement).classList.add("hovered-alignment")
+                }
+            }
+        }
+        val mouseLeaveHandler: (Event) -> Unit = {
+            alignmentGroups[id]?.forEach { linkedId ->
+                val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
+                for (i in 0 until elements.length) {
+                    (elements[i] as HTMLElement).classList.remove("hovered-alignment")
+                }
+            }
+        }
+
+        el.addEventListener("mouseenter", mouseEnterHandler)
+        el.addEventListener("mouseleave", mouseLeaveHandler)
+
+        alignmentMouseEnterListeners[id] = mouseEnterHandler
+        alignmentMouseLeaveListeners[id] = mouseLeaveHandler
+    }
+}
+
+// remove old sequence alignment listeners
+fun removeAllSequenceAlignmentListeners() {
+    for ((id, enterHandler) in alignmentMouseEnterListeners) {
+        val elements = document.querySelectorAll("[value-align-id='${id}']")
+        for (i in 0 until elements.length) {
+            (elements[i] as HTMLElement).removeEventListener("mouseenter", enterHandler)
+        }
+    }
+    for ((id, leaveHandler) in alignmentMouseLeaveListeners) {
+        val elements = document.querySelectorAll("[value-align-id='${id}']")
+        for (i in 0 until elements.length) {
+            (elements[i] as HTMLElement).removeEventListener("mouseleave", leaveHandler)
+        }
+    }
+    alignmentMouseEnterListeners.clear()
+    alignmentMouseLeaveListeners.clear()
+}
+
+
 
 // attach button handlers for nemesys
 fun attachNemesysButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
@@ -242,7 +345,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             nemesysSegments[msgIndex] = newSegments
 
             // create new nemesys object with new segments
-            val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd)
+            val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd, msgIndex)
             val newHTML = newObject.renderHTML()
 
             val temp = document.createElement("div") as HTMLDivElement
@@ -261,6 +364,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             attachRangeListeners(newWrapper, msgIndex)
             attachEditButtonHandler(newWrapper)
             attachFinishButtonHandler(newWrapper, originalBytes, msgIndex)
+
+            // rerun sequence alignment
+            val alignedSegment = NemesysSequenceAlignment.alignSegments(messages, nemesysSegments)
+            attachSequenceAlignmentListeners(alignedSegment)
         })
     }
 }

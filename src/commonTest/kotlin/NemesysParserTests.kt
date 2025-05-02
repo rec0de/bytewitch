@@ -4,7 +4,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import bitmage.fromHex
 import decoders.NemesysField
-import decoders.NemesysObject
 import decoders.NemesysParser
 
 class NemesysParserTests {

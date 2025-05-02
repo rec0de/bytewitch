@@ -10,7 +10,7 @@ class NemesysParser {
         override val name = "nemesysparser"
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-            return NemesysParser().parse(data, sourceOffset)
+            return NemesysParser().parse(data, sourceOffset, null)
         }
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
@@ -249,10 +249,10 @@ class NemesysParser {
     }
 
     // this finds all segment boundaries and returns a nemesys object that can be called to get the html code
-    fun parse(bytes: ByteArray, sourceOffset: Int): NemesysObject {
+    fun parse(bytes: ByteArray, sourceOffset: Int, msgIndex: Int?): NemesysObject {
         val segments = findSegmentBoundaries(bytes)
 
-        return NemesysObject(segments, bytes, Pair(sourceOffset, sourceOffset+bytes.size))
+        return NemesysObject(segments, bytes, Pair(sourceOffset, sourceOffset+bytes.size), msgIndex)
     }
 }
 
@@ -261,7 +261,12 @@ enum class NemesysField {
 }
 
 // this object can be used to get useable html code from the nemesys parser
-class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: ByteArray, override val sourceByteRange: Pair<Int, Int>?) : ByteWitchResult {
+class NemesysObject(
+    val segments: List<Pair<Int, NemesysField>>,
+    val bytes: ByteArray,
+    override val sourceByteRange: Pair<Int, Int>?,
+    val msgIndex: Int?) : ByteWitchResult {
+
     // html view of the normal (non-editable) byte sequences
     fun renderPrettyHTML(): String {
         // val updatedSegments = updateFieldType(segments, bytes) // TODO don't think this is needed because we check it later anyway by using NemesysField.UNKOWN
@@ -274,12 +279,13 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
             val segmentBytes = bytes.sliceArray(start until end)
 
             val valueLengthTag = " data-start='${start+sourceOffset}' data-end='${end+sourceOffset}'"
+            val valueAlignId = " value-align-id='$msgIndex-$index'"
 
             // differentiate between field types
             when (fieldType) {
                 // TODO maybe we shouldn't work with NemesysField.STRING because it is automatically detected as a string anyway by the quickDecoder
                 NemesysField.STRING ->
-                    "<div class=\"nemesysfield roundbox data\" $valueLengthTag>" +
+                    "<div class=\"nemesysfield roundbox data\" $valueLengthTag $valueAlignId>" +
                         "<div class=\"nemesysvalue\" $valueLengthTag>" +
                             "${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"" +
                         "</div>" +
@@ -290,8 +296,8 @@ class NemesysObject(val segments: List<Pair<Int, NemesysField>>, val bytes: Byte
 
                     // check if we have to wrap content
                     val requiresWrapping = decode == null || decode is NemesysObject || decode is BWString || decode is BWAnnotatedData
-                    val prePayload = if(requiresWrapping) "<div class=\"nemesysfield roundbox data\" $valueLengthTag>" else ""
-                    val postPayload = if(requiresWrapping) "</div>" else ""
+                    val prePayload = if(requiresWrapping) "<div class=\"nemesysfield roundbox data\" $valueLengthTag $valueAlignId>" else "<div $valueAlignId>"
+                    val postPayload = if(requiresWrapping) "</div>" else "</div>"
 
                     // if it's a nemesys object again, just show the hex output
                     if (decode == null || decode is NemesysObject) { // settings changed so it can't be a NemesysObject anymore but it can be null
@@ -389,6 +395,9 @@ object NemesysSequenceAlignment {
         // get dissimilarity matrix (by using canberra-ulm dissimilarity)
         val sparseMatrixData = calcSparseSimilarityMatrix(messages, nemesysSegments, tresholdAlignedSegment)
 
+        Logger.log("Matrix")
+        Logger.log(sparseMatrixData)
+
         for ((pair, matrixS) in sparseMatrixData) {
             val (protoA, protoB) = pair
 
@@ -428,7 +437,7 @@ object NemesysSequenceAlignment {
     }
 
     // calc Needleman-Wunsch Matrix NW
-    private fun calcNeedlemanWunschMatrix(m: Int, n:Int, matrixS: Map<Pair<Int, Int>, Double>, gapPenalty: Double): Array<DoubleArray> {
+    fun calcNeedlemanWunschMatrix(m: Int, n:Int, matrixS: Map<Pair<Int, Int>, Double>, gapPenalty: Double): Array<DoubleArray> {
         val matrixNW = Array(m + 1) { DoubleArray(n + 1) }
 
         // init matrix
@@ -490,7 +499,7 @@ object NemesysSequenceAlignment {
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].first else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        val dissim = calculateDissimilarity(segmentBytesA, segmentBytesB, startA, startB)
+                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB/*, startA, startB*/)
                         val sim = 1.0 - dissim
 
                         if (sim >= similarityThreshold) {
@@ -500,37 +509,15 @@ object NemesysSequenceAlignment {
                     }
                 }
 
-                if (simMap.isNotEmpty()) {
-                    result[i to j] = simMap
-                }
+                result[i to j] = simMap
             }
         }
 
         return result
     }
 
-
-    // calculate dissimilarity between two segments
-    private fun calculateDissimilarity(segmentA: ByteArray, segmentB: ByteArray, startA: Int, startB: Int): Double {
-        // check if segments have the same size
-        val baseDm = if (segmentA.size == segmentB.size) {
-            canberraDistance(segmentA, segmentB) / segmentA.size
-        } else {
-            // need sliding window approach (Canberra-Ulm Dissimilarity) if segments have different sizes
-            canberraUlmDissimilarity(segmentA, segmentB)
-
-            // my own alternative
-            // canberraDissimilarityWithPooling(segmentA, segmentB)
-        }
-
-        // advanced position penalty
-        // val positionPenalty = computePositionPenalty(startA, startB, segmentA.size, segmentB.size)
-
-        return baseDm // + positionPenalty
-    }
-
     // Canberra Distance for segments of the same size
-    private fun canberraDistance(segmentA: ByteArray, segmentB: ByteArray): Double {
+    fun canberraDistance(segmentA: ByteArray, segmentB: ByteArray): Double {
         var sum = 0.0
         for (i in segmentA.indices) {
             val ai = segmentA[i].toInt() and 0xFF
@@ -544,7 +531,7 @@ object NemesysSequenceAlignment {
     }
 
     // Canberra-Ulm Dissimilarity for segments of different sizes (sliding window approach)
-    private fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray): Double {
+    fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray): Double {
         val shortSegment = if (segmentS.size <= segmentT.size) segmentS else segmentT
         val longSegment = if (segmentS.size > segmentT.size) segmentS else segmentT
 

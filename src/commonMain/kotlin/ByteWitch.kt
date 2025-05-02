@@ -32,7 +32,7 @@ object ByteWitch {
     }
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
-        val allDecoders = decoders + nemesysDecoder // add nemesys
+        val allDecoders = decoders // + nemesysDecoder // add nemesys
 
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
