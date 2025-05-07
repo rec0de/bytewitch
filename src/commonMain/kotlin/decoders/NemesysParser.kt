@@ -3,6 +3,8 @@ package decoders
 import bitmage.hex
 import kotlin.math.ceil
 import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.pow
 
 class NemesysParser {
 
@@ -181,7 +183,7 @@ class NemesysParser {
     }
 
     // merge consecutive fields together if both are printable char values
-    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<Pair<Int, NemesysField>> {
         val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
 
         // if no boundary detected set start boundary to 0
@@ -223,6 +225,237 @@ class NemesysParser {
         return mergedBoundaries
     }
 
+    // try to improve boundaries by shifting them a bit
+    private fun improveBoundaries(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        var result = mergeCharSequences(boundaries, bytes)
+        result = slideCharWindow(result, bytes)
+        result = nullByteTransitions(result, bytes)
+        result = entropyMerge(result, bytes)
+
+        return result
+    }
+
+    // calc Shannon-Entropy for one segment
+    fun calculateShannonEntropy(segment: ByteArray): Double {
+        // count the amount of bytes in the segment
+        val frequency = mutableMapOf<Byte, Int>()
+        for (byte in segment) {
+            frequency[byte] = (frequency[byte] ?: 0) + 1
+        }
+
+        // calc entropy
+        val total = segment.size.toDouble()
+        var entropy = 0.0
+        for ((_, count) in frequency) {
+            val probability = count / total
+            entropy -= probability * ln(probability) / ln(2.0)
+        }
+
+        return entropy
+    }
+
+    // merge two segments based on their entropy
+    fun entropyMerge(
+        segments: List<Pair<Int, NemesysField>>,
+        bytes: ByteArray
+    ): MutableList<Pair<Int, NemesysField>> {
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        var index = 0
+        while (index < segments.size) {
+            // get current segment
+            val (start, fieldType) = segments[index]
+            val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
+            val currentSegment = bytes.sliceArray(start until end)
+            val currentEntropy = calculateShannonEntropy(currentSegment)
+
+            if (index + 1 < segments.size) { // check if a following segment exists
+                val (nextStart, nextFieldType) = segments[index + 1]
+                if (fieldType == nextFieldType) {  // check that both field have the same field type
+                    val nextEnd = if (index + 2 < segments.size) segments[index + 2].first else bytes.size
+                    val nextSegment = bytes.sliceArray(nextStart until nextEnd)
+                    val nextEntropy = calculateShannonEntropy(nextSegment)
+
+                    val entropyDiff = kotlin.math.abs(currentEntropy - nextEntropy)
+
+                    if (currentEntropy > 0.7 && nextEntropy > 0.7 && entropyDiff < 0.05) {
+                        // xor of the start bytes for both segments
+                        val xorLength = minOf(2, currentSegment.size, nextSegment.size)
+                        val xorStart1 = currentSegment.take(xorLength).toByteArray()
+                        val xorStart2 = nextSegment.take(xorLength).toByteArray()
+                        val xorResult = ByteArray(xorLength) { i -> (xorStart1[i].toInt() xor xorStart2[i].toInt()).toByte() }
+                        val xorEntropy = calculateShannonEntropy(xorResult)
+
+                        if (xorEntropy > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
+                            // merge segments together
+                            result.add(Pair(start, fieldType))
+                            index += 2 // skip the following field because we want to merge it to this one
+                            continue
+                        }
+                    }
+                }
+            }
+
+            // add regular boundary if we didn't merge any segments
+            result.add(Pair(start, fieldType))
+            index++
+        }
+
+        return result
+    }
+
+    // shift null bytes to the right field
+    fun nullByteTransitions(
+        segments: List<Pair<Int, NemesysField>>,
+        bytes: ByteArray
+    ): MutableList<Pair<Int, NemesysField>> {
+        val result = segments.toMutableList()
+
+        for (i in 1 until result.size) {
+            val (prevStart, prevType) = result[i - 1]
+            val (currStart, currType) = result[i]
+
+            // Rule 1: allocate nullbytes to string field
+            if (prevType == NemesysField.STRING) {
+                // count null bytes after the segment
+                var extra = 0
+                while (currStart + extra < bytes.size && bytes[currStart + extra] == 0.toByte()) {
+                    extra++
+                }
+                // only shift boundary if x0 bytes are less than 2 bytes long
+                if (extra in 1..2) {
+                    result[i] = (currStart + extra) to currType
+                }
+            }
+
+
+            // Rule 2: nullbytes before UNKNOWN
+            if (currType != NemesysField.STRING) {
+                // count null bytes in front of the segment
+                var count = 0
+                var idx = currStart - 1
+                while (idx >= prevStart && bytes[idx] == 0.toByte()) {
+                    count++
+                    idx--
+                }
+
+                // only shift boundary if x0 bytes are less than 2 bytes long
+                if (count in 1..2) {
+                    result[i] = (currStart - count) to currType
+                }
+            }
+
+        }
+
+        return result.sortedBy { it.first }.distinctBy { it.first }.toMutableList()
+    }
+
+
+    // check if left or right byte of char sequence is also part of it
+    private fun slideCharWindow(segments: List<Pair<Int, NemesysField>>, bytes: ByteArray): MutableList<Pair<Int, NemesysField>> {
+        val improved = mutableListOf<Pair<Int, NemesysField>>()
+
+        var newEnd = 0
+
+        for (i in segments.indices) {
+            // get start and end of segment
+            var (start, type) = segments[i]
+            val end = if (i + 1 < segments.size) segments[i + 1].first else bytes.size
+
+            // need to check if we already changed the start value in the last round by shifting the boundary
+            if (start < newEnd) {
+                start = newEnd
+            }
+
+            // only shift boundaries if it's a string field
+            if (type == NemesysField.STRING) {
+                var newStart = start
+                newEnd = end
+
+                // check left side
+                while (newStart > 0 && isPrintableChar(bytes[newStart - 1])) {
+                    newStart--
+                }
+
+                // check right side
+                while (newEnd < bytes.size && isPrintableChar(bytes[newEnd])) {
+                    newEnd++
+                }
+
+                improved.add(newStart to NemesysField.STRING)
+            } else {
+                improved.add(start to type)
+            }
+        }
+
+        return improved
+    }
+
+
+    // merge char sequences together - this is the way how it's done by Stephan Kleber in his paper
+    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
+
+        // if no boundary detected set start boundary to 0
+        if (boundaries.isEmpty()) {
+            mergedBoundaries.add(0 to NemesysField.UNKNOWN)
+            return mergedBoundaries
+        }
+
+        boundaries.add(0, 0)
+        var i = 0
+
+        while (i < boundaries.size) {
+            // set start and end of segment
+            val start = boundaries[i]
+            var end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
+            var j = i + 1
+
+            while (j + 1 < boundaries.size) {
+                val nextStart = boundaries[j]
+                val nextEnd = boundaries[j + 1]
+                val nextSegment = bytes.sliceArray(nextStart until nextEnd)
+
+                if (nextSegment.all { it >= 0 && it < 0x7f }) {
+                    end = nextEnd
+                    j++
+                } else {
+                    break
+                }
+            }
+
+            val fullSegment = bytes.sliceArray(start until end)
+
+            if (isCharSegment(fullSegment)) {
+                mergedBoundaries.add(start to NemesysField.STRING)
+                i = j
+            } else {
+                mergedBoundaries.add(start to NemesysField.UNKNOWN)
+                i++
+            }
+        }
+
+        return mergedBoundaries
+    }
+
+    // check if segment is a char sequence
+    private fun isCharSegment(segment: ByteArray): Boolean {
+        if (segment.size < 6) return false
+        if (!segment.all { it >= 0 && it < 0x7f }) return false
+
+        val nonZeroBytes = segment.filter { it != 0.toByte() }
+        if (nonZeroBytes.isEmpty()) return false
+
+        val mean = nonZeroBytes.map { it.toUByte().toInt() }.average()
+        if (mean !in 50.0..115.0) return false
+
+        val nonPrintable = nonZeroBytes.count { it < 0x20 || it == 0x7f.toByte() }
+        val ratio = nonPrintable.toDouble() / segment.size
+        return ratio < 0.33
+    }
+
+
+
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>> {
         val deltaBC = computeDeltaBC(bytes)
@@ -243,7 +476,8 @@ class NemesysParser {
         val preBoundaries = findInflectionPoints(risingDeltas, smoothedDeltaBC)
 
         // merge consecutive text segments together
-        val boundaries = mergeCharSequences(preBoundaries, bytes)
+        // val boundaries = mergeCharSequences(preBoundaries, bytes)
+        val boundaries = improveBoundaries(preBoundaries, bytes)
 
         return boundaries
     }

@@ -5,6 +5,8 @@ import kotlin.test.assertTrue
 import bitmage.fromHex
 import decoders.NemesysField
 import decoders.NemesysParser
+import kotlin.collections.listOf
+
 
 class NemesysParserTests {
 
@@ -203,5 +205,139 @@ class NemesysParserTests {
         expectedValue2.add(Pair(0, NemesysField.STRING))
         val merged2 = parser.mergeCharSequences(boundaries2, message2)
         assertEquals(expectedValue2, merged2) // Full merge, as both are text segments
+    }
+
+    @Test
+    fun testNullByteTransitions() {
+        // check if 00 is added to the previous string
+        var bytes = "556c6d00037a".fromHex()
+
+        var segments = mutableListOf<Pair<Int, NemesysField>>()
+        segments.add(Pair(0, NemesysField.STRING))
+        segments.add(Pair(3, NemesysField.UNKNOWN))
+
+        var expectedResult = mutableListOf<Pair<Int, NemesysField>>()
+        expectedResult.add(Pair(0, NemesysField.STRING))
+        expectedResult.add(Pair(4, NemesysField.UNKNOWN))
+        var actualResult = parser.nullByteTransitions(segments, bytes)
+
+        assertEquals(expectedResult, actualResult)
+
+
+        // check if 00 is added to the next field
+        bytes = "015bf9000003".fromHex()
+
+        segments = mutableListOf<Pair<Int, NemesysField>>()
+        segments.add(Pair(0, NemesysField.UNKNOWN))
+        segments.add(Pair(4, NemesysField.UNKNOWN))
+
+        expectedResult = mutableListOf<Pair<Int, NemesysField>>()
+        expectedResult.add(Pair(0, NemesysField.UNKNOWN))
+        expectedResult.add(Pair(3, NemesysField.UNKNOWN))
+        actualResult = parser.nullByteTransitions(segments, bytes)
+
+        assertEquals(expectedResult, actualResult)
+
+
+        // check that 00 won't be added to the string because x0 row is too long
+        bytes = "7d6e6f746966794576656e743a00000000".fromHex()
+
+        segments = mutableListOf<Pair<Int, NemesysField>>()
+        segments.add(Pair(0, NemesysField.STRING))
+        segments.add(Pair(13, NemesysField.UNKNOWN))
+
+        expectedResult = mutableListOf<Pair<Int, NemesysField>>()
+        expectedResult.add(Pair(0, NemesysField.STRING))
+        expectedResult.add(Pair(13, NemesysField.UNKNOWN))
+        actualResult = parser.nullByteTransitions(segments, bytes)
+
+        assertEquals(expectedResult, actualResult)
+    }
+
+    @Test
+    fun testEntropy_AllZeros() {
+        val bytes = byteArrayOf(0x00, 0x00, 0x00, 0x00)
+        val entropy = parser.calculateShannonEntropy(bytes)
+        assertEquals(0.0, entropy, 0.0001)
+    }
+
+    @Test
+    fun testEntropy_AllSameByte() {
+        val bytes = byteArrayOf(0x41, 0x41, 0x41, 0x41) // 'A'
+        val entropy = parser.calculateShannonEntropy(bytes)
+        assertEquals(0.0, entropy, 0.0001)
+    }
+
+    @Test
+    fun testEntropy_TwoValuesEqualDistribution() {
+        val bytes = byteArrayOf(0x41, 0x42, 0x41, 0x42) // 'A', 'B', 'A', 'B'
+        val entropy = parser.calculateShannonEntropy(bytes)
+        val expected = 1.0
+        assertEquals(expected, entropy, 0.0001)
+    }
+
+    @Test
+    fun testEntropy_FourUniqueValues() {
+        val bytes = byteArrayOf(0x41, 0x42, 0x43, 0x44) // 'A', 'B', 'C', 'D'
+        val entropy = parser.calculateShannonEntropy(bytes)
+        val expected = 2.0
+        assertEquals(expected, entropy, 0.0001)
+    }
+
+    @Test
+    fun testEntropy_RealisticRandomData() {
+        val bytes = byteArrayOf(0xA7.toByte(), 0xD2.toByte(), 0x1B, 0x94.toByte())
+        val entropy = parser.calculateShannonEntropy(bytes)
+        assertTrue(entropy > 1.5 && entropy < 2.1)
+    }
+
+    @Test
+    fun testEntropy_EmptyInput() {
+        val bytes = byteArrayOf()
+        val entropy = parser.calculateShannonEntropy(bytes)
+        assertEquals(0.0, entropy, 0.0001)
+    }
+
+    @Test
+    fun testNoMergeDueToLowEntropy() {
+        val bytes = byteArrayOf(0x00.toByte(), 0x00.toByte(), 0x11.toByte(), 0x11.toByte())
+        val segments = listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN)
+
+        val result = parser.entropyMerge(segments, bytes)
+        assertEquals(segments, result) // no merging, because of low entropy
+    }
+
+    @Test
+    fun testMergeWithHighEntropyAndHighXorEntropy() {
+        val bytes = byteArrayOf(
+            0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
+            0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte()  // Segment 2
+        )
+        val segments = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
+        val expected = listOf(0 to NemesysField.UNKNOWN) // merge together
+        val result = parser.entropyMerge(segments, bytes)
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testNoMergeDueToLowXorEntropy() {
+        val bytes = byteArrayOf(
+            0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
+            0x8A.toByte(), 0x4F.toByte(), 0x2D.toByte(), 0x10.toByte() // Segment 2
+        )
+        val segments = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
+        // no merging because first two bytes are too similar
+        val expected = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
+        val result = parser.entropyMerge(segments, bytes)
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testNoMergeDueToDifferentFieldTypes() {
+        val bytes = byteArrayOf(0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), 0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte())
+        val segments = listOf(0 to NemesysField.STRING, 4 to NemesysField.UNKNOWN)
+        val expected = segments // no merging because of different field types
+        val result = parser.entropyMerge(segments, bytes)
+        assertEquals(expected, result)
     }
 }
