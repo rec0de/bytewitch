@@ -226,7 +226,7 @@ class NemesysParser {
     }
 
     // try to improve boundaries by shifting them a bit
-    private fun improveBoundaries(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+    private fun postProcessing(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
         var result = mergeCharSequences(boundaries, bytes)
         result = slideCharWindow(result, bytes)
         result = nullByteTransitions(result, bytes)
@@ -454,10 +454,113 @@ class NemesysParser {
         return ratio < 0.33
     }
 
+    // detect length prefixes and the corresponding payload
+    fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<Pair<Int, NemesysField>> {
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        // 1 byte sliding window over the message
+        var i = 0
+        while (i < bytes.size - 1) {
+            val payloadLength = bytes[i].toUByte().toInt()
+            val payloadStart = i + 1
+            val payloadEnd = payloadStart + payloadLength
+
+            // check if payloadEnd exceed the message
+            if (payloadEnd > bytes.size) {
+                i++
+                continue
+            }
+
+            val payload = bytes.sliceArray(payloadStart until payloadEnd)
+            val entropy = calculateShannonEntropy(payload)
+            val isPrintable = payload.all { isPrintableChar(it) }
+
+            // try to check if we have another (length, payload) pair
+            val nextValid = if (payloadEnd + 1 < bytes.size) {
+                val nextLength = bytes[payloadEnd].toUByte().toInt()
+                val nextStart = payloadEnd + 1
+                val nextEnd = nextStart + nextLength
+                nextEnd <= bytes.size && (nextEnd - nextStart > 0)
+            } else false
+
+            // check if payload is a string or has the same structure or if we have a follow-up (length, payload) pair
+            if (payloadLength > 3 && (isPrintable /*|| entropy < 3.0 || nextValid*/)) { // TODO better without entropy and nextValid???
+                result.add(i to NemesysField.PAYLOAD_LENGTH)
+                result.add(payloadStart to if (isPrintable) NemesysField.STRING else NemesysField.UNKNOWN)
+                for (j in i until payloadEnd) taken[j] = true
+                i = payloadEnd
+            } else {
+                i++
+            }
+        }
+
+        return result.distinctBy { it.first }.sortedBy { it.first }
+    }
+
 
 
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>> {
+        val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
+
+        // post processing
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        // find all bytes without a corresponding segment
+        val freeRanges = mutableListOf<Pair<Int, Int>>()
+        var currentStart: Int? = null
+        for (i in bytes.indices) {
+            if (!taken[i]) {
+                if (currentStart == null) currentStart = i
+            } else {
+                if (currentStart != null) {
+                    freeRanges.add(currentStart to i)
+                    currentStart = null
+                }
+            }
+        }
+        if (currentStart != null) {
+            freeRanges.add(currentStart to bytes.size)
+        }
+
+        //
+        val dynamicSegments = mutableListOf<Pair<Int, NemesysField>>()
+        for ((start, end) in freeRanges) {
+            val slice = bytes.sliceArray(start until end)
+            val deltaBC = computeDeltaBC(slice)
+
+            // sigma should depend on the field length: Nemesys paper on page 5
+            val smoothed = applyGaussianFilter(deltaBC, 0.6)
+
+            // Safety check (it mostly enters if the bytes are too short)
+            if (smoothed.isEmpty()) continue
+
+            // find extrema of smoothedDeltaBC
+            val extrema = findExtremaInList(smoothed)
+
+            // find all rising points from minimum to maximum in extrema list
+            val rising = findRisingDeltas(extrema)
+
+            // find inflection point in risingDeltas -> those are considered as boundaries
+            val inflection = findInflectionPoints(rising, smoothed)
+
+            // merge consecutive text segments together
+            // val boundaries = mergeCharSequences(preBoundaries, bytes)
+            val improved = postProcessing(inflection.toMutableList(), slice)
+
+            // add relativeStart to the boundaries
+            for ((relativeStart, type) in improved) {
+                dynamicSegments.add((start + relativeStart) to type)
+            }
+        }
+
+        // combine segments together
+        return (fixedSegments + dynamicSegments).sortedBy { it.first }.distinctBy { it.first }
+
+
+
+        /*
+
         val deltaBC = computeDeltaBC(bytes)
 
         // sigma should depend on the field length: Nemesys paper on page 5
@@ -480,6 +583,8 @@ class NemesysParser {
         val boundaries = improveBoundaries(preBoundaries, bytes)
 
         return boundaries
+
+         */
     }
 
     // this finds all segment boundaries and returns a nemesys object that can be called to get the html code
@@ -491,7 +596,7 @@ class NemesysParser {
 }
 
 enum class NemesysField {
-    UNKNOWN, STRING
+    UNKNOWN, STRING, PAYLOAD_LENGTH
 }
 
 // this object can be used to get useable html code from the nemesys parser
@@ -524,8 +629,24 @@ class NemesysObject(
                             "${segmentBytes.hex()} <span>→</span> \"${segmentBytes.decodeToString()}\"" +
                         "</div>" +
                     "</div>"
+                NemesysField.PAYLOAD_LENGTH -> {
+                    val decode = ByteWitch.quickDecode(segmentBytes, start + sourceOffset)
 
-                NemesysField.UNKNOWN -> {
+                    // check if we have to wrap content
+                    val requiresWrapping =
+                        decode == null || decode is NemesysObject || decode is BWString || decode is BWAnnotatedData
+                    val prePayload =
+                        if (requiresWrapping) "<div style='color:blue' class=\"nemesysfield roundbox data\" $valueLengthTag $valueAlignId>" else "<div $valueAlignId>"
+                    val postPayload = if (requiresWrapping) "</div>" else "</div>"
+
+                    // if it's a nemesys object again, just show the hex output
+                    if (decode == null || decode is NemesysObject) { // settings changed so it can't be a NemesysObject anymore but it can be null
+                        "$prePayload<div style='color:blue' class=\"nemesysvalue\" $valueLengthTag>${segmentBytes.hex()}</div>$postPayload"
+                    } else {
+                        "$prePayload${decode.renderHTML()}$postPayload"
+                    }
+                }
+                else -> {
                     val decode = ByteWitch.quickDecode(segmentBytes, start+sourceOffset)
 
                     // check if we have to wrap content
