@@ -676,7 +676,9 @@ fun appendTextareaWithContent(content: String) {
 
 fun arrayBufferToHex(buffer: ArrayBuffer): String {
     val byteArray = Uint8Array(buffer) // Create a Uint8Array view for the buffer
+    val dynamic = byteArray.asDynamic()
     return (0 until byteArray.length).joinToString("") { index ->
-        byteArray.asDynamic()[index].toString(16).padStart(2, '0')
+        val b16string = dynamic[index].toString(16) as String
+        b16string.padStart(2, '0')
     }
 }

@@ -89,6 +89,12 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
             return decode(thing as BPDict)
 
         return when (thing) {
+            is BPAsciiString -> {
+                if(thing.value == "\$null")
+                    BPNull
+                else
+                    thing
+            }
             is BPArray -> {
                 val transformedValues = thing.values.map { transformSupportedClasses(it) }
                 BPArray(transformedValues, thing.sourceByteRange)
@@ -153,6 +159,14 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                             // NSDates encode time as seconds from Jan 01 2001, we convert to standard unix time here
                             NSDate(Date((timestamp.value * 1000).toLong() + 978307200000), timestamp.sourceByteRange)
                         }
+
+                        /*"NSURL" -> {
+                            val base = thing.values[BPAsciiString("NS.base")]!!
+                            val relative = thing.values[BPAsciiString("NS.relative")] as BPString
+
+                            val url = if(base is BPString) base.value + relative.value else relative.value
+                            NSURL(url, relative.sourceByteRange!!)
+                        }*/
 
                         "NSUUID" -> {
                             val uuidData = thing.values[BPAsciiString("NS.uuidbytes")]!! as BPData

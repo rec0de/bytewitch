@@ -44,6 +44,7 @@ class ASN1BER : ParseCompanion() {
     }
 
     private fun decode(bytes: ByteArray, sourceOffset: Int) : ASN1Result {
+        val start = parseOffset + sourceOffset
         val tag = readIdentifier(bytes)
 
         checkPlausibleTag(tag)
@@ -54,7 +55,7 @@ class ASN1BER : ParseCompanion() {
 
         val payloadStartOffset = parseOffset
         val payload = readBytes(bytes, len)
-        val byteRange = Pair(sourceOffset, sourceOffset+parseOffset)
+        val byteRange = Pair(start, sourceOffset+parseOffset)
 
 
         //Logger.log("Payload size: $len")
@@ -94,8 +95,14 @@ class ASN1BER : ParseCompanion() {
                 // Strings
                 12, in 18..22, in 25..30 -> ASN1String(tag, len, payload.decodeToString(), byteRange)
                 // Time
-                23 -> ASN1Time(tag, len, payload.decodeToString(), byteRange, generalized = false)
-                24 -> ASN1Time(tag, len, payload.decodeToString(), byteRange, generalized = true)
+                23 -> {
+                    val string = payload.decodeToString()
+                    ASN1Time(tag, len, string, byteRange, dateFromUTCString(string, false).toString())
+                }
+                24 -> {
+                    val string = payload.decodeToString()
+                    ASN1Time(tag, len, string, byteRange, dateFromUTCString(string, true).toString())
+                }
                 else -> throw Exception("unreachable (update supported types?)")
             }
         }
@@ -253,10 +260,9 @@ class ASN1Integer(tag: ASN1BER.ASN1Tag, length: Int, val value: ByteArray, sourc
     }
 }
 
-class ASN1Time(tag: ASN1BER.ASN1Tag, length: Int, val value: String, sourceByteRange: Pair<Int, Int>, val generalized: Boolean) : ASN1Result(tag, length, sourceByteRange) {
+class ASN1Time(tag: ASN1BER.ASN1Tag, length: Int, val value: String, sourceByteRange: Pair<Int, Int>, private val rendering: String) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
-        val valueRendering = dateFromUTCString(value, generalized).toString()
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$valueRendering</div>"
+        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$rendering</div>"
     }
 }
 

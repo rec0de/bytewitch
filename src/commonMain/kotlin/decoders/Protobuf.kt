@@ -27,15 +27,15 @@ class ProtobufParser {
                     //Logger.log("divined start offset $effectiveStartOffset")
                     val prefix = data.sliceArray(0 until effectiveStartOffset)
 
-                    offsetSearchStart += 1
-
                     val parser = ProtobufParser()
                     val result = parser.parse(data.fromIndex(effectiveStartOffset), effectiveStartOffset)
                     Logger.log("Parsed protobuf accounts for ${((parser.offset.toDouble() / data.size)*100).roundToInt()}% of input bytes")
 
                     // parsed protobuf should at least represent 30% of the input bytes
-                    if(parser.offset < data.size * 0.3)
+                    if(parser.offset < data.size * 0.3) {
+                        offsetSearchStart += 1
                         continue
+                    }
 
                     return if(parser.fullyParsed && effectiveStartOffset == 0) {
                         result
@@ -46,6 +46,8 @@ class ProtobufParser {
                 } catch (e: Exception) {
                     Logger.log(e.toString())
                 }
+
+                offsetSearchStart += 1
             }
 
             return null
@@ -210,13 +212,12 @@ class ProtobufParser {
     }
 
     private fun guessVarLenValue(data: ProtoLen): ProtoValue {
-        // detect nested bplists
-        //if(BPListParser.decodesAsValid(data.value))
-        //    return ProtoBPList(data.value, data.sourceByteRange)
+        // short ascii strings are sometimes hard to distinguish from valid protobufs
 
         // try decoding as string
         try {
-            if(looksLikeUtf8String(data.value) > 0.5)
+            // first character should be printable ascii
+            if(looksLikeUtf8String(data.value, enableLengthBias = false) > 0.95 && data.value[0] in 33..122)
                 return ProtoString(data.value.decodeToString(), data.sourceByteRange)
         } catch(_: Exception) {}
 
@@ -229,6 +230,12 @@ class ProtobufParser {
             if(parser.fullyParsed && nested.objs.keys.all { it in 1..99 })
                 return nested
         } catch (_: Exception) { }
+
+        // try decoding as string with lower threshold
+        try {
+            if(looksLikeUtf8String(data.value) > 0.6)
+                return ProtoString(data.value.decodeToString(), data.sourceByteRange)
+        } catch(_: Exception) {}
 
         return data
     }

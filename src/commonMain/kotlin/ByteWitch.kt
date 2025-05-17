@@ -6,9 +6,9 @@ object ByteWitch {
 
     private val nemesysDecoder = NemesysParser
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser,
-        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector//, NemesysParser // Nemesys
+        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
+        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
+        EntropyDetector, HeuristicSignatureDetector
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
@@ -58,10 +58,18 @@ object ByteWitch {
         }
     }
 
-    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? = decoders.firstOrNull {
-        val confidence = it.confidence(data)
-        confidence > 0.75
-    }?.decode(data, sourceOffset, inlineDisplay = true)
+    fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
+        try {
+            return decoders.firstOrNull {
+                val confidence = it.confidence(data)
+                confidence > 0.75
+            }?.decode(data, sourceOffset, inlineDisplay = true)
+        } catch(e: Exception) {
+            Logger.log("Quick decode failed with exception: ${e.message}")
+            e.printStackTrace()
+            return null
+        }
+    }
 
     private fun decodeHexdump(hexdumpData: String): ByteArray {
         var collectedBytes = byteArrayOf()

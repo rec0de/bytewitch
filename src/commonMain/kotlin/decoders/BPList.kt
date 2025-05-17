@@ -17,6 +17,8 @@ class BPListParser(private val nestedDecode: Boolean = true) {
     private var offsetTable = byteArrayOf()
     private var sourceOffset = 0
 
+    private val decodeKeyedArchives = true
+
     companion object : ByteWitchDecoder {
         override val name = "bplist"
         override fun decodesAsValid(data: ByteArray): Pair<Boolean,ByteWitchResult?> {
@@ -35,23 +37,41 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
             val prefix = data.sliceArray(0 until headerPosition)
             var remainder = data.fromIndex(headerPosition)
+            val remainderSize = remainder.size
+
+            val nestedBplistPositions = remainder.indicesOfAllSubsequences("bplist0".encodeToByteArray()).toMutableList()
+            nestedBplistPositions.remove(0)
 
             // find plausible footer
             var footerEnd = -1
             var alreadySearchedOffset = 0
-            while(footerEnd < remainder.size) {
+            while(alreadySearchedOffset < remainderSize) {
                 val footerCandidatePosition = remainder.indexOfSubsequence("0000000000".fromHex())
                 if(footerCandidatePosition == -1 || remainder.size - footerCandidatePosition < 32)
                     return null
+
                 val tableSize = remainder[footerCandidatePosition + 6]
                 val refSize = remainder[footerCandidatePosition + 7]
                 val objCount = remainder.fromIndex(footerCandidatePosition + 8).readLong(ByteOrder.BIG)
                 val topOffset = remainder.fromIndex(footerCandidatePosition + 16).readLong(ByteOrder.BIG)
                 val tablePosition = remainder.fromIndex(footerCandidatePosition + 24).readLong(ByteOrder.BIG)
 
-                if(tableSize < 4 && refSize < 4 && objCount < 10000 && topOffset < 10000 && tablePosition < footerCandidatePosition) {
+                if(tableSize in 1..3 && refSize in 1..3 && objCount < 10000 && topOffset < 10000 && tablePosition < alreadySearchedOffset+footerCandidatePosition) {
                     footerEnd = alreadySearchedOffset + footerCandidatePosition + 32
-                    break
+                    // footer belongs to nested bplist
+                    if(nestedBplistPositions.any { it < footerEnd }) {
+                        // remove closest preceding header from consideration
+                        val matchingHeader = nestedBplistPositions.filter { it < footerEnd }.max()
+                        nestedBplistPositions.remove(matchingHeader)
+
+                        // skip ahead to end of recognized footer
+                        remainder = remainder.fromIndex(footerEnd)
+                        alreadySearchedOffset = footerEnd
+                        continue
+                    }
+                    else {
+                        break
+                    }
                 }
 
                 remainder = remainder.fromIndex(footerCandidatePosition+1)
@@ -80,16 +100,22 @@ class BPListParser(private val nestedDecode: Boolean = true) {
         val rootObject = parseCodable(bytes, sourceOffset)
         rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
 
-        return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
+        if(KeyedArchiveDecoder.isKeyedArchive(rootObject) && decodeKeyedArchives) {
+            try {
+                Logger.log("interpreting bplist as keyed archive")
                 val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
                 archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
-                archive
+                return archive
             }
-            else
-                rootObject
+            catch (e: Exception) {
+                Logger.log("tried to interpret as NSKeyedArchive but got error: $e: ${e.message}")
+            }
+        }
+
+        return rootObject
     }
 
-    fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
+    private fun parseCodable(bytes: ByteArray, sourceOffset: Int): BPListObject {
         this.sourceOffset = sourceOffset
         objectMap.clear()
 
@@ -255,7 +281,18 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
                 }
 
-                BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
+                val dict = BPDict(keys.zip(values).toMap(), Pair(sourceOffset+offset, sourceOffset+effectiveOffset+objectRefSize*entries))
+                if(KeyedArchiveDecoder.isKeyedArchive(dict) && decodeKeyedArchives) {
+                    try {
+                        KeyedArchiveDecoder.decode(dict)
+                    }
+                    catch (e: Exception) {
+                        Logger.log("tried to interpret as NSKeyedArchive but got error: $e: ${e.message}")
+                        dict
+                    }
+                }
+                else
+                    dict
             }
             else -> throw Exception("Unknown object type byte 0b${objectByte.toString(2)}")
         }
@@ -359,7 +396,7 @@ abstract class BPString : BPListObject() {
 
     override fun renderHtmlValue(): String {
         val veryLong = if(value.length > 300) "data" else ""
-        return "<div class=\"bpvalue stringlit $veryLong\" $byteRangeDataTags>\"$value\"</div>"
+        return "<div class=\"bpvalue stringlit $veryLong\" $byteRangeDataTags>\"${htmlEscape(value)}\"</div>"
     }
 }
 data class BPAsciiString(override val value: String, override val sourceByteRange: Pair<Int, Int>? = null) : BPString() {
@@ -471,6 +508,10 @@ data class NSUUID(val value: ByteArray, override val sourceByteRange: Pair<Int, 
     override fun toString() = value.hex() // for now
 }
 
+data class NSURL(val value: String, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
+    override fun toString() = value // for now
+}
+
 data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = "NSData(${value.hex()})"
 
@@ -482,7 +523,7 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
         // for nested decodes of different types we can omit it for cleaner display
         val requiresWrapping = decodeAttempt == null || decodeAttempt is NSObject
 
-        val prePayload = if(requiresWrapping) "<div class=\"nsvalue data\" $byteRangeDataTags>" else ""
+        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $byteRangeDataTags>" else ""
         val postPayload = if(requiresWrapping) "</div>" else ""
         val payloadHTML = decodeAttempt?.renderHTML() ?: "0x${value.hex()}"
 
