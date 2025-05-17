@@ -22,6 +22,21 @@ class BPList17 {
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             return BPList17().parse(data, sourceOffset)
         }
+
+        override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+            val headerPos = data.indexOfSubsequence("bplist17".encodeToByteArray())
+
+            return if(headerPos >= 0) {
+                val parser = BPList17()
+                val prefix = data.untilIndex(headerPos)
+                val parse = parser.parse(data.fromIndex(headerPos), headerPos)
+                val endPos = parse.rootByteRange!!.second
+                PartialDecode(prefix, parse, data.fromIndex(endPos), Pair(0, data.size))
+            }
+            else
+                null
+
+        }
     }
 
     fun parse(bytes: ByteArray, sourceOffset: Int): BPListObject {
@@ -31,11 +46,11 @@ class BPList17 {
             throw Exception("not a bplist 16/17")
 
         val rootObject = parseCodable(bytes, sourceOffset)
-        rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+        rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+lastObjectEndOffset)
 
         return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
             val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
-            archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
+            archive.rootByteRange = Pair(sourceOffset, sourceOffset+lastObjectEndOffset)
             archive
         }
         else
@@ -75,8 +90,8 @@ class BPList17 {
                 // some bplists contain crazy long integers for tiny numbers
                 // we'll just hope they're never used beyond actual long range
                 if(byteLen in 9..16) {
-                    val upper = Long.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.BIG)
-                    val lower = Long.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.BIG)
+                    val upper = Long.fromBytes(bytes.sliceArray(offset+1 until (offset+1+byteLen-8)), ByteOrder.LITTLE)
+                    val lower = Long.fromBytes(bytes.sliceArray((offset+1+byteLen-8) until (offset+1+byteLen)), ByteOrder.LITTLE)
 
                     if(upper != 0L) {
                         Logger.log("Encountered very long BPInt ($byteLen B) that cannot be equivalently represented as Long")
@@ -89,22 +104,22 @@ class BPList17 {
                 else {
                     // TODO: does this mess with signs? how does bigint do it?
                     lastObjectEndOffset = offset+1+byteLen
-                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.LITTLE), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
                 }
             }
             // Real float
             0x22 -> {
                 lastObjectEndOffset = offset+1+4
-                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readFloat(ByteOrder.BIG).toDouble(), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readFloat(ByteOrder.LITTLE).toDouble(), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Real double
             0x23 -> {
                 lastObjectEndOffset = offset+1+8
-                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readDouble(ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readDouble(ByteOrder.LITTLE), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }
             // Date, always 8 bytes long
             0x33 -> {
-                val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.BIG)
+                val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.LITTLE) // don't have evidence of this being LE but guessing it should match the others
                 lastObjectEndOffset = offset+1+8
                 BPDate(timestamp, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
             }

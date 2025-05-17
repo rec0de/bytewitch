@@ -15,20 +15,24 @@ expect fun currentTimestamp(): Long
 
 expect fun dateFromUTCString(string: String, fullYear: Boolean): Date
 
-fun looksLikeUtf16String(string: String): Double {
-    val printableASCII = string.filter { it.code in 32..126 || it.code in 9..13 }
+fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Double {
+    val printableASCII = string.filter { it.code in 32..126 || it.code in setOf(9, 10, 13) }
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
-    if(veryWeird || string.isEmpty())
+    if(veryWeird || string.isEmpty()) {
+        Logger.log("very weird string: $string")
         return 0.0
+    }
 
-    val lengthBias = max((10-string.length).toDouble()/10, 0.0) * 0.6
+    val lengthBias = if(enableLengthBias) max((10-string.length).toDouble()/10, 0.0) * 0.6 else 0.0
 
     // string is mostly printable ASCII, seems plausible
     val asciiPercentage = printableASCII.length.toDouble() / string.length
-    if(asciiPercentage > 0.8)
+    if(asciiPercentage > 0.8 && weirdASCII.isEmpty()) {
+        Logger.log("mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias}")
         return max(asciiPercentage - lengthBias, 0.0)
+    }
 
     // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
     // let's sort the characters into some bins matching the largest character blocks on the BMP
@@ -86,7 +90,7 @@ fun looksLikeUtf16String(string: String): Double {
     return score
 }
 
-fun looksLikeUtf8String(data: ByteArray): Double {
+fun looksLikeUtf8String(data: ByteArray, enableLengthBias: Boolean = true): Double {
     val string = data.decodeToString()
 
     // there are a lot of ways to cause decoding errors
@@ -94,13 +98,16 @@ fun looksLikeUtf8String(data: ByteArray): Double {
     if(string.any { it.code == 0xFFFD })
         return 0.0
 
+    val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
+    Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
+
     // if the string has no decoding errors and contains multi-byte UTF8 sequences
     // we can be pretty sure this is a valid string
-    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8))
+    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8) && weirdASCII.isEmpty())
         return 1.0
 
     // otherwise, default to generic UTF16 judgment
-    return looksLikeUtf16String(string)
+    return looksLikeUtf16String(string, enableLengthBias)
 }
 
 fun dateFromAppleTimestamp(timestamp: Double): Date {
@@ -123,8 +130,8 @@ open class ParseCompanion {
         return sliced
     }
 
-    protected fun readLengthPrefixedString(bytes: ByteArray, sizePrefixLen: Int): String? {
-        val len = readInt(bytes, sizePrefixLen)
+    protected fun readLengthPrefixedString(bytes: ByteArray, sizePrefixLen: Int, byteOrder: ByteOrder = ByteOrder.BIG): String? {
+        val len = readInt(bytes, sizePrefixLen, false, byteOrder)
         return if(len == 0) null else readString(bytes, len)
     }
 
@@ -156,5 +163,17 @@ open class ParseCompanion {
         val int = ULong.fromBytes(bytes.sliceArray(parseOffset until parseOffset +size), byteOrder)
         parseOffset += size
         return int
+    }
+
+    protected fun readFloat(bytes: ByteArray, byteOrder: ByteOrder = ByteOrder.BIG): Float {
+        val float = Float.fromBytes(bytes.sliceArray(parseOffset until parseOffset+4), byteOrder)
+        parseOffset += 4
+        return float
+    }
+
+    protected fun readDouble(bytes: ByteArray, byteOrder: ByteOrder = ByteOrder.BIG): Double {
+        val float = Double.fromBytes(bytes.sliceArray(parseOffset until parseOffset+8), byteOrder)
+        parseOffset += 8
+        return float
     }
 }

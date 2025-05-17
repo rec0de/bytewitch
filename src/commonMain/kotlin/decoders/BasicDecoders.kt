@@ -86,6 +86,11 @@ object IEEE754 : ByteWitchDecoder {
         return score
     }
 
+    /*fun score(double: Long): Double {
+        val parts = dissectDouble(double)
+        return looksReasonable(parts.first, parts.second, parts.third, valueBE, isDouble = true)
+    }*/
+
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         when(data.size) {
             4 -> {
@@ -276,7 +281,9 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "16fefd" to Pair("DTLS 1.2 record header", null),
         "212022" to Pair("IKEv2 SA_INIT header", "https://www.rfc-editor.org/rfc/rfc7296.html#section-3.1"),
         "4d500305" to Pair("Apple MsgPack header", null),
-        "7b22" to Pair("JSON dict", null)
+        "7b22" to Pair("JSON dict", null),
+        "3a290a" to Pair("Smile Data Format", "https://github.com/FasterXML/smile-format-specification"),
+        "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
