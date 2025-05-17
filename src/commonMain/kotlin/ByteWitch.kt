@@ -3,12 +3,10 @@ import bitmage.hex
 import decoders.*
 
 object ByteWitch {
-
-    private val nemesysDecoder = NemesysParser
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector//, NemesysParser // Nemesys
+        EntropyDetector, HeuristicSignatureDetector
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
@@ -32,7 +30,7 @@ object ByteWitch {
     }
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
-        val allDecoders = decoders // + nemesysDecoder // add nemesys
+        val allDecoders = decoders
 
         if(tryhard) {
             Logger.log("tryhard decode attempt...")

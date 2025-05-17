@@ -1,36 +1,23 @@
 import bitmage.hex
-import decoders.*
+import decoders.Nemesys.*
 import kotlinx.browser.document
 import kotlinx.browser.window
-import kotlinx.dom.clear
-import kotlinx.dom.createElement
-import org.w3c.dom.*
-import kotlinx.browser.document
-import kotlinx.browser.window
-import kotlinx.dom.clear
-import kotlinx.dom.createElement
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
 import org.w3c.dom.events.MouseEvent
-import kotlin.math.roundToInt
 
-import kotlinx.browser.document
-import kotlinx.browser.window
-import org.w3c.dom.*
 import org.w3c.dom.events.Event
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
-// save byte messages and nemesys segments
-val messages = mutableMapOf<Int, ByteArray>()
-val nemesysSegments = mutableMapOf<Int, List<Pair<Int, NemesysField>>>()
+// save parsed messages for float view and nemesys
+val parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
 
 // global values for SequenceAlignment listeners
 val alignmentMouseEnterListeners = mutableMapOf<String, (Event) -> Unit>()
@@ -125,8 +112,7 @@ fun removeTextArea(dataContainer: Element) {
     // delete text area from view
     dataContainer.removeChild(dataContainer.lastElementChild!!)
 
-    messages.remove(lastIndex)
-    nemesysSegments.remove(lastIndex)
+    parsedMessages.remove(lastIndex)
 
     // TODO need to remove alignment listeners
 
@@ -172,10 +158,6 @@ fun decode(tryhard: Boolean) {
         if (result.isNotEmpty()) {
             bytefinder.style.display = "flex"
 
-            // add byte sequence for float view
-            val msgIndex = i
-            messages[msgIndex] = bytes
-
             // create a container for this message
             val messageBox = document.createElement("DIV") as HTMLDivElement
             messageBox.classList.add("message-output")
@@ -191,16 +173,16 @@ fun decode(tryhard: Boolean) {
                 parseContent.classList.add("parsecontent")
                 parseContent.innerHTML = it.second.renderHTML()
 
-                attachRangeListeners(parseContent, msgIndex)
+                attachRangeListeners(parseContent, i)
 
                 parseResult.appendChild(parseName)
                 parseResult.appendChild(parseContent)
                 messageBox.appendChild(parseResult)
             }
 
-            // for nemesys
-            val nemesysObj = NemesysParser().parse(bytes, 0, msgIndex)
-            nemesysSegments[msgIndex] = nemesysObj.getSegments()
+            // for nemesys (and float view)
+            val nemesysParsed = NemesysParser().parse(bytes, i)
+            parsedMessages[i] = nemesysParsed // besides nemesys this is also needed for the float view
 
             val nemesysResult = document.createElement("DIV") as HTMLDivElement
             val nemesysName = document.createElement("H3") as HTMLHeadingElement
@@ -208,21 +190,20 @@ fun decode(tryhard: Boolean) {
 
             val nemesysContent = document.createElement("DIV") as HTMLDivElement
             nemesysContent.classList.add("parsecontent")
-            nemesysContent.innerHTML = nemesysObj.renderHTML()
+            nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
 
-            attachRangeListeners(nemesysContent, msgIndex)
-            attachNemesysButtons(nemesysContent, bytes, msgIndex)
+            attachRangeListeners(nemesysContent, i)
+            attachNemesysButtons(nemesysContent, bytes, i)
 
             nemesysResult.appendChild(nemesysName)
             nemesysResult.appendChild(nemesysContent)
             messageBox.appendChild(nemesysResult)
 
-
             output.appendChild(messageBox)
         }
     }
 
-    val alignedSegment = NemesysSequenceAlignment.alignSegments(messages, nemesysSegments)
+    val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
     attachSequenceAlignmentListeners(alignedSegment)
 }
 
@@ -341,13 +322,14 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             val slicedBytes = originalBytes.sliceArray(dataStart until dataEnd)
 
             // read out new segment structure based on separators
-            val newSegments = rebuildSegmentsFromDOM(byteContainer)
-            nemesysSegments[msgIndex] = newSegments
+            val segmentPairs = rebuildSegmentsFromDOM(byteContainer)
+            val newSegments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
 
-            // create new nemesys object with new segments
-            val newObject = NemesysObject(newSegments, slicedBytes, dataStart to dataEnd, msgIndex)
-            val newHTML = newObject.renderHTML()
+            val newParsed = NemesysParsedMessage(newSegments, slicedBytes, msgIndex)
+            parsedMessages[msgIndex] = newParsed
 
+            // render new html content
+            val newHTML = NemesysRenderer.render(newParsed)
             val temp = document.createElement("div") as HTMLDivElement
             temp.innerHTML = newHTML
 
@@ -366,7 +348,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             attachFinishButtonHandler(newWrapper, originalBytes, msgIndex)
 
             // rerun sequence alignment
-            val alignedSegment = NemesysSequenceAlignment.alignSegments(messages, nemesysSegments)
+            val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
             attachSequenceAlignmentListeners(alignedSegment)
         })
     }
@@ -574,7 +556,7 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
             val floatview = document.getElementById("floatview")!!
 
             // set byte sequence
-            val message = messages[msgIndex] ?: return@addEventListener
+            val message = parsedMessages[msgIndex]?.bytes ?: return@addEventListener
             floatview.innerHTML = message.hex()
 
             // apply highlighting

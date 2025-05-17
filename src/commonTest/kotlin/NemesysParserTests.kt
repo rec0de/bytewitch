@@ -3,31 +3,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import bitmage.fromHex
-import decoders.NemesysField
-import decoders.NemesysParser
+import decoders.Nemesys.NemesysField
+import decoders.Nemesys.NemesysParser
 import kotlin.collections.listOf
 
 
 class NemesysParserTests {
 
     private val parser = NemesysParser()
-
-    @Test
-    fun testConfidence() {
-        val inputShort = "12".fromHex()
-        val inputLong = "123456".fromHex()
-        assertEquals(0.00, NemesysParser.confidence(inputShort))
-        assertEquals(0.76, NemesysParser.confidence(inputLong))
-    }
-
-    @Test
-    fun testDecode() {
-        val message = "fe4781820001000000000000037777770369666303636f6d0000010001".fromHex()
-        val result = NemesysParser.decode(message, 0, true) // Adjust inlineDisplay if needed
-
-        // Check if decoding returns a non-null result
-        assertTrue(result != null, "Decode result should not be null")
-    }
 
     @Test
     fun testFindExtremaInList() {

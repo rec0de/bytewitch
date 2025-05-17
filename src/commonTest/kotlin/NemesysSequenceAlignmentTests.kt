@@ -1,47 +1,8 @@
-import bitmage.fromHex
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import decoders.*
+import decoders.Nemesys.NemesysSequenceAlignment
 
 class NemesysSequenceAlignmentTests {
-
-    /*@Test
-    fun testSimpleAlignment() {
-        val msgA = ByteWitch.getBytesFromInputEncoding("01 02 03 04 05 06 07 08")
-        val msgB = ByteWitch.getBytesFromInputEncoding("01 02 03 0A 0B 06 07 08")
-
-        val messages = mapOf(
-            0 to msgA,
-            1 to msgB
-        )
-
-        val segments = mapOf(
-            0 to listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN, 6 to NemesysField.UNKNOWN),
-            1 to listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN, 6 to NemesysField.UNKNOWN)
-        )
-
-        val aligned = NemesysSequenceAlignment.alignSegments(messages, segments)
-
-        assertTrue(aligned.isNotEmpty(), "Alignment should find aligned segments")
-        assertTrue(aligned.any { it.segmentIndexA == 0 && it.segmentIndexB == 0 }, "First segments should be aligned")
-        assertTrue(aligned.any { it.segmentIndexA == 3 && it.segmentIndexB == 3 }, "Last segments should be aligned")
-    }*/
-
-    /*@Test
-    fun testNoAlignmentDueToDissimilarity() {
-        val msgA = hexBytes("FF FF FF FF")
-        val msgB = hexBytes("00 00 00 00")
-
-        val messages = mapOf(0 to msgA, 1 to msgB)
-        val segments = mapOf(
-            0 to listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN),
-            1 to listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN)
-        )
-
-        val aligned = NemesysSequenceAlignment.alignSegments(messages, segments)
-        assertTrue(aligned.isEmpty(), "Completely dissimilar messages should yield no alignment")
-    }*/
 
     @Test
     fun testCanberraDistanceEqualSegments() {
