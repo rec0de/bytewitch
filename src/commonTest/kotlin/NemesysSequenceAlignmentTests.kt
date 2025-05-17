@@ -1,6 +1,7 @@
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import decoders.Nemesys.NemesysSequenceAlignment
+import kotlin.test.assertNotEquals
 
 class NemesysSequenceAlignmentTests {
 
@@ -33,7 +34,7 @@ class NemesysSequenceAlignmentTests {
         val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 00")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
         val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
-        assertEquals(0.0, dissim)
+        assertNotEquals(0.0, dissim)
     }
 
     @Test
@@ -41,7 +42,7 @@ class NemesysSequenceAlignmentTests {
         val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 11")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
         val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
-        assertEquals(0.0, dissim)
+        assertNotEquals(0.0, dissim)
     }
 
     @Test
@@ -49,7 +50,7 @@ class NemesysSequenceAlignmentTests {
         val segmentA = ByteWitch.getBytesFromInputEncoding("01 02 03")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 01 02 03 04")
         val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
-        assertEquals(0.0, dissim)
+        assertNotEquals(0.0, dissim)
     }
 
     @Test

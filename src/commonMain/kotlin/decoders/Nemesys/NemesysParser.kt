@@ -38,7 +38,6 @@ class NemesysParser {
             freeRanges.add(currentStart to bytes.size)
         }
 
-        //
         val dynamicSegments = mutableListOf<Pair<Int, NemesysField>>()
         for ((start, end) in freeRanges) {
             val slice = bytes.sliceArray(start until end)
@@ -506,46 +505,85 @@ class NemesysParser {
         return ratio < 0.33
     }
 
+    // handle length field payload and add it to the result
+    fun handlePrintablePayload(
+        bytes: ByteArray, taken: BooleanArray, result: MutableList<Pair<Int, NemesysField>>,
+        i: Int, lengthFieldSize: Int, payloadLength: Int
+    ): Int? {
+        // check if payload is printable
+        val payloadStart = i + lengthFieldSize
+        val payloadEnd = payloadStart + payloadLength
+        val payload = bytes.sliceArray(payloadStart until payloadEnd)
+        if (!payload.all { isPrintableChar(it) }) return null
+
+        // check if all following three bytes are also printable
+        val lookaheadEnd = minOf(payloadEnd + 3, bytes.size)
+        if (payloadEnd < lookaheadEnd) { // skip if there are no follow-up bytes
+            val lookahead = bytes.sliceArray(payloadEnd until lookaheadEnd)
+            if (lookahead.all { isPrintableChar(it) }) {
+                return null
+            }
+        }
+
+        // finally add fields
+        result.add(i to NemesysField.PAYLOAD_LENGTH)
+        result.add(payloadStart to NemesysField.STRING)
+        for (j in i until payloadEnd) taken[j] = true
+
+        return payloadEnd
+    }
+
+    // used to detect length fields and the corresponding payload
+    fun checkLengthPrefixedSegment(
+        bytes: ByteArray,
+        taken: BooleanArray,
+        result: MutableList<Pair<Int, NemesysField>>,
+        i: Int,
+        lengthFieldSize: Int
+    ): Int? {
+        if (i + lengthFieldSize >= bytes.size) return null
+
+        val length = when (lengthFieldSize) {
+            1 -> bytes[i].toUByte().toInt()
+            2 -> ((bytes[i + 1].toUByte().toInt() shl 8) or bytes[i].toUByte().toInt()) // little endian
+            else -> return null // unsupported
+        }
+
+        val payloadStart = i + lengthFieldSize
+        val payloadEnd = payloadStart + length
+
+        // check bounds and collisions
+        if (payloadEnd > bytes.size || length < 3) return null
+        if ((i until payloadEnd).any { taken[it] }) return null
+
+        return handlePrintablePayload(bytes, taken, result, i, lengthFieldSize, length)
+    }
+
+
     // detect length prefixes and the corresponding payload
     fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<Pair<Int, NemesysField>> {
         val result = mutableListOf<Pair<Int, NemesysField>>()
-
-        // 1 byte sliding window over the message
         var i = 0
-        while (i < bytes.size - 1) {
-            val payloadLength = bytes[i].toUByte().toInt()
-            val payloadStart = i + 1
-            val payloadEnd = payloadStart + payloadLength
 
-            // check if payloadEnd exceed the message
-            if (payloadEnd > bytes.size) {
-                i++
+        while (i < bytes.size - 1) {
+            // Try 1-byte length field
+            val newIndex1 = checkLengthPrefixedSegment(bytes, taken, result, i, 1)
+            if (newIndex1 != null) {
+                i = newIndex1
                 continue
             }
 
-            val payload = bytes.sliceArray(payloadStart until payloadEnd)
-            val entropy = calculateShannonEntropy(payload)
-            val isPrintable = payload.all { isPrintableChar(it) }
-
-            // try to check if we have another (length, payload) pair
-            val nextValid = if (payloadEnd + 1 < bytes.size) {
-                val nextLength = bytes[payloadEnd].toUByte().toInt()
-                val nextStart = payloadEnd + 1
-                val nextEnd = nextStart + nextLength
-                nextEnd <= bytes.size && (nextEnd - nextStart > 0)
-            } else false
-
-            // check if payload is a string or has the same structure or if we have a follow-up (length, payload) pair
-            if (payloadLength > 3 && (isPrintable /*|| entropy < 3.0 || nextValid*/)) { // TODO better without entropy and nextValid???
-                result.add(i to NemesysField.PAYLOAD_LENGTH)
-                result.add(payloadStart to if (isPrintable) NemesysField.STRING else NemesysField.UNKNOWN)
-                for (j in i until payloadEnd) taken[j] = true
-                i = payloadEnd
-            } else {
-                i++
+            // Try 2-byte length field (little endian)
+            val newIndex2 = checkLengthPrefixedSegment(bytes, taken, result, i, 2)
+            if (newIndex2 != null) {
+                i = newIndex2
+                continue
             }
+
+            i++
         }
 
         return result.distinctBy { it.first }.sortedBy { it.first }
     }
+
 }

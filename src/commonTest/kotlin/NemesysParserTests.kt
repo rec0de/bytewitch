@@ -1,11 +1,8 @@
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import bitmage.fromHex
 import decoders.Nemesys.NemesysField
 import decoders.Nemesys.NemesysParser
 import kotlin.collections.listOf
+import kotlin.test.*
 
 
 class NemesysParserTests {
@@ -321,6 +318,140 @@ class NemesysParserTests {
         val segments = listOf(0 to NemesysField.STRING, 4 to NemesysField.UNKNOWN)
         val expected = segments // no merging because of different field types
         val result = parser.entropyMerge(segments, bytes)
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testHandlePrintablePayload_validString() {
+        val bytes = "0748656C6C6F2121".fromHex() // 07 'Hello!!'
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val newIndex = parser.handlePrintablePayload(
+            bytes = bytes,
+            taken = taken,
+            result = result,
+            i = 0,
+            lengthFieldSize = 1,
+            payloadLength = 7
+        )
+
+        assertEquals(8, newIndex)
+        assertEquals(listOf(
+            0 to NemesysField.PAYLOAD_LENGTH,
+            1 to NemesysField.STRING
+        ), result)
+        assertTrue(taken.slice(0..7).all { it })
+    }
+
+    @Test
+    fun testCheckLengthPrefixedSegment_valid1Byte() {
+        val bytes = "0648656C6C6F21".fromHex() // 06 + "Hello!"
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+
+        assertEquals(7, nextIndex) // i + 1 + 6
+        assertEquals(
+            listOf(0 to NemesysField.PAYLOAD_LENGTH, 1 to NemesysField.STRING),
+            result
+        )
+        assertTrue(taken.slice(0..6).all { it })
+    }
+
+    @Test
+    fun testCheckLengthPrefixedSegment_valid2ByteLE() {
+        val bytes = "060048656C6C6F21".fromHex() // 06 00 + "Hello!"
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 2)
+
+        assertEquals(8, nextIndex) // i + 2 + 6
+        assertEquals(
+            listOf(0 to NemesysField.PAYLOAD_LENGTH, 2 to NemesysField.STRING),
+            result
+        )
+        assertTrue(taken.slice(0..7).all { it })
+    }
+
+    @Test
+    fun testCheckLengthPrefixedSegment_rejectsShortPayload() {
+        val bytes = "024142".fromHex() // 02 + "AB"
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+
+        assertNull(nextIndex)
+        assertTrue(result.isEmpty())
+        assertTrue(taken.all { !it })
+    }
+
+    @Test
+    fun testCheckLengthPrefixedSegment_rejectsContinuationText() {
+        val bytes = "0548656C6C6F576F".fromHex() // 05 + "HelloWo"
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+
+        assertNull(nextIndex)
+        assertTrue(result.isEmpty())
+        assertTrue(taken.all { !it })
+    }
+
+    @Test
+    fun testCheckLengthPrefixedSegment_rejectsOverlappingTaken() {
+        val bytes = "0548656C6C6F21".fromHex()
+        val taken = BooleanArray(bytes.size) { false }
+        taken[3] = true // simulate overlap
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+
+        assertNull(nextIndex)
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun testHandlePrintablePayload_rejectsContinuation() {
+        val bytes = "0548656C6C6F576F72".fromHex() // 05 'Hello' + 'Wor...'
+        val taken = BooleanArray(bytes.size) { false }
+        val result = mutableListOf<Pair<Int, NemesysField>>()
+
+        val newIndex = parser.handlePrintablePayload(
+            bytes = bytes,
+            taken = taken,
+            result = result,
+            i = 0,
+            lengthFieldSize = 1,
+            payloadLength = 5
+        )
+
+        assertNull(newIndex)
+        assertTrue(result.isEmpty())
+        assertTrue(taken.all { !it })
+    }
+
+    @Test
+    fun testDetectLengthPrefixedFields_mixed1and2Byte() {
+        // 01 48 ('H') → too short
+        // 05 48656C6C6F → valid 1-byte (Hello + terminator)
+        // 06 00 576F726C6421 → valid 2-byte LE (06 00 → 'World!')
+        val bytes = "01480548656C6C600600576F726C6421".fromHex()
+        val taken = BooleanArray(bytes.size) { false }
+
+        val result = parser.detectLengthPrefixedFields(bytes, taken)
+
+        val expected = listOf(
+            2 to NemesysField.PAYLOAD_LENGTH,
+            3 to NemesysField.STRING,
+            8 to NemesysField.PAYLOAD_LENGTH,
+            10 to NemesysField.STRING
+        )
+
         assertEquals(expected, result)
     }
 }
