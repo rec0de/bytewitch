@@ -89,10 +89,6 @@ object NemesysSequenceAlignment {
     private fun calcSparseSimilarityMatrix(
         messages: Map<Int, NemesysParsedMessage>,
         similarityThreshold: Double
-
-        // messages: Map<Int, ByteArray>,
-        // nemesysSegments: Map<Int, List<Pair<Int, NemesysField>>>,
-        // similarityThreshold: Double
     ): Map<Pair<Int, Int>, Map<Pair<Int, Int>, Double>> {
         val result = mutableMapOf<Pair<Int, Int>, MutableMap<Pair<Int, Int>, Double>>()
 
@@ -173,7 +169,7 @@ object NemesysSequenceAlignment {
         }
 
         val r = (longSegment.size - shortSegment.size).toDouble() / longSegment.size
-        val pf = 1.0 // hyper parameter to set the non-linear penalty
+        val pf = 0.8 // hyper parameter to set the non-linear penalty
 
         val dm = (shortSegment.size.toDouble() / longSegment.size.toDouble()) * minD +
                 r +
