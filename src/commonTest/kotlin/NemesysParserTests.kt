@@ -499,7 +499,7 @@ class NemesysParserTests {
             msgIndex = 1
         )
 
-        val refined = parser.refineSegmentsAcrossMessages(listOf(msg1, msg2))
+        val refined = parser.cropDistinct(listOf(msg1, msg2))
 
         val refinedMsg1 = refined.first { it.msgIndex == 0 }
 

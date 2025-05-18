@@ -31,9 +31,8 @@ class NemesysParser {
         return segmentValueCounts
     }
 
-
-    // refine segments based on all messages
-    fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    // Split segments if one segment of another message appears quite often
+    fun cropDistinct(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
         // count how often every segment exists
         val segmentValueCounts = countSegmentValues(messages)
 
@@ -87,6 +86,12 @@ class NemesysParser {
             val distinctSorted = newSegments.sortedBy { it.offset }.distinctBy { it.offset }
             msg.copy(segments = distinctSorted)
         }
+    }
+
+    // refine segments based on all messages
+    fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+        // you could also implement PCA by Stephan Kleber (in his dissertation)
+        return cropDistinct(messages)
     }
 
     // check if segment has subsequence and return the corresponding index
