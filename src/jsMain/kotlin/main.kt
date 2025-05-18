@@ -283,7 +283,7 @@ fun attachNemesysButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int)
 
 
 // read out nemesys segments based on separators set by the user
-fun rebuildSegmentsFromDOM(container: HTMLElement): List<Pair<Int, NemesysField>> {
+fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<NemesysSegment> {
     val byteElements = container.querySelectorAll(".bytegroup + .field-separator, .bytegroup")
     var byteOffset = 0
     val segmentOffsets = mutableListOf(0)
@@ -300,12 +300,13 @@ fun rebuildSegmentsFromDOM(container: HTMLElement): List<Pair<Int, NemesysField>
         }
     }
 
-    val segments = segmentOffsets.mapIndexed { index, offset ->
-        val fieldType = NemesysField.UNKNOWN // set to field type unknown
-        offset to fieldType
-    }
 
-    return segments
+    // an alternative would be to check the offset of the previous message. Based on this decide if we want to keep the field type or set it to unknown
+    // In my opinion this behaves a bit weird and isn't the best solution.
+    // Another way would be to just rerun a field type detection. This also behaves weird
+    return segmentOffsets.map { offset ->
+        NemesysSegment(offset, NemesysField.UNKNOWN)
+    }
 }
 
 // attach finish button handler for editable nemesys content
@@ -322,8 +323,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             val slicedBytes = originalBytes.sliceArray(dataStart until dataEnd)
 
             // read out new segment structure based on separators
-            val segmentPairs = rebuildSegmentsFromDOM(byteContainer)
-            val newSegments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
+            val newSegments = rebuildSegmentsFromDOM(byteContainer, msgIndex)
 
             val newParsed = NemesysParsedMessage(newSegments, slicedBytes, msgIndex)
             parsedMessages[msgIndex] = newParsed
