@@ -203,9 +203,41 @@ fun decode(tryhard: Boolean) {
         }
     }
 
+    // refine nemesys fields and rerender html content
+    val refined = NemesysParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+    refined.forEach { msg ->
+        parsedMessages[msg.msgIndex] = msg
+        rerenderNemesys(msg.msgIndex, msg)
+    }
+
     val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
     attachSequenceAlignmentListeners(alignedSegment)
 }
+
+// rerender nemesys html view
+fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
+    val output = document.getElementById("output") as? HTMLDivElement ?: return
+    val messageBox = output.children[msgIndex] as? HTMLDivElement ?: return
+    val oldWrapper = messageBox.querySelector(".nemesys") as? HTMLElement ?: return
+
+    val newHTML = NemesysRenderer.render(parsed)
+    val temp = document.createElement("div") as HTMLDivElement
+    temp.innerHTML = newHTML
+
+    val newWrapper = temp.firstElementChild as? HTMLElement
+    if (newWrapper == null) {
+        console.error("Newly rendered .nemesys could not be parsed")
+        return
+    }
+
+    oldWrapper.replaceWith(newWrapper)
+
+    // attach javascript handlers
+    attachRangeListeners(newWrapper, msgIndex)
+    attachEditButtonHandler(newWrapper)
+    attachFinishButtonHandler(newWrapper, parsed.bytes, msgIndex)
+}
+
 
 // attach sequence alignment listeners
 fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
@@ -329,23 +361,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             parsedMessages[msgIndex] = newParsed
 
             // render new html content
-            val newHTML = NemesysRenderer.render(newParsed)
-            val temp = document.createElement("div") as HTMLDivElement
-            temp.innerHTML = newHTML
-
-            val newWrapper = temp.firstElementChild as? HTMLElement
-            if (newWrapper == null) {
-                console.error("Newly rendered .nemesys could not be parsed")
-                return@addEventListener
-            }
-
-            // replace old wrapper div
-            oldWrapper.replaceWith(newWrapper)
-
-            // attach new button handlers
-            attachRangeListeners(newWrapper, msgIndex)
-            attachEditButtonHandler(newWrapper)
-            attachFinishButtonHandler(newWrapper, originalBytes, msgIndex)
+            rerenderNemesys(msgIndex, newParsed)
 
             // rerun sequence alignment
             val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)

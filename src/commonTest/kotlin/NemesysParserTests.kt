@@ -1,6 +1,8 @@
 import bitmage.fromHex
 import decoders.Nemesys.NemesysField
+import decoders.Nemesys.NemesysParsedMessage
 import decoders.Nemesys.NemesysParser
+import decoders.Nemesys.NemesysSegment
 import kotlin.collections.listOf
 import kotlin.test.*
 
@@ -453,5 +455,73 @@ class NemesysParserTests {
         )
 
         assertEquals(expected, result)
+    }
+
+    @Test
+    fun testCountSegmentValues_countsCorrectly() {
+        val msg1 = NemesysParsedMessage(
+            segments = listOf(
+                NemesysSegment(0, NemesysField.STRING),
+                NemesysSegment(5, NemesysField.UNKNOWN)
+            ),
+            bytes = "48656C6C6F123456".fromHex(), // "Hello" + 0x12 0x34 0x56
+            msgIndex = 0
+        )
+
+        val msg2 = NemesysParsedMessage(
+            segments = listOf(
+                NemesysSegment(0, NemesysField.STRING),
+                NemesysSegment(5, NemesysField.UNKNOWN)
+            ),
+            bytes = "48656C6C6F999999".fromHex(), // "Hello" + 0x99 0x99 0x99
+            msgIndex = 1
+        )
+
+        val result = parser.countSegmentValues(listOf(msg1, msg2))
+
+        // Expect "Hello" (5 bytes = 48656C6C6F) to appear in both
+        assertEquals(2, result["48656C6C6F"])
+        assertEquals(1, result["123456"])
+        assertEquals(1, result["999999"])
+    }
+
+    @Test
+    fun testRefineSegmentsAcrossMessages_splitsOnFrequentValue() {
+        val msg1 = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = "ABCD1234EF".fromHex(), // Contains "1234"
+            msgIndex = 0
+        )
+
+        val msg2 = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = "1234".fromHex(), // Just the "frequent" sequence
+            msgIndex = 1
+        )
+
+        val refined = parser.refineSegmentsAcrossMessages(listOf(msg1, msg2))
+
+        val refinedMsg1 = refined.first { it.msgIndex == 0 }
+
+        val segmentOffsets = refinedMsg1.segments.map { it.offset }
+        assertEquals(listOf(0, 2, 4), segmentOffsets) // AB CD | 12 34 | EF
+    }
+
+    @Test
+    fun testIndexOfSubsequence_findsCorrectIndex() {
+        val main = "0011223344556677".fromHex()
+        val sub = "334455".fromHex()
+
+        val idx = parser.indexOfSubsequence(main, sub)
+        assertEquals(3, idx)
+    }
+
+    @Test
+    fun testIndexOfSubsequence_notFound() {
+        val main = "001122334455".fromHex()
+        val sub = "778899".fromHex()
+
+        val idx = parser.indexOfSubsequence(main, sub)
+        assertEquals(-1, idx)
     }
 }

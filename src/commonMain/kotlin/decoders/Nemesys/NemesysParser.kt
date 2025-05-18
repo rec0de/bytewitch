@@ -13,12 +13,98 @@ class NemesysParser {
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
+    // count how often every segment exists
+    fun countSegmentValues(messages: List<NemesysParsedMessage>): Map<String, Int> {
+        val segmentValueCounts = mutableMapOf<String, Int>()
+
+        for (msg in messages) {
+            for ((index, segment) in msg.segments.withIndex()) {
+                val start = segment.offset
+                val end = msg.segments.getOrNull(index + 1)?.offset ?: msg.bytes.size
+                val value = msg.bytes.sliceArray(start until end).joinToString("") { byte ->
+                    byte.toInt().and(0xFF).toString(16).padStart(2, '0').uppercase()
+                }
+                segmentValueCounts[value] = (segmentValueCounts[value] ?: 0) + 1
+            }
+        }
+
+        return segmentValueCounts
+    }
+
+
+    // refine segments based on all messages
+    fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+        // count how often every segment exists
+        val segmentValueCounts = countSegmentValues(messages)
+
+        // only keep segments that occure in more than 10% of the message
+        val threshold = (messages.size * 0.1).toInt().coerceAtLeast(1)
+        val frequentValues = segmentValueCounts.filterValues { it >= threshold }.keys.map { hex ->
+            hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        }
+
+        // refine messages
+        return messages.map { msg ->
+            val newSegments = mutableListOf<NemesysSegment>()
+
+            // go through each segment of the message
+            var i = 0
+            while (i < msg.segments.size) {
+                val curr = msg.segments[i]
+                val start = curr.offset
+                val end = msg.segments.getOrNull(i + 1)?.offset ?: msg.bytes.size
+                val segmentBytes = msg.bytes.sliceArray(start until end)
+
+                // compare each segment with every frequent occurring segment
+                var matched = false
+                for (frequent in frequentValues) {
+                    if (frequent.size >= segmentBytes.size) continue // skip if not smaller
+
+                    // check if frequent segment is in current segment
+                    val idx = indexOfSubsequence(segmentBytes, frequent)
+                    if (idx != -1) {
+                        matched = true
+
+                        // split segment into up to three segments
+                        if (idx > 0) {
+                            newSegments.add(NemesysSegment(start, curr.fieldType))
+                        }
+                        newSegments.add(NemesysSegment(start + idx, curr.fieldType))
+                        if (idx + frequent.size < segmentBytes.size) {
+                            newSegments.add(NemesysSegment(start + idx + frequent.size, curr.fieldType))
+                        }
+                        break
+                    }
+                }
+
+                if (!matched) {
+                    newSegments.add(curr)
+                }
+
+                i++
+            }
+
+            val distinctSorted = newSegments.sortedBy { it.offset }.distinctBy { it.offset }
+            msg.copy(segments = distinctSorted)
+        }
+    }
+
+    // check if segment has subsequence and return the corresponding index
+    fun indexOfSubsequence(segment: ByteArray, sub: ByteArray): Int {
+        if (sub.isEmpty() || segment.size < sub.size) return -1
+
+        for (i in 0..segment.size - sub.size) {
+            if (segment.sliceArray(i until i + sub.size).contentEquals(sub)) return i
+        }
+
+        return -1
+    }
 
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>> {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
 
-        // post processing
+        // pre processing
         val fixedSegments = detectLengthPrefixedFields(bytes, taken)
 
         // find all bytes without a corresponding segment
