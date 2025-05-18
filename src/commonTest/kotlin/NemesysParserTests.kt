@@ -479,11 +479,19 @@ class NemesysParserTests {
 
         val result = parser.countSegmentValues(listOf(msg1, msg2))
 
-        // Expect "Hello" (5 bytes = 48656C6C6F) to appear in both
-        assertEquals(2, result["48656C6C6F"])
-        assertEquals(1, result["123456"])
-        assertEquals(1, result["999999"])
+        val hello = "48656C6C6F".fromHex()
+        val tail1 = "123456".fromHex()
+        val tail2 = "999999".fromHex()
+
+        val helloEntry = result.entries.find { it.key.contentEquals(hello) }
+        val tail1Entry = result.entries.find { it.key.contentEquals(tail1) }
+        val tail2Entry = result.entries.find { it.key.contentEquals(tail2) }
+
+        assertEquals(2, helloEntry?.value)
+        assertEquals(1, tail1Entry?.value)
+        assertEquals(1, tail2Entry?.value)
     }
+
 
     @Test
     fun testRefineSegmentsAcrossMessages_splitsOnFrequentValue() {

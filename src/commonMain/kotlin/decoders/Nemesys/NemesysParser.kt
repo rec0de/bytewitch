@@ -14,33 +14,43 @@ class NemesysParser {
     }
 
     // count how often every segment exists
-    fun countSegmentValues(messages: List<NemesysParsedMessage>): Map<String, Int> {
-        val segmentValueCounts = mutableMapOf<String, Int>()
+    fun countSegmentValues(messages: List<NemesysParsedMessage>, minSegmentLength: Int = 2): Map<ByteArray, Int> {
+        val segmentValueCounts = mutableMapOf<ByteArray, Int>()
 
         for (msg in messages) {
             for ((index, segment) in msg.segments.withIndex()) {
                 val start = segment.offset
                 val end = msg.segments.getOrNull(index + 1)?.offset ?: msg.bytes.size
-                val value = msg.bytes.sliceArray(start until end).joinToString("") { byte ->
-                    byte.toInt().and(0xFF).toString(16).padStart(2, '0').uppercase()
+                val segmentBytes = msg.bytes.sliceArray(start until end)
+
+                // filter some segments
+                if (segmentBytes.size < minSegmentLength) continue
+                if (segmentBytes.all { it == 0.toByte() }) continue
+
+                // check for existing key
+                val existingKey = segmentValueCounts.keys.find { it.contentEquals(segmentBytes) }
+
+                if (existingKey != null) {
+                    segmentValueCounts[existingKey] = segmentValueCounts.getValue(existingKey) + 1
+                } else {
+                    segmentValueCounts[segmentBytes.copyOf()] = 1
                 }
-                segmentValueCounts[value] = (segmentValueCounts[value] ?: 0) + 1
             }
         }
 
         return segmentValueCounts
     }
 
+
+
     // Split segments if one segment of another message appears quite often
     fun cropDistinct(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
         // count how often every segment exists
         val segmentValueCounts = countSegmentValues(messages)
 
-        // only keep segments that occure in more than 10% of the message
+        // only keep segments that occur in more than 10% of the message
         val threshold = (messages.size * 0.1).toInt().coerceAtLeast(1)
-        val frequentValues = segmentValueCounts.filterValues { it >= threshold }.keys.map { hex ->
-            hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        }
+        val frequentValues = segmentValueCounts.filterValues { it >= threshold }.keys
 
         // refine messages
         return messages.map { msg ->
@@ -50,34 +60,48 @@ class NemesysParser {
             var i = 0
             while (i < msg.segments.size) {
                 val curr = msg.segments[i]
+
+                // don't split if it's a STRING field
+                if (curr.fieldType == NemesysField.STRING) {
+                    newSegments.add(curr)
+                    i++
+                    continue
+                }
+
                 val start = curr.offset
                 val end = msg.segments.getOrNull(i + 1)?.offset ?: msg.bytes.size
                 val segmentBytes = msg.bytes.sliceArray(start until end)
 
+                var splitOffsets = mutableSetOf<Int>()
+                splitOffsets.add(0) // segment start
+
                 // compare each segment with every frequent occurring segment
-                var matched = false
                 for (frequent in frequentValues) {
                     if (frequent.size >= segmentBytes.size) continue // skip if not smaller
 
                     // check if frequent segment is in current segment
-                    val idx = indexOfSubsequence(segmentBytes, frequent)
-                    if (idx != -1) {
-                        matched = true
+                    var searchStart = 0
+                    while (searchStart <= segmentBytes.size - frequent.size) { // check if it occurs multiple times
+                        val subSegmentBytes = segmentBytes.sliceArray(searchStart until segmentBytes.size)
+                        val idx = indexOfSubsequence(subSegmentBytes, frequent) // get index of the subsequenc
 
-                        // split segment into up to three segments
-                        if (idx > 0) {
-                            newSegments.add(NemesysSegment(start, curr.fieldType))
+                        if (idx != -1) {
+                            val absoluteIdx = searchStart + idx
+                            splitOffsets.add(absoluteIdx)
+                            splitOffsets.add(absoluteIdx + frequent.size)
+                            searchStart = absoluteIdx + frequent.size
+                        } else {
+                            break
                         }
-                        newSegments.add(NemesysSegment(start + idx, curr.fieldType))
-                        if (idx + frequent.size < segmentBytes.size) {
-                            newSegments.add(NemesysSegment(start + idx + frequent.size, curr.fieldType))
-                        }
-                        break
                     }
                 }
 
-                if (!matched) {
-                    newSegments.add(curr)
+                splitOffsets.add(segmentBytes.size) // end of the segment
+
+                val sortedOffsets = splitOffsets.toList().sorted().distinct()
+                for (j in 0 until sortedOffsets.size - 1) {
+                    val relativeOffset = sortedOffsets[j]
+                    newSegments.add(NemesysSegment(start + relativeOffset, curr.fieldType))
                 }
 
                 i++
@@ -88,9 +112,10 @@ class NemesysParser {
         }
     }
 
+
     // refine segments based on all messages
     fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
-        // you could also implement PCA by Stephan Kleber (in his dissertation)
+        // you could also implement PCA by Stephan Kleber (written in his dissertation)
         return cropDistinct(messages)
     }
 
