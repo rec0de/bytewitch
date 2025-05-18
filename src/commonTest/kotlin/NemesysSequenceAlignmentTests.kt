@@ -1,3 +1,4 @@
+import decoders.Nemesys.NemesysField
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import decoders.Nemesys.NemesysSequenceAlignment
@@ -25,7 +26,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityEqualLength() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("00 00")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.UNKNOWN, NemesysField.UNKNOWN)
         assertEquals(0.0, dissim)
     }
 
@@ -33,7 +34,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityUnequalLength() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 00")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.UNKNOWN, NemesysField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
@@ -41,7 +42,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityEqualSegment() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 11")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.UNKNOWN, NemesysField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
@@ -49,7 +50,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityShiftedSegment() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("01 02 03")
         val segmentB = ByteWitch.getBytesFromInputEncoding("00 01 02 03 04")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.UNKNOWN, NemesysField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
@@ -57,9 +58,25 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityEqualsCanberraDistance() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("A3 B7")
         val segmentB = ByteWitch.getBytesFromInputEncoding("C7 01")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.UNKNOWN, NemesysField.UNKNOWN)
         val dist = NemesysSequenceAlignment.canberraDistance(segmentA, segmentB)
         assertEquals(dissim, dist/2)
+    }
+
+    @Test
+    fun testCanberraUlmDissimilarityLengthField() {
+        val segmentA = ByteWitch.getBytesFromInputEncoding("01 02")
+        val segmentB = ByteWitch.getBytesFromInputEncoding("34 78")
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH, NemesysField.PAYLOAD_LENGTH)
+        assertEquals(0.0, dissim)
+    }
+
+    @Test
+    fun testCanberraUlmDissimilarityLongLengthField() {
+        val segmentA = ByteWitch.getBytesFromInputEncoding("0013627282")
+        val segmentB = ByteWitch.getBytesFromInputEncoding("3488733711")
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH, NemesysField.PAYLOAD_LENGTH)
+        assertEquals(0.0, dissim)
     }
 
     @Test

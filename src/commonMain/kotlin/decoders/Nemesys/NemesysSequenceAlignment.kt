@@ -19,6 +19,8 @@ object NemesysSequenceAlignment {
         val sparseMatrixData = calcSparseSimilarityMatrix(messages, tresholdAlignedSegment)
 
         for ((pair, matrixS) in sparseMatrixData) {
+            if (matrixS.isEmpty()) continue
+
             val (protoA, protoB) = pair
 
             // get maximum amount of segments in each protocol
@@ -111,17 +113,17 @@ object NemesysSequenceAlignment {
                 // compare all segments form A with all segments of B
                 for (segmentAIndex in segmentsA.indices) {
                     // extract bytes from segmentA
-                    val (startA, _) = segmentsA[segmentAIndex]
+                    val (startA, typeA) = segmentsA[segmentAIndex]
                     val endA = if (segmentAIndex + 1 < segmentsA.size) segmentsA[segmentAIndex + 1].offset else bytesA.size
                     val segmentBytesA = bytesA.sliceArray(startA until endA)
 
                     for (segmentBIndex in segmentsB.indices) {
                         // extract bytes from segmentB
-                        val (startB, _) = segmentsB[segmentBIndex]
+                        val (startB, typeB) = segmentsB[segmentBIndex]
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].offset else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB/*, startA, startB*/)
+                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
                         val sim = 1.0 - dissim
 
                         if (sim >= similarityThreshold) {
@@ -153,18 +155,23 @@ object NemesysSequenceAlignment {
     }
 
     // Canberra-Ulm Dissimilarity for segments of different sizes (sliding window approach)
-    fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray): Double {
+    fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
         val shortSegment = if (segmentS.size <= segmentT.size) segmentS else segmentT
         val longSegment = if (segmentS.size > segmentT.size) segmentS else segmentT
 
         var minD = Double.MAX_VALUE
 
-        // sliding window to search for the lowest dissimilarity
-        for (offset in 0..(longSegment.size - shortSegment.size)) {
-            val window = longSegment.sliceArray(offset until (offset + shortSegment.size))
-            val dC = canberraDistance(shortSegment, window) / shortSegment.size
-            if (dC < minD) {
-                minD = dC
+        // if both segments are a payload length field so set canberra distance to 0
+        if (typeA == NemesysField.PAYLOAD_LENGTH && typeB == NemesysField.PAYLOAD_LENGTH) {
+            minD = 0.0
+        } else {
+            // sliding window to search for the lowest dissimilarity
+            for (offset in 0..(longSegment.size - shortSegment.size)) {
+                val window = longSegment.sliceArray(offset until (offset + shortSegment.size))
+                val dC = canberraDistance(shortSegment, window) / shortSegment.size
+                if (dC < minD) {
+                    minD = dC
+                }
             }
         }
 
