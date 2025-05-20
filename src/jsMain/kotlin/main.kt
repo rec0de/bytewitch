@@ -1,3 +1,4 @@
+import bitmage.fromHex
 import bitmage.hex
 import decoders.Nemesys.*
 import kotlinx.browser.document
@@ -11,13 +12,14 @@ import org.khronos.webgl.Uint8Array
 import org.w3c.dom.events.MouseEvent
 
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
 // save parsed messages for float view and nemesys
-val parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
+var parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
 
 // global values for SequenceAlignment listeners
 val alignmentMouseEnterListeners = mutableMapOf<String, (Event) -> Unit>()
@@ -134,6 +136,176 @@ fun applyLiveDecodeListeners() {
     }
 }
 
+fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
+    val message1 = "0821b10132010c3f2f5cd941da0104080010009a02bf010a3b636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e4661636554696d6550726f766964657212084661636554696d651a6466696c653a2f2f2f707269766174652f7661722f636f6e7461696e6572732f42756e646c652f4170706c69636174696f6e2f30323639344631412d303138312d343031342d423036342d4536303938333636464431342f4661636554696d652e6170702f2002280130013801400048006803680278019a02de010a17636f6d2e6170706c652e636f726574656c6570686f6e79200228053001380040014801680278018a0107080212033131328a0107080212033131308a0107080212033131328a0107080212033131308a0107080212033931318a0107080212033131328a0107080212033030308a01060802120230388a0107080212033131308a0107080212033939398a0107080212033131388a0107080212033131398a0107080212033132308a0107080212033132328a0107080212033931318a0107080212033131328a0108080212042a3931318a010808021204233931319a02450a31636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e54696e43616e200128013001380040004800680368027800".fromHex()
+
+    val segments1 = listOf(
+        NemesysSegment(0, NemesysField.UNKNOWN),
+        NemesysSegment(2, NemesysField.UNKNOWN),
+        NemesysSegment(12, NemesysField.UNKNOWN),
+        NemesysSegment(15, NemesysField.UNKNOWN),
+        NemesysSegment(17, NemesysField.UNKNOWN),
+        NemesysSegment(19, NemesysField.UNKNOWN),
+        NemesysSegment(23, NemesysField.UNKNOWN),
+        NemesysSegment(84, NemesysField.UNKNOWN),
+        NemesysSegment(94, NemesysField.UNKNOWN),
+        NemesysSegment(196, NemesysField.UNKNOWN),
+        NemesysSegment(198, NemesysField.UNKNOWN),
+        NemesysSegment(200, NemesysField.UNKNOWN),
+        NemesysSegment(202, NemesysField.UNKNOWN),
+        NemesysSegment(204, NemesysField.UNKNOWN),
+        NemesysSegment(206, NemesysField.UNKNOWN),
+        NemesysSegment(208, NemesysField.UNKNOWN),
+        NemesysSegment(210, NemesysField.UNKNOWN),
+        NemesysSegment(212, NemesysField.UNKNOWN),
+        NemesysSegment(214, NemesysField.UNKNOWN),
+        NemesysSegment(218, NemesysField.UNKNOWN),
+        NemesysSegment(243, NemesysField.UNKNOWN),
+        NemesysSegment(245, NemesysField.UNKNOWN),
+        NemesysSegment(247, NemesysField.UNKNOWN),
+        NemesysSegment(249, NemesysField.UNKNOWN),
+        NemesysSegment(251, NemesysField.UNKNOWN),
+        NemesysSegment(253, NemesysField.UNKNOWN),
+        NemesysSegment(255, NemesysField.UNKNOWN),
+        NemesysSegment(257, NemesysField.UNKNOWN),
+        NemesysSegment(259, NemesysField.UNKNOWN),
+        NemesysSegment(262, NemesysField.UNKNOWN),
+        NemesysSegment(264, NemesysField.UNKNOWN),
+        NemesysSegment(269, NemesysField.UNKNOWN),
+        NemesysSegment(272, NemesysField.UNKNOWN),
+        NemesysSegment(274, NemesysField.UNKNOWN),
+        NemesysSegment(279, NemesysField.UNKNOWN),
+        NemesysSegment(282, NemesysField.UNKNOWN),
+        NemesysSegment(284, NemesysField.UNKNOWN),
+        NemesysSegment(289, NemesysField.UNKNOWN),
+        NemesysSegment(292, NemesysField.UNKNOWN),
+        NemesysSegment(294, NemesysField.UNKNOWN),
+        NemesysSegment(299, NemesysField.UNKNOWN),
+        NemesysSegment(302, NemesysField.UNKNOWN),
+        NemesysSegment(304, NemesysField.UNKNOWN),
+        NemesysSegment(309, NemesysField.UNKNOWN),
+        NemesysSegment(312, NemesysField.UNKNOWN),
+        NemesysSegment(314, NemesysField.UNKNOWN),
+        NemesysSegment(319, NemesysField.UNKNOWN),
+        NemesysSegment(322, NemesysField.UNKNOWN),
+        NemesysSegment(324, NemesysField.UNKNOWN),
+        NemesysSegment(329, NemesysField.UNKNOWN),
+        NemesysSegment(332, NemesysField.UNKNOWN),
+        NemesysSegment(334, NemesysField.UNKNOWN),
+        NemesysSegment(338, NemesysField.UNKNOWN),
+        NemesysSegment(341, NemesysField.UNKNOWN),
+        NemesysSegment(343, NemesysField.UNKNOWN),
+        NemesysSegment(348, NemesysField.UNKNOWN),
+        NemesysSegment(351, NemesysField.UNKNOWN),
+        NemesysSegment(353, NemesysField.UNKNOWN),
+        NemesysSegment(358, NemesysField.UNKNOWN),
+        NemesysSegment(361, NemesysField.UNKNOWN),
+        NemesysSegment(363, NemesysField.UNKNOWN),
+        NemesysSegment(368, NemesysField.UNKNOWN),
+        NemesysSegment(371, NemesysField.UNKNOWN),
+        NemesysSegment(373, NemesysField.UNKNOWN),
+        NemesysSegment(378, NemesysField.UNKNOWN),
+        NemesysSegment(381, NemesysField.UNKNOWN),
+        NemesysSegment(383, NemesysField.UNKNOWN),
+        NemesysSegment(388, NemesysField.UNKNOWN),
+        NemesysSegment(391, NemesysField.UNKNOWN),
+        NemesysSegment(393, NemesysField.UNKNOWN),
+        NemesysSegment(398, NemesysField.UNKNOWN),
+        NemesysSegment(401, NemesysField.UNKNOWN),
+        NemesysSegment(403, NemesysField.UNKNOWN),
+        NemesysSegment(408, NemesysField.UNKNOWN),
+        NemesysSegment(411, NemesysField.UNKNOWN),
+        NemesysSegment(413, NemesysField.UNKNOWN),
+        NemesysSegment(418, NemesysField.UNKNOWN),
+        NemesysSegment(421, NemesysField.UNKNOWN),
+        NemesysSegment(423, NemesysField.UNKNOWN),
+        NemesysSegment(429, NemesysField.UNKNOWN),
+        NemesysSegment(432, NemesysField.UNKNOWN),
+        NemesysSegment(434, NemesysField.UNKNOWN),
+        NemesysSegment(440, NemesysField.UNKNOWN),
+        NemesysSegment(443, NemesysField.UNKNOWN),
+        NemesysSegment(494, NemesysField.UNKNOWN),
+        NemesysSegment(496, NemesysField.UNKNOWN),
+        NemesysSegment(498, NemesysField.UNKNOWN),
+        NemesysSegment(500, NemesysField.UNKNOWN),
+        NemesysSegment(502, NemesysField.UNKNOWN),
+        NemesysSegment(504, NemesysField.UNKNOWN),
+        NemesysSegment(506, NemesysField.UNKNOWN),
+        NemesysSegment(508, NemesysField.UNKNOWN),
+        NemesysSegment(510, NemesysField.UNKNOWN)
+    )
+
+
+
+    val messages = mutableMapOf(
+        0 to NemesysParsedMessage(segments1, message1, 0)
+    )
+
+    return messages
+}
+
+
+
+val selectedGroups = mutableListOf<MutableSet<String>>()
+var currentGroup = mutableSetOf<String>()
+
+fun setupSelectableSegments() {
+    val elements = document.querySelectorAll("[value-align-id]")
+    for (i in 0 until elements.length) {
+        val el = elements[i] as HTMLElement
+        el.addEventListener("click", {
+            toggleSegment(el)
+        })
+    }
+
+    // start new group by pressing "n" on the keyboard
+    document.addEventListener("keydown", { e ->
+        if ((e as KeyboardEvent).key == "n") {
+            if (currentGroup.size > 1) {
+                selectedGroups.add(currentGroup.toMutableSet())
+            }
+            currentGroup.clear()
+        }
+    })
+}
+
+fun toggleSegment(el: HTMLElement) {
+    val id = el.getAttribute("value-align-id") ?: return
+    if (currentGroup.contains(id)) {
+        currentGroup.remove(id)
+        el.classList.remove("highlighted")
+    } else {
+        currentGroup.add(id)
+        el.classList.add("highlighted")
+    }
+}
+
+fun exportAlignments(): String {
+    val triplets = mutableSetOf<String>()
+
+    for (group in selectedGroups) {
+        Logger.log("Group:")
+        Logger.log(group)
+        val items = group.map {
+            val (msg, seg) = it.split("-").map { part -> part.toInt() }
+            msg to seg
+        }
+
+        for (i in items.indices) {
+            for (j in i + 1 until items.size) {
+                val (msgA, segA) = items[i]
+                val (msgB, segB) = items[j]
+                triplets.add("Triple($msgA, $msgB, Pair($segA, $segB))")
+            }
+        }
+    }
+
+    return """val expectedAlignments = setOf(
+        ${triplets.joinToString(",\n    ")}
+    )"""
+}
+
+
 fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -154,6 +326,8 @@ fun decode(tryhard: Boolean) {
         // decode input
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         val result = ByteWitch.analyze(bytes, tryhard)
+
+
 
         if (result.isNotEmpty()) {
             bytefinder.style.display = "flex"
@@ -212,6 +386,45 @@ fun decode(tryhard: Boolean) {
 
     val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
     attachSequenceAlignmentListeners(alignedSegment)
+
+
+
+    // TODO for testing purposes only
+    includeAlignmentForTesting()
+
+}
+
+fun includeAlignmentForTesting() {
+    val output = document.getElementById("output") as HTMLDivElement
+    val testingMessages = getTestingData()
+    val messageBox = document.createElement("DIV") as HTMLDivElement
+    messageBox.classList.add("message-output")
+    for ((index, message) in testingMessages) {
+        val nemesysResult = document.createElement("DIV") as HTMLDivElement
+        val nemesysName = document.createElement("H3") as HTMLHeadingElement
+        nemesysName.innerText = "nemesysparser $index"
+
+        val nemesysContent = document.createElement("DIV") as HTMLDivElement
+        nemesysContent.classList.add("parsecontent")
+
+        if (message != null) {
+            nemesysContent.innerHTML = NemesysRenderer.render(message)
+        } else {
+            nemesysContent.innerText = "Fehler: Nachricht $index ist null."
+        }
+
+        nemesysResult.appendChild(nemesysName)
+        nemesysResult.appendChild(nemesysContent)
+        messageBox.appendChild(nemesysResult)
+        output.appendChild(messageBox)
+    }
+    setupSelectableSegments()
+    val btn = document.createElement("button") as HTMLElement
+    btn.innerText = "Export Alignments"
+    btn.onclick = {
+        console.log(exportAlignments())
+    }
+    document.body?.appendChild(btn)
 }
 
 // rerender nemesys html view

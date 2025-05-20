@@ -124,6 +124,7 @@ object NemesysSequenceAlignment {
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
                         val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
+                        // val dissim = canberraDissimilarityWithPooling(segmentBytesA, segmentBytesB)
                         val sim = 1.0 - dissim
 
                         if (sim >= similarityThreshold) {
