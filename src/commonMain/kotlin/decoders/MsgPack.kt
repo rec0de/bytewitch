@@ -49,12 +49,11 @@ class MsgPackParser : ParseCompanion() {
             }
         }
 
-        // single bytes are often false-positive detected as booleans, return low confidence for those
-        override fun confidence(data: ByteArray): Double {
-            return if(data.size < 3)
-                    0.2
-                else
-                    super.confidence(data)
+        // single bytes are often false-positive detected as booleans
+        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+            if(data.size < 3)
+                return Pair(false, null)
+            return super.decodesAsValid(data)
         }
     }
 

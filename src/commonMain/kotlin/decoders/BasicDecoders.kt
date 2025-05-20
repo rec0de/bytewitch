@@ -50,6 +50,10 @@ object Utf16Decoder : ByteWitchDecoder {
     override val name = "utf16"
 
     override fun confidence(data: ByteArray): Double {
+        // utf16 should be even byte length
+        if(data.size % 2 == 1)
+            return 0.0
+
         try {
             val string = Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE()
             return looksLikeUtf16String(string)
@@ -198,14 +202,16 @@ object EntropyDetector : ByteWitchDecoder {
                     hexByte
             }
         }
-        else
+        else if (inlineDisplay)
             data.hex()
+        else
+            ""
 
         return if(inlineDisplay) {
             BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
         }
         else
-            BWAnnotatedData("$iconHTML Shannon Entropy: $rounded (0-8 b/byte) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
+            BWAnnotatedData("$iconHTML Shannon Entropy: $rounded (0-8 b/byte)", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
     }
 
     private fun decodeShort(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
