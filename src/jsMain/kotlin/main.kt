@@ -76,16 +76,13 @@ fun main() {
 fun decode(tryhard: Boolean) {
     val input = document.getElementById("data") as HTMLTextAreaElement
     val output = document.getElementById("output") as HTMLDivElement
-    val floatview = document.getElementById("floatview") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
         output.clear()
-        floatview.innerText = bytes.hex()
-        bytefinder.style.display = "flex"
+        setByteFinderContent(bytes)
 
         result.forEach {
             val parseResult = document.createElement("DIV") as HTMLDivElement
@@ -109,20 +106,41 @@ fun decode(tryhard: Boolean) {
     }
 }
 
+fun setByteFinderContent(bytes: ByteArray) {
+    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+
+    floatview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    bytefinder.style.display = "flex"
+}
+
+fun setByteFinderHighlight(start: Int, end: Int) {
+    val floatview = document.getElementById("floatview")!!
+    floatview.innerHTML = floatview.textContent!! // re-set previous highlights
+    val text = floatview.childNodes[0]!!
+    val range = document.createRange()
+    range.setStart(text, start*2 + start/8);
+    range.setEnd(text, end*2 + end/8);
+    range.surroundContents(document.createElement("span"))
+
+    val textview = document.getElementById("textview")!!
+    textview.innerHTML = textview.textContent!! // re-set previous highlights
+    val txtText = textview.childNodes[0]!!
+    val txtRange = document.createRange()
+    txtRange.setStart(txtText, start);
+    txtRange.setEnd(txtText, end);
+    txtRange.surroundContents(document.createElement("span"))
+}
+
 fun attachRangeListeners(element: Element) {
     if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
         val start = element.getAttribute("data-start")!!.toInt()
         val end =  element.getAttribute("data-end")!!.toInt()
         element.addEventListener("click", { evt ->
             console.log("$start to $end")
-            val floatview = document.getElementById("floatview")!!
-            floatview.innerHTML = floatview.textContent!! // re-set previous highlights
-            val text = floatview.childNodes[0]!!
-            val range = document.createRange()
-            range.setStart(text, start*2);
-            range.setEnd(text, end*2);
-            range.surroundContents(document.createElement("span"))
-
+            setByteFinderHighlight(start, end)
             evt.stopPropagation()
         })
 
