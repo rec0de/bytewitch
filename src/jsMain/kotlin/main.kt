@@ -238,6 +238,13 @@ fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
     attachFinishButtonHandler(newWrapper, parsed.bytes, msgIndex)
 }
 
+// extract segment give the protocol id and segment id
+fun extractBytes(protocol: Int, index: Int): ByteArray? {
+    val msg = parsedMessages[protocol] ?: return null
+    val start = msg.segments.getOrNull(index)?.offset ?: return null
+    val end = msg.segments.getOrNull(index + 1)?.offset ?: msg.bytes.size
+    return msg.bytes.copyOfRange(start, end)
+}
 
 // attach sequence alignment listeners
 fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
@@ -248,6 +255,8 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
     // for example: if AlignedSegment(0, 1, 3, 2, 0.05) is given
     // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
     val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
+    val alignmentColors = mutableMapOf<String, String>() // safe highlighting color
+    val alignmentBytes = mutableMapOf<String, ByteArray>() // save byte segment of corresponding id
     for (segment in alignedSegments) {
         val idA = "${segment.protocolA}-${segment.segmentIndexA}"
         val idB = "${segment.protocolB}-${segment.segmentIndexB}"
@@ -256,7 +265,25 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
         alignmentGroups.getOrPut(idB) { mutableSetOf() }.add(idA)
         alignmentGroups[idA]!!.add(idA)
         alignmentGroups[idB]!!.add(idB)
+
+        alignmentBytes[idA] = extractBytes(segment.protocolA, segment.segmentIndexA) ?: continue
+        alignmentBytes[idB] = extractBytes(segment.protocolB, segment.segmentIndexB) ?: continue
     }
+
+    // go through all groups and save color with the lowest difference to the nearest aligned segment
+    for ((id, group) in alignmentGroups) {
+        for (entry in group) {
+            val thisBytes = alignmentBytes[entry] ?: continue
+
+            val minDiff = group
+                .filter { it != entry }
+                .mapNotNull { other -> alignmentBytes[other]?.let { byteDistance(thisBytes, it) } }
+                .minOrNull() ?: 1.0
+
+            alignmentColors[entry] = getColorClassForDifference(minDiff)
+        }
+    }
+
 
     // set up event listeners for every value-align-id
     for (id in alignmentGroups.keys) {
@@ -265,19 +292,25 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
         val mouseEnterHandler: (Event) -> Unit = {
             alignmentGroups[id]?.forEach { linkedId ->
                 val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
+                val className = alignmentColors[linkedId] ?: "align-blue"
                 for (i in 0 until elements.length) {
-                    (elements[i] as HTMLElement).classList.add("hovered-alignment")
+                    // (elements[i] as HTMLElement).classList.add("hovered-alignment")
+                    (elements[i] as HTMLElement).classList.add("hovered-alignment", className)
                 }
             }
         }
+
         val mouseLeaveHandler: (Event) -> Unit = {
             alignmentGroups[id]?.forEach { linkedId ->
                 val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
                 for (i in 0 until elements.length) {
-                    (elements[i] as HTMLElement).classList.remove("hovered-alignment")
+                    // (elements[i] as HTMLElement).classList.remove("hovered-alignment")
+                    val el = elements[i] as HTMLElement
+                    el.classList.remove("hovered-alignment", "align-green", "align-yellow", "align-red", "align-blue")
                 }
             }
         }
+
 
         el.addEventListener("mouseenter", mouseEnterHandler)
         el.addEventListener("mouseleave", mouseLeaveHandler)
@@ -286,6 +319,22 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
         alignmentMouseLeaveListeners[id] = mouseLeaveHandler
     }
 }
+
+// detect the difference between two byte segments
+fun byteDistance(a: ByteArray, b: ByteArray): Double {
+    if (a.size != b.size) return 1.0
+    return a.indices.count { a[it] != b[it] }.toDouble() / a.size
+}
+
+// return colour based on the difference
+fun getColorClassForDifference(diff: Double): String = when {
+    diff == 0.0 -> "align-green"
+    diff < 0.5 -> "align-yellow"
+    diff < 0.9 -> "align-red"
+    else -> "align-blue"
+}
+
+
 
 // remove old sequence alignment listeners
 fun removeAllSequenceAlignmentListeners() {
