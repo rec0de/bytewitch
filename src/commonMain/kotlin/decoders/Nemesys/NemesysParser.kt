@@ -163,7 +163,10 @@ class NemesysParser {
             val smoothed = applyGaussianFilter(deltaBC, 0.6)
 
             // Safety check (it mostly enters if the bytes are too short)
-            if (smoothed.isEmpty()) continue
+            if (smoothed.isEmpty()) {
+                dynamicSegments.add(start to NemesysField.UNKNOWN)
+                continue
+            }
 
             // find extrema of smoothedDeltaBC
             val extrema = findExtremaInList(smoothed)
@@ -624,10 +627,10 @@ class NemesysParser {
     // handle length field payload and add it to the result
     fun handlePrintablePayload(
         bytes: ByteArray, taken: BooleanArray, result: MutableList<Pair<Int, NemesysField>>,
-        i: Int, lengthFieldSize: Int, payloadLength: Int
+        offset: Int, lengthFieldSize: Int, payloadLength: Int, bigEndian: Boolean
     ): Int? {
         // check if payload is printable
-        val payloadStart = i + lengthFieldSize
+        val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + payloadLength
         val payload = bytes.sliceArray(payloadStart until payloadEnd)
         if (!payload.all { isPrintableChar(it) }) return null
@@ -642,9 +645,13 @@ class NemesysParser {
         }
 
         // finally add fields
-        result.add(i to NemesysField.PAYLOAD_LENGTH)
-        result.add(payloadStart to NemesysField.STRING)
-        for (j in i until payloadEnd) taken[j] = true
+        if (bigEndian) {
+            result.add(offset to NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)
+        } else {
+            result.add(offset to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+        }
+        result.add(payloadStart to NemesysField.STRING_PAYLOAD)
+        for (j in offset until payloadEnd) taken[j] = true
 
         return payloadEnd
     }
@@ -654,25 +661,34 @@ class NemesysParser {
         bytes: ByteArray,
         taken: BooleanArray,
         result: MutableList<Pair<Int, NemesysField>>,
-        i: Int,
-        lengthFieldSize: Int
+        offset: Int,
+        lengthFieldSize: Int,
+        bigEndian: Boolean
     ): Int? {
-        if (i + lengthFieldSize >= bytes.size) return null
+        if (offset + lengthFieldSize >= bytes.size) return null
 
         val length = when (lengthFieldSize) {
-            1 -> bytes[i].toUByte().toInt()
-            2 -> ((bytes[i + 1].toUByte().toInt() shl 8) or bytes[i].toUByte().toInt()) // little endian
+            1 -> bytes[offset].toUByte().toInt()
+            2 -> {
+                if (bigEndian) {
+                    // big endian: Most significant byte first
+                    ((bytes[offset].toUByte().toInt() shl 8) or bytes[offset + 1].toUByte().toInt())
+                } else {
+                    // little endian: Least significant byte first
+                    ((bytes[offset + 1].toUByte().toInt() shl 8) or bytes[offset].toUByte().toInt())
+                }
+            }
             else -> return null // unsupported
         }
 
-        val payloadStart = i + lengthFieldSize
+        val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + length
 
         // check bounds and collisions
         if (payloadEnd > bytes.size || length < 3) return null
-        if ((i until payloadEnd).any { taken[it] }) return null
+        if ((offset until payloadEnd).any { taken[it] }) return null
 
-        return handlePrintablePayload(bytes, taken, result, i, lengthFieldSize, length)
+        return handlePrintablePayload(bytes, taken, result, offset, lengthFieldSize, length, bigEndian)
     }
 
 
@@ -682,17 +698,23 @@ class NemesysParser {
         var i = 0
 
         while (i < bytes.size - 1) {
-            // Try 1-byte length field
-            val newIndex1 = checkLengthPrefixedSegment(bytes, taken, result, i, 1)
-            if (newIndex1 != null) {
-                i = newIndex1
+            // Try 2-byte length field (big endian)
+            var newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 2, true)
+            if (newIndex != null) {
+                i = newIndex
+                continue
+            }
+            // Try 2-byte length field (little endian)
+            newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 2, false)
+            if (newIndex != null) {
+                i = newIndex
                 continue
             }
 
-            // Try 2-byte length field (little endian)
-            val newIndex2 = checkLengthPrefixedSegment(bytes, taken, result, i, 2)
-            if (newIndex2 != null) {
-                i = newIndex2
+            // Try 1-byte length field
+            newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 1, true)
+            if (newIndex != null) {
+                i = newIndex
                 continue
             }
 

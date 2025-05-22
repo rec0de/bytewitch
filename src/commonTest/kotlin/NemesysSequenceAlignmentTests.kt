@@ -67,7 +67,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityLengthField() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("01 02")
         val segmentB = ByteWitch.getBytesFromInputEncoding("34 78")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH, NemesysField.PAYLOAD_LENGTH)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
         assertEquals(0.0, dissim)
     }
 
@@ -75,7 +75,7 @@ class NemesysSequenceAlignmentTests {
     fun testCanberraUlmDissimilarityLongLengthField() {
         val segmentA = ByteWitch.getBytesFromInputEncoding("0013627282")
         val segmentB = ByteWitch.getBytesFromInputEncoding("3488733711")
-        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH, NemesysField.PAYLOAD_LENGTH)
+        val dissim = NemesysSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
         assertEquals(0.0, dissim)
     }
 

@@ -14,5 +14,7 @@ data class NemesysSegment(
 enum class NemesysField {
     UNKNOWN,
     STRING,
-    PAYLOAD_LENGTH
+    PAYLOAD_LENGTH_LITTLE_ENDIAN,
+    PAYLOAD_LENGTH_BIG_ENDIAN,
+    STRING_PAYLOAD // currently the payload after a payload_length field can only be a string
 }

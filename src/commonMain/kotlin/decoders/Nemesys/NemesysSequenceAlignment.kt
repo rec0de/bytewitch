@@ -162,7 +162,8 @@ object NemesysSequenceAlignment {
         var minD = Double.MAX_VALUE
 
         // if both segments are a payload length field so set canberra distance to 0
-        if (typeA == NemesysField.PAYLOAD_LENGTH && typeB == NemesysField.PAYLOAD_LENGTH) {
+        if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+            || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
             minD = 0.0
         } else {
             // sliding window to search for the lowest dissimilarity

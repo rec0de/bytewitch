@@ -333,15 +333,16 @@ class NemesysParserTests {
             bytes = bytes,
             taken = taken,
             result = result,
-            i = 0,
+            offset = 0,
             lengthFieldSize = 1,
-            payloadLength = 7
+            payloadLength = 7,
+            bigEndian = false
         )
 
         assertEquals(8, newIndex)
         assertEquals(listOf(
-            0 to NemesysField.PAYLOAD_LENGTH,
-            1 to NemesysField.STRING
+            0 to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN,
+            1 to NemesysField.STRING_PAYLOAD
         ), result)
         assertTrue(taken.slice(0..7).all { it })
     }
@@ -352,11 +353,11 @@ class NemesysParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<Pair<Int, NemesysField>>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
         assertEquals(7, nextIndex) // i + 1 + 6
         assertEquals(
-            listOf(0 to NemesysField.PAYLOAD_LENGTH, 1 to NemesysField.STRING),
+            listOf(0 to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN, 1 to NemesysField.STRING_PAYLOAD),
             result
         )
         assertTrue(taken.slice(0..6).all { it })
@@ -368,11 +369,11 @@ class NemesysParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<Pair<Int, NemesysField>>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 2)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 2, false)
 
         assertEquals(8, nextIndex) // i + 2 + 6
         assertEquals(
-            listOf(0 to NemesysField.PAYLOAD_LENGTH, 2 to NemesysField.STRING),
+            listOf(0 to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN, 2 to NemesysField.STRING_PAYLOAD),
             result
         )
         assertTrue(taken.slice(0..7).all { it })
@@ -384,7 +385,7 @@ class NemesysParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<Pair<Int, NemesysField>>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -397,7 +398,7 @@ class NemesysParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<Pair<Int, NemesysField>>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -411,7 +412,7 @@ class NemesysParserTests {
         taken[3] = true // simulate overlap
         val result = mutableListOf<Pair<Int, NemesysField>>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, i = 0, lengthFieldSize = 1)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -427,9 +428,10 @@ class NemesysParserTests {
             bytes = bytes,
             taken = taken,
             result = result,
-            i = 0,
+            offset = 0,
             lengthFieldSize = 1,
-            payloadLength = 5
+            payloadLength = 5,
+            bigEndian = false
         )
 
         assertNull(newIndex)
@@ -448,10 +450,10 @@ class NemesysParserTests {
         val result = parser.detectLengthPrefixedFields(bytes, taken)
 
         val expected = listOf(
-            2 to NemesysField.PAYLOAD_LENGTH,
-            3 to NemesysField.STRING,
-            8 to NemesysField.PAYLOAD_LENGTH,
-            10 to NemesysField.STRING
+            2 to NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN,
+            3 to NemesysField.STRING_PAYLOAD,
+            8 to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN,
+            10 to NemesysField.STRING_PAYLOAD
         )
 
         assertEquals(expected, result)

@@ -3,6 +3,7 @@ package decoders.Nemesys
 import bitmage.hex
 import decoders.BWAnnotatedData
 import decoders.BWString
+import decoders.Utf8Decoder
 
 object NemesysRenderer {
 
@@ -25,7 +26,7 @@ object NemesysRenderer {
 
             // differentiate between field types
             when (segment.fieldType) {
-                NemesysField.STRING -> """
+                NemesysField.STRING, NemesysField.STRING_PAYLOAD -> """
                     <div class="nemesysfield roundbox data" $valueLengthTag $valueAlignId>
                         <div class="nemesysvalue" $valueLengthTag>
                             $hex <span>→</span> "$text"
@@ -33,20 +34,16 @@ object NemesysRenderer {
                     </div>
                 """.trimIndent()
 
-                NemesysField.PAYLOAD_LENGTH -> {
-                    val decode = ByteWitch.quickDecode(segmentBytes, start + sourceOffset)
+                NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN -> {
+                    val payloadLength = ((bytes[start + sourceOffset].toUByte().toInt() shl 8) or bytes[start + sourceOffset + 1].toUByte().toInt())
 
-                    // check if we have to wrap content
-                    val requiresWrapping = decode == null || decode is BWString || decode is BWAnnotatedData
-                    val pre = if (requiresWrapping) "<div style='color:blue' class=\"nemesysfield roundbox data\" $valueLengthTag $valueAlignId>" else "<div $valueAlignId>"
-                    val post = if (requiresWrapping) "</div>" else "</div>"
-
-                    // if it doesn't find a suitable decoder show the hex output
-                    if (decode == null) {
-                        "$pre<div style='color:blue' class=\"nemesysvalue\" $valueLengthTag>$hex</div>$post"
-                    } else {
-                        "$pre${decode.renderHTML()}$post"
-                    }
+                    """
+                        <div class="nemesysfield roundbox data" $valueLengthTag $valueAlignId>
+                            <div class="nemesysvalue" $valueLengthTag>
+                                Payload length: "$payloadLength"
+                            </div>
+                        </div>
+                    """.trimIndent()
                 }
 
                 else -> {
