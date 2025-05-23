@@ -112,12 +112,112 @@ class NemesysParser {
         }
     }
 
+    // tries to detect length field that determines the rest of the message size in all messages
+    fun detectMessageLengthField(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+        // test 1 byte, 2 byte and 4 bytes length field of both endian
+        val candidateConfigs = listOf(
+            Pair(1, true),
+            Pair(2, true),
+            Pair(2, false),
+            Pair(4, true),
+            Pair(4, false)
+        )
+
+        // check if any configuration exists
+        val validConfigs = candidateConfigs.filter { (size, isBigEndian) ->
+            messages.all { msg ->
+                detectLengthFieldInMessage(msg, size, isBigEndian) != null
+            }
+        }
+        if (validConfigs.isEmpty()) return messages
+
+        val (chosenSize, chosenEndian) = validConfigs.first() // take first configuration
+
+        // create new segment in all messages
+        return messages.map { msg ->
+            val match = detectLengthFieldInMessage(msg, chosenSize, chosenEndian)!!
+            val (lengthFieldOffset, lengthValue) = match
+            val payloadStart = lengthFieldOffset + chosenSize
+            // val payloadEnd = payloadStart + lengthValue
+
+
+            val newSegments = msg.segments.toMutableList()
+
+            // replace old segment if it already exists
+            val replacedSegments = newSegments.filterNot { it.offset == lengthFieldOffset }.toMutableList()
+            replacedSegments.add(
+                NemesysSegment(
+                    lengthFieldOffset,
+                    if (chosenEndian)
+                        NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN
+                    else
+                        NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN
+                )
+            )
+
+            // add field for payload if no border exits yet
+            val payloadOffsetExists = replacedSegments.any { it.offset == payloadStart }
+            if (!payloadOffsetExists) {
+                replacedSegments.add(NemesysSegment(payloadStart, NemesysField.UNKNOWN))
+            }
+
+            val finalSegments = replacedSegments.sortedBy { it.offset }
+            msg.copy(segments = finalSegments)
+
+            /*val newSegments = msg.segments.toMutableList()
+            newSegments.add(NemesysSegment(lengthFieldOffset,
+                if (chosenEndian) NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN else NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
+            newSegments.add(NemesysSegment(payloadStart, NemesysField.UNKNOWN))
+
+            msg.copy(segments = newSegments.sortedBy { it.offset }.distinctBy { it.offset })*/
+        }
+    }
+
+    // find length field in one given message with specific endian and field size
+    fun detectLengthFieldInMessage(
+        msg: NemesysParsedMessage,
+        lengthFieldSize: Int,
+        bigEndian: Boolean
+    ): Pair<Int, Int>? {
+        val bytes = msg.bytes
+        val segments = msg.segments.sortedBy { it.offset }
+
+        for (offset in 0 until bytes.size - lengthFieldSize) {
+            val length = NemesysUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: continue
+            val payloadStart = offset + lengthFieldSize
+            val payloadEnd = payloadStart + length
+
+            // payloadEnd must be message size
+            if (payloadEnd != bytes.size) continue
+
+            // length field must be of type UNKNOWN
+            val currentSegment = findSegmentForOffset(segments, offset)
+            if (currentSegment?.fieldType != NemesysField.UNKNOWN) continue
+
+            return offset to length
+        }
+
+        return null
+    }
+
+    // get NemesysSegment given an offset
+    fun findSegmentForOffset(segments: List<NemesysSegment>, offset: Int): NemesysSegment? {
+        for (i in segments.indices) {
+            val start = segments[i].offset
+            val end = segments.getOrNull(i + 1)?.offset ?: Int.MAX_VALUE
+            if (offset in start until end) return segments[i]
+        }
+        return null
+    }
 
     // refine segments based on all messages
     fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
-        // you could also implement PCA by Stephan Kleber (written in his dissertation)
-        return cropDistinct(messages)
+        // maybe also implement PCA by Stephan Kleber (written in his dissertation), not sure if it's fast enough
+        return messages
+            .let(::cropDistinct)
+            .let(::detectMessageLengthField)
     }
+
 
     // check if segment has subsequence and return the corresponding index
     fun indexOfSubsequence(segment: ByteArray, sub: ByteArray): Int {
@@ -667,19 +767,7 @@ class NemesysParser {
     ): Int? {
         if (offset + lengthFieldSize >= bytes.size) return null
 
-        val length = when (lengthFieldSize) {
-            1 -> bytes[offset].toUByte().toInt()
-            2 -> {
-                if (bigEndian) {
-                    // big endian: Most significant byte first
-                    ((bytes[offset].toUByte().toInt() shl 8) or bytes[offset + 1].toUByte().toInt())
-                } else {
-                    // little endian: Least significant byte first
-                    ((bytes[offset + 1].toUByte().toInt() shl 8) or bytes[offset].toUByte().toInt())
-                }
-            }
-            else -> return null // unsupported
-        }
+        val length = NemesysUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: return null
 
         val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + length
@@ -724,4 +812,38 @@ class NemesysParser {
         return result.distinctBy { it.first }.sortedBy { it.first }
     }
 
+}
+
+// this object is used as a tool for nemesys parser and renderer
+object NemesysUtil {
+    // get actual length given the bytes and endian
+    fun tryParseLength(
+        bytes: ByteArray,
+        offset: Int,
+        lengthFieldSize: Int,
+        bigEndian: Boolean
+    ): Int? {
+        return try {
+            when (lengthFieldSize) {
+                1 -> bytes[offset].toUByte().toInt()
+                2 -> if (bigEndian)
+                    (bytes[offset].toUByte().toInt() shl 8) or bytes[offset + 1].toUByte().toInt()
+                else
+                    (bytes[offset + 1].toUByte().toInt() shl 8) or bytes[offset].toUByte().toInt()
+                4 -> if (bigEndian)
+                    (bytes[offset].toUByte().toInt() shl 24) or
+                            (bytes[offset + 1].toUByte().toInt() shl 16) or
+                            (bytes[offset + 2].toUByte().toInt() shl 8) or
+                            (bytes[offset + 3].toUByte().toInt())
+                else
+                    (bytes[offset + 3].toUByte().toInt() shl 24) or
+                            (bytes[offset + 2].toUByte().toInt() shl 16) or
+                            (bytes[offset + 1].toUByte().toInt() shl 8) or
+                            (bytes[offset].toUByte().toInt())
+                else -> null
+            }
+        } catch (e: IndexOutOfBoundsException) {
+            null
+        }
+    }
 }

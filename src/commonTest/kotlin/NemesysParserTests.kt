@@ -1,8 +1,5 @@
 import bitmage.fromHex
-import decoders.Nemesys.NemesysField
-import decoders.Nemesys.NemesysParsedMessage
-import decoders.Nemesys.NemesysParser
-import decoders.Nemesys.NemesysSegment
+import decoders.Nemesys.*
 import kotlin.collections.listOf
 import kotlin.test.*
 
@@ -533,5 +530,254 @@ class NemesysParserTests {
 
         val idx = parser.indexOfSubsequence(main, sub)
         assertEquals(-1, idx)
+    }
+
+    @Test
+    fun testTryParseLength_1Byte() {
+        val bytes = byteArrayOf(0x0A)
+        val length = NemesysUtil.tryParseLength(bytes, 0, 1, true)
+        assertEquals(10, length)
+    }
+
+    @Test
+    fun testTryParseLength_2Byte_BigEndian() {
+        val bytes = byteArrayOf(0x01, 0x02) // 0x0102 = 258
+        val length = NemesysUtil.tryParseLength(bytes, 0, 2, true)
+        assertEquals(258, length)
+    }
+
+    @Test
+    fun testTryParseLength_2Byte_LittleEndian() {
+        val bytes = byteArrayOf(0x02, 0x01) // 0x0102 = 258 (little endian)
+        val length = NemesysUtil.tryParseLength(bytes, 0, 2, false)
+        assertEquals(258, length)
+    }
+
+    @Test
+    fun testTryParseLength_4Byte_BigEndian() {
+        val bytes = byteArrayOf(0x00, 0x00, 0x01, 0x00) // 256
+        val length = NemesysUtil.tryParseLength(bytes, 0, 4, true)
+        assertEquals(256, length)
+    }
+
+    @Test
+    fun testTryParseLength_4Byte_LittleEndian() {
+        val bytes = byteArrayOf(0x00, 0x01, 0x00, 0x00) // 256
+        val length = NemesysUtil.tryParseLength(bytes, 0, 4, false)
+        assertEquals(256, length)
+    }
+
+    @Test
+    fun testTryParseLength_invalidLengthSize_returnsNull() {
+        val bytes = byteArrayOf(0x01, 0x02, 0x03)
+        val length = NemesysUtil.tryParseLength(bytes, 0, 3, true) // unsupported size
+        assertNull(length)
+    }
+
+    @Test
+    fun testFindSegmentForOffset_findsCorrectSegment() {
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(5, NemesysField.STRING),
+            NemesysSegment(10, NemesysField.STRING_PAYLOAD)
+        )
+
+        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 0)?.fieldType)
+        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
+        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
+        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 9)?.fieldType)
+        assertEquals(NemesysField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 10)?.fieldType)
+        assertEquals(NemesysField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 999999)?.fieldType)
+    }
+
+    @Test
+    fun testFindSegmentForOffset_returnsNullIfBeforeFirstSegment() {
+        val segments = listOf(
+            NemesysSegment(5, NemesysField.STRING),
+            NemesysSegment(10, NemesysField.STRING_PAYLOAD)
+        )
+
+        assertNull(parser.findSegmentForOffset(segments, 0))
+        assertNull(parser.findSegmentForOffset(segments, 4))
+    }
+
+    @Test
+    fun testFindSegmentForOffset_returnsNullIfEmptyList() {
+        val segments = emptyList<NemesysSegment>()
+        assertNull(parser.findSegmentForOffset(segments, 0))
+    }
+
+    @Test
+    fun testFindSegmentForOffset_exactlyOnSegmentStart() {
+        val segments = listOf(
+            NemesysSegment(3, NemesysField.UNKNOWN),
+            NemesysSegment(7, NemesysField.STRING)
+        )
+
+        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 3)?.fieldType)
+        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 7)?.fieldType)
+    }
+
+    @Test
+    fun testFindSegmentForOffset_exactlyOnSegmentEnd_returnsPrevious() {
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(5, NemesysField.STRING)
+        )
+        // Offset 5 is start of next segment, so should return segment[1]
+        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
+        // Offset 4 is still within segment[0]
+        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_valid1ByteLE() {
+        // 03 41 42 43 → length=3, payload="ABC", UNKNOWN segment
+        val msg = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43),
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        assertEquals(0 to 3, result)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_valid2ByteBE() {
+        // 00 03 41 42 43 → BE: length = 3
+        val msg = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = byteArrayOf(0x00, 0x03, 0x41, 0x42, 0x43),
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 2, bigEndian = true)
+        assertEquals(0 to 3, result)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_rejectsWrongSegmentType() {
+        // valid length, but segment is STRING not UNKNOWN
+        val msg = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.STRING)),
+            bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43),
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_rejectsIfPayloadEndNotEqualToMessageSize() {
+        // length = 3, but message size is 5 → should be rejected
+        val msg = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43, 0x44),
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_returnsNullIfNoMatch() {
+        // no valid length field
+        val msg = NemesysParsedMessage(
+            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            bytes = byteArrayOf(0x7F, 0x00), // length = 127, too long
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun testDetectLengthFieldInMessage_findsCorrectOffsetAmongMultiple() {
+        // 02 00 03 41 42 43 → LE: offset 2 → length = 3, payload="ABC"
+        val msg = NemesysParsedMessage(
+            segments = listOf(
+                NemesysSegment(0, NemesysField.STRING),
+                NemesysSegment(2, NemesysField.UNKNOWN)
+            ),
+            bytes = byteArrayOf(0x02, 0x00, 0x03, 0x41, 0x42, 0x43),
+            msgIndex = 0
+        )
+
+        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        assertEquals(2 to 3, result)
+    }
+
+    @Test
+    fun testDetectMessageLengthField_setsLengthSegmentsWhenValidGlobally() {
+        val messages = listOf(
+            NemesysParsedMessage(
+                segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+                bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43), // length = 3, payload = "ABC"
+                msgIndex = 0
+            ),
+            NemesysParsedMessage(
+                segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+                bytes = byteArrayOf(0x02, 0x41, 0x42), // length = 2, payload = "AB"
+                msgIndex = 1
+            )
+        )
+
+        val actual = parser.detectMessageLengthField(messages)
+
+        assertEquals(2, actual.size)
+
+        actual.forEachIndexed { index, msg ->
+            val segments = msg.segments.sortedBy { it.offset }
+            val lengthField = segments.find { it.fieldType.name.startsWith("PAYLOAD_LENGTH") }
+            val unknownAfterLength = segments.find { it.offset > (lengthField?.offset ?: -1) }
+
+            assertNotNull(lengthField, "Length field missing in msg[$index]")
+            assertEquals(NemesysField.UNKNOWN, unknownAfterLength?.fieldType)
+        }
+    }
+
+    @Test
+    fun testDetectMessageLengthField_returnsOriginalWhenNoValidConfig() {
+        val messages = listOf(
+            NemesysParsedMessage(
+                segments = listOf(NemesysSegment(0, NemesysField.STRING)),
+                bytes = byteArrayOf(0xFF.toByte(), 0x00), // length = 255 (invalid for short payload)
+                msgIndex = 0
+            )
+        )
+
+        val result = parser.detectMessageLengthField(messages)
+
+        assertEquals(messages, result)
+    }
+
+    @Test
+    fun testDetectMessageLengthField_preservesOriginalSegments() {
+        val messages = listOf(
+            NemesysParsedMessage(
+                segments = listOf(
+                    NemesysSegment(0, NemesysField.UNKNOWN),
+                    NemesysSegment(2, NemesysField.STRING)
+                ),
+                bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43), // length = 3, payload = "ABC"
+                msgIndex = 0
+            )
+        )
+
+        val result = parser.detectMessageLengthField(messages)
+
+        val newMsg = result.first()
+        val segmentOffsets = newMsg.segments.map { it.offset }
+
+        // don't delete other fields
+        assertTrue(segmentOffsets.contains(2))
+        // contain length field
+        assertTrue(segmentOffsets.contains(0))
+        // add payload field
+        assertTrue(segmentOffsets.contains(1))
     }
 }

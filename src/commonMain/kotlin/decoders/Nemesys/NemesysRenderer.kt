@@ -35,7 +35,12 @@ object NemesysRenderer {
                 """.trimIndent()
 
                 NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN -> {
-                    val payloadLength = ((bytes[start + sourceOffset].toUByte().toInt() shl 8) or bytes[start + sourceOffset + 1].toUByte().toInt())
+                    val payloadLength = NemesysUtil.tryParseLength(
+                        bytes = bytes,
+                        offset = start + sourceOffset,
+                        lengthFieldSize = segmentBytes.size,
+                        bigEndian = segment.fieldType == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN
+                    ) ?: 0
 
                     """
                         <div class="nemesysfield roundbox data" $valueLengthTag $valueAlignId>
