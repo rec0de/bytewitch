@@ -186,19 +186,73 @@ object NemesysSequenceAlignment {
         return dm
     }
 
+    private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
+        val shortSegment = if (segmentA.size <= segmentB.size) segmentA else segmentB
+        val longSegment = if (segmentA.size > segmentB.size) segmentA else segmentB
+
+        var minD = Double.MAX_VALUE
+
+        // if both segments are a payload length field so set canberra distance to 0
+        if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+            || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
+            minD = 0.0
+        } else {
+            // sliding window to search for the lowest dissimilarity
+            /*for (offset in 0..(longSegment.size - shortSegment.size)) {
+                val window = longSegment.sliceArray(offset until (offset + shortSegment.size))
+                val dC = canberraDistance(shortSegment, window) / shortSegment.size
+                if (dC < minD) {
+                    minD = dC
+                }
+            }*/
+            minD = needlemanWunschCanberra(segmentA, segmentB)
+        }
+
+        val r = (longSegment.size - shortSegment.size).toDouble() / longSegment.size
+        val pf = 0.8 // hyper parameter to set the non-linear penalty
+
+        val dm = (shortSegment.size.toDouble() / longSegment.size.toDouble()) * minD +
+                r +
+                (1 - minD) * r * (shortSegment.size / (longSegment.size * longSegment.size) - pf)
+
+        return dm
+    }
+
+    private fun needlemanWunschCanberra(segmentA: ByteArray, segmentB: ByteArray, gapPenalty: Double = 1.0): Double {
+        val m = segmentA.size
+        val n = segmentB.size
+        val dp = Array(m + 1) { DoubleArray(n + 1) }
+
+        // init
+        for (i in 0..m) dp[i][0] = i * gapPenalty
+        for (j in 0..n) dp[0][j] = j * gapPenalty
+
+        // fill up matrix
+        for (i in 1..m) {
+            for (j in 1..n) {
+                val match = dp[i - 1][j - 1] + byteCanberra(segmentA[i - 1], segmentB[j - 1])
+                val delete = dp[i - 1][j] + gapPenalty
+                val insert = dp[i][j - 1] + gapPenalty
+                dp[i][j] = minOf(match, delete, insert)
+            }
+        }
+
+        return dp[m][n] / maxOf(m, n).toDouble()
+    }
+
+    // scoring function for bytes using canberra
+    private fun byteCanberra(a: Byte, b: Byte): Double {
+        val ai = a.toInt() and 0xFF
+        val bi = b.toInt() and 0xFF
+        val denominator = ai + bi
+        return if (denominator == 0) 0.0 else kotlin.math.abs(ai - bi).toDouble() / denominator
+    }
+
+
     // Canberra Dissimilarity for segments of different sizes (using pooling)
     private fun canberraDissimilarityWithPooling(segmentA: ByteArray, segmentB: ByteArray): Double {
-        val shortSegment: ByteArray
-        val longSegment: ByteArray
-
-        // determine longer and shorter segment
-        if (segmentA.size <= segmentB.size) {
-            shortSegment = segmentA
-            longSegment = segmentB
-        } else {
-            shortSegment = segmentB
-            longSegment = segmentA
-        }
+        val shortSegment = if (segmentA.size <= segmentB.size) segmentA else segmentB
+        val longSegment = if (segmentA.size > segmentB.size) segmentA else segmentB
 
         // pool longer segment
         val pooledSegment = averagePoolSegment(longSegment, shortSegment.size)
