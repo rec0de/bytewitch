@@ -217,6 +217,32 @@ class NemesysTrainingset {
     }
 
     @Test
+    fun testSegmentParsing7() {
+        val bytes = "62706c6973743030d30102030405065173516651625c636f6d2e6b696b2e636861741105ffa107d208090a0b516851645f102036366137626435396665376639613763323265623436336436646233393730342341d95c3031cf51a2080f1113152225272c2e30530000000000000101000000000000000c0000000000000000000000000000005c".fromHex()
+
+        val expectedSegments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),     // Start der BPList
+            NemesysSegment(8, NemesysField.UNKNOWN),     // Start des Root-Objekts (Dictionary)
+            NemesysSegment(15, NemesysField.UNKNOWN),    // "s"
+            NemesysSegment(17, NemesysField.UNKNOWN),    // "f"
+            NemesysSegment(19, NemesysField.UNKNOWN),    // "b"
+            NemesysSegment(21, NemesysField.UNKNOWN),    // "com.kik.chat"
+            NemesysSegment(34, NemesysField.UNKNOWN),    // 1535
+            NemesysSegment(37, NemesysField.UNKNOWN),    // Start des Arrays
+            NemesysSegment(39, NemesysField.UNKNOWN),    // Start des Dictionary-Objekts im Array
+            NemesysSegment(44, NemesysField.UNKNOWN),    // "h"
+            NemesysSegment(46, NemesysField.UNKNOWN),    // "d"
+            NemesysSegment(48, NemesysField.UNKNOWN),    // "66a7bd59fe7f9a7c22eb463d6db39704"
+            NemesysSegment(83, NemesysField.UNKNOWN),
+        )
+
+        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val actualSegments = parsed.segments
+
+        printSegmentParsingResult(7, expectedSegments, actualSegments)
+    }
+
+    @Test
     fun testSequenceAlignment1() {
         val message1 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
         val message2 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102446394532423231352d393431372d344141372d413439302d384446364539443445364639080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
