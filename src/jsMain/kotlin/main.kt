@@ -1,3 +1,4 @@
+import bitmage.fromHex
 import bitmage.hex
 import decoders.Nemesys.*
 import kotlinx.browser.document
@@ -11,13 +12,14 @@ import org.khronos.webgl.Uint8Array
 import org.w3c.dom.events.MouseEvent
 
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.KeyboardEvent
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 
 // save parsed messages for float view and nemesys
-val parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
+var parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
 
 // global values for SequenceAlignment listeners
 val alignmentMouseEnterListeners = mutableMapOf<String, (Event) -> Unit>()
@@ -134,6 +136,130 @@ fun applyLiveDecodeListeners() {
     }
 }
 
+fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
+    val message1 = "A76269640C67766F726E616D65634D6178686E6163686E616D656A4D75737465726D616E6E68757365726E616D65636D617865656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E7472796A4175737472616C69656E6969735F616374697665F4".fromHex()
+    val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
+
+    val segments1 = listOf(
+        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
+        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
+        NemesysSegment(4, NemesysField.UNKNOWN),     // 12
+        NemesysSegment(5, NemesysField.UNKNOWN),     // "vorname"
+        NemesysSegment(13, NemesysField.UNKNOWN),    // "Max"
+        NemesysSegment(17, NemesysField.UNKNOWN),    // "nachname"
+        NemesysSegment(26, NemesysField.UNKNOWN),    // "Mustermann"
+        NemesysSegment(37, NemesysField.UNKNOWN),    // "username"
+        NemesysSegment(46, NemesysField.UNKNOWN),    // "max"
+        NemesysSegment(50, NemesysField.UNKNOWN),    // "email"
+        NemesysSegment(56, NemesysField.UNKNOWN),    // "bob@gmx.de"
+        NemesysSegment(67, NemesysField.UNKNOWN),    // "profile"
+        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes Objekt beginnt
+        NemesysSegment(76, NemesysField.UNKNOWN),    // "age"
+        NemesysSegment(80, NemesysField.UNKNOWN),    // 76
+        NemesysSegment(82, NemesysField.UNKNOWN),    // "country"
+        NemesysSegment(90, NemesysField.UNKNOWN),    // "Australien"
+        NemesysSegment(101, NemesysField.UNKNOWN),   // "is_active"
+        NemesysSegment(111, NemesysField.UNKNOWN)    // false
+    )
+
+    val segments2 = listOf(
+        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
+        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
+        NemesysSegment(4, NemesysField.UNKNOWN),     // 112
+        NemesysSegment(6, NemesysField.UNKNOWN),     // "nachname"
+        NemesysSegment(15, NemesysField.UNKNOWN),    // "Neumann"
+        NemesysSegment(23, NemesysField.UNKNOWN),    // "username"
+        NemesysSegment(32, NemesysField.UNKNOWN),    // "neumannxXx"
+        NemesysSegment(43, NemesysField.UNKNOWN),    // "email"
+        NemesysSegment(49, NemesysField.UNKNOWN),    // "neumann@outlook.de"
+        NemesysSegment(68, NemesysField.UNKNOWN),    // "hobbys"
+        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes "hobbys"-Objekt
+        NemesysSegment(76, NemesysField.UNKNOWN),    // "hobby1"
+        NemesysSegment(83, NemesysField.UNKNOWN),    // "Fußball"
+        NemesysSegment(92, NemesysField.UNKNOWN),    // "hobby2"
+        NemesysSegment(99, NemesysField.UNKNOWN),    // "Basketball"
+        NemesysSegment(110, NemesysField.UNKNOWN),   // "profile"
+        NemesysSegment(118, NemesysField.UNKNOWN),   // verschachteltes "profile"-Objekt
+        NemesysSegment(119, NemesysField.UNKNOWN),   // "age"
+        NemesysSegment(123, NemesysField.UNKNOWN),   // 18
+        NemesysSegment(124, NemesysField.UNKNOWN),   // "country"
+        NemesysSegment(132, NemesysField.UNKNOWN),   // "Deutschland"
+        NemesysSegment(144, NemesysField.UNKNOWN),   // "is_active"
+        NemesysSegment(154, NemesysField.UNKNOWN)    // true
+    )
+
+
+
+    val messages = mutableMapOf(
+        0 to NemesysParsedMessage(segments1, message1, 0),
+        1 to NemesysParsedMessage(segments2, message2, 1)
+    )
+
+    return messages
+}
+
+
+
+val selectedGroups = mutableListOf<MutableSet<String>>()
+var currentGroup = mutableSetOf<String>()
+
+fun setupSelectableSegments() {
+    val elements = document.querySelectorAll("[value-align-id]")
+    for (i in 0 until elements.length) {
+        val el = elements[i] as HTMLElement
+        el.addEventListener("click", {
+            toggleSegment(el)
+        })
+    }
+
+    // start new group by pressing "n" on the keyboard
+    document.addEventListener("keydown", { e ->
+        if ((e as KeyboardEvent).key == "n") {
+            if (currentGroup.size > 1) {
+                selectedGroups.add(currentGroup.toMutableSet())
+            }
+            currentGroup.clear()
+        }
+    })
+}
+
+fun toggleSegment(el: HTMLElement) {
+    val id = el.getAttribute("value-align-id") ?: return
+    if (currentGroup.contains(id)) {
+        currentGroup.remove(id)
+        el.classList.remove("highlighted")
+    } else {
+        currentGroup.add(id)
+        el.classList.add("highlighted")
+    }
+}
+
+fun exportAlignments(): String {
+    val triplets = mutableSetOf<String>()
+
+    for (group in selectedGroups) {
+        Logger.log("Group:")
+        Logger.log(group)
+        val items = group.map {
+            val (msg, seg) = it.split("-").map { part -> part.toInt() }
+            msg to seg
+        }
+
+        for (i in items.indices) {
+            for (j in i + 1 until items.size) {
+                val (msgA, segA) = items[i]
+                val (msgB, segB) = items[j]
+                triplets.add("Triple($msgA, $msgB, Pair($segA, $segB))")
+            }
+        }
+    }
+
+    return """val expectedAlignments = setOf(
+        ${triplets.joinToString(",\n    ")}
+    )"""
+}
+
+
 fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -154,6 +280,8 @@ fun decode(tryhard: Boolean) {
         // decode input
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         val result = ByteWitch.analyze(bytes, tryhard)
+
+
 
         if (result.isNotEmpty()) {
             bytefinder.style.display = "flex"
@@ -212,6 +340,45 @@ fun decode(tryhard: Boolean) {
 
     val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
     attachSequenceAlignmentListeners(alignedSegment)
+
+
+
+    // TODO for testing purposes only
+    includeAlignmentForTesting()
+
+}
+
+fun includeAlignmentForTesting() {
+    val output = document.getElementById("output") as HTMLDivElement
+    val testingMessages = getTestingData()
+    val messageBox = document.createElement("DIV") as HTMLDivElement
+    messageBox.classList.add("message-output")
+    for ((index, message) in testingMessages) {
+        val nemesysResult = document.createElement("DIV") as HTMLDivElement
+        val nemesysName = document.createElement("H3") as HTMLHeadingElement
+        nemesysName.innerText = "nemesysparser $index"
+
+        val nemesysContent = document.createElement("DIV") as HTMLDivElement
+        nemesysContent.classList.add("parsecontent")
+
+        if (message != null) {
+            nemesysContent.innerHTML = NemesysRenderer.render(message)
+        } else {
+            nemesysContent.innerText = "Fehler: Nachricht $index ist null."
+        }
+
+        nemesysResult.appendChild(nemesysName)
+        nemesysResult.appendChild(nemesysContent)
+        messageBox.appendChild(nemesysResult)
+        output.appendChild(messageBox)
+    }
+    setupSelectableSegments()
+    val btn = document.createElement("button") as HTMLElement
+    btn.innerText = "Export Alignments"
+    btn.onclick = {
+        console.log(exportAlignments())
+    }
+    document.body?.appendChild(btn)
 }
 
 // rerender nemesys html view
