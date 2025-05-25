@@ -123,7 +123,8 @@ object NemesysSequenceAlignment {
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].offset else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
+                        // val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
+                        val dissim = canberraDissimilarityByteWise(segmentBytesA, segmentBytesB, typeA, typeB)
                         // val dissim = canberraDissimilarityWithPooling(segmentBytesA, segmentBytesB)
                         val sim = 1.0 - dissim
 
@@ -187,38 +188,18 @@ object NemesysSequenceAlignment {
         return dm
     }
 
+    // using canberra dissimilarity byte wise
     private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
-        val shortSegment = if (segmentA.size <= segmentB.size) segmentA else segmentB
-        val longSegment = if (segmentA.size > segmentB.size) segmentA else segmentB
-
-        var minD = Double.MAX_VALUE
-
         // if both segments are a payload length field so set canberra distance to 0
         if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
             || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
-            minD = 0.0
-        } else {
-            // sliding window to search for the lowest dissimilarity
-            /*for (offset in 0..(longSegment.size - shortSegment.size)) {
-                val window = longSegment.sliceArray(offset until (offset + shortSegment.size))
-                val dC = canberraDistance(shortSegment, window) / shortSegment.size
-                if (dC < minD) {
-                    minD = dC
-                }
-            }*/
-            minD = needlemanWunschCanberra(segmentA, segmentB)
+            return 0.0
         }
 
-        val r = (longSegment.size - shortSegment.size).toDouble() / longSegment.size
-        val pf = 0.8 // hyper parameter to set the non-linear penalty
-
-        val dm = (shortSegment.size.toDouble() / longSegment.size.toDouble()) * minD +
-                r +
-                (1 - minD) * r * (shortSegment.size / (longSegment.size * longSegment.size) - pf)
-
-        return dm
+        return needlemanWunschCanberra(segmentA, segmentB)
     }
 
+    // canberra score using sequence alignment on two segments
     private fun needlemanWunschCanberra(segmentA: ByteArray, segmentB: ByteArray, gapPenalty: Double = 1.0): Double {
         val m = segmentA.size
         val n = segmentB.size
@@ -238,6 +219,7 @@ object NemesysSequenceAlignment {
             }
         }
 
+        // dp[m][n] is the score on the bottom right of the matrix. It says the distance of the best alignment
         return dp[m][n] / maxOf(m, n).toDouble()
     }
 

@@ -344,7 +344,7 @@ fun decode(tryhard: Boolean) {
 
 
     // TODO for testing purposes only
-    includeAlignmentForTesting()
+    // includeAlignmentForTesting()
 
 }
 
