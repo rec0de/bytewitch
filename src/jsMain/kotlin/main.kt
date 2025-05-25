@@ -137,108 +137,62 @@ fun applyLiveDecodeListeners() {
 }
 
 fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
-    val message1 = "0821b10132010c3f2f5cd941da0104080010009a02bf010a3b636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e4661636554696d6550726f766964657212084661636554696d651a6466696c653a2f2f2f707269766174652f7661722f636f6e7461696e6572732f42756e646c652f4170706c69636174696f6e2f30323639344631412d303138312d343031342d423036342d4536303938333636464431342f4661636554696d652e6170702f2002280130013801400048006803680278019a02de010a17636f6d2e6170706c652e636f726574656c6570686f6e79200228053001380040014801680278018a0107080212033131328a0107080212033131308a0107080212033131328a0107080212033131308a0107080212033931318a0107080212033131328a0107080212033030308a01060802120230388a0107080212033131308a0107080212033939398a0107080212033131388a0107080212033131398a0107080212033132308a0107080212033132328a0107080212033931318a0107080212033131328a0108080212042a3931318a010808021204233931319a02450a31636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e54696e43616e200128013001380040004800680368027800".fromHex()
+    val message1 = "A76269640C67766F726E616D65634D6178686E6163686E616D656A4D75737465726D616E6E68757365726E616D65636D617865656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E7472796A4175737472616C69656E6969735F616374697665F4".fromHex()
+    val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
 
     val segments1 = listOf(
-        NemesysSegment(0, NemesysField.UNKNOWN),
-        NemesysSegment(2, NemesysField.UNKNOWN),
-        NemesysSegment(12, NemesysField.UNKNOWN),
-        NemesysSegment(15, NemesysField.UNKNOWN),
-        NemesysSegment(17, NemesysField.UNKNOWN),
-        NemesysSegment(19, NemesysField.UNKNOWN),
-        NemesysSegment(23, NemesysField.UNKNOWN),
-        NemesysSegment(84, NemesysField.UNKNOWN),
-        NemesysSegment(94, NemesysField.UNKNOWN),
-        NemesysSegment(196, NemesysField.UNKNOWN),
-        NemesysSegment(198, NemesysField.UNKNOWN),
-        NemesysSegment(200, NemesysField.UNKNOWN),
-        NemesysSegment(202, NemesysField.UNKNOWN),
-        NemesysSegment(204, NemesysField.UNKNOWN),
-        NemesysSegment(206, NemesysField.UNKNOWN),
-        NemesysSegment(208, NemesysField.UNKNOWN),
-        NemesysSegment(210, NemesysField.UNKNOWN),
-        NemesysSegment(212, NemesysField.UNKNOWN),
-        NemesysSegment(214, NemesysField.UNKNOWN),
-        NemesysSegment(218, NemesysField.UNKNOWN),
-        NemesysSegment(243, NemesysField.UNKNOWN),
-        NemesysSegment(245, NemesysField.UNKNOWN),
-        NemesysSegment(247, NemesysField.UNKNOWN),
-        NemesysSegment(249, NemesysField.UNKNOWN),
-        NemesysSegment(251, NemesysField.UNKNOWN),
-        NemesysSegment(253, NemesysField.UNKNOWN),
-        NemesysSegment(255, NemesysField.UNKNOWN),
-        NemesysSegment(257, NemesysField.UNKNOWN),
-        NemesysSegment(259, NemesysField.UNKNOWN),
-        NemesysSegment(262, NemesysField.UNKNOWN),
-        NemesysSegment(264, NemesysField.UNKNOWN),
-        NemesysSegment(269, NemesysField.UNKNOWN),
-        NemesysSegment(272, NemesysField.UNKNOWN),
-        NemesysSegment(274, NemesysField.UNKNOWN),
-        NemesysSegment(279, NemesysField.UNKNOWN),
-        NemesysSegment(282, NemesysField.UNKNOWN),
-        NemesysSegment(284, NemesysField.UNKNOWN),
-        NemesysSegment(289, NemesysField.UNKNOWN),
-        NemesysSegment(292, NemesysField.UNKNOWN),
-        NemesysSegment(294, NemesysField.UNKNOWN),
-        NemesysSegment(299, NemesysField.UNKNOWN),
-        NemesysSegment(302, NemesysField.UNKNOWN),
-        NemesysSegment(304, NemesysField.UNKNOWN),
-        NemesysSegment(309, NemesysField.UNKNOWN),
-        NemesysSegment(312, NemesysField.UNKNOWN),
-        NemesysSegment(314, NemesysField.UNKNOWN),
-        NemesysSegment(319, NemesysField.UNKNOWN),
-        NemesysSegment(322, NemesysField.UNKNOWN),
-        NemesysSegment(324, NemesysField.UNKNOWN),
-        NemesysSegment(329, NemesysField.UNKNOWN),
-        NemesysSegment(332, NemesysField.UNKNOWN),
-        NemesysSegment(334, NemesysField.UNKNOWN),
-        NemesysSegment(338, NemesysField.UNKNOWN),
-        NemesysSegment(341, NemesysField.UNKNOWN),
-        NemesysSegment(343, NemesysField.UNKNOWN),
-        NemesysSegment(348, NemesysField.UNKNOWN),
-        NemesysSegment(351, NemesysField.UNKNOWN),
-        NemesysSegment(353, NemesysField.UNKNOWN),
-        NemesysSegment(358, NemesysField.UNKNOWN),
-        NemesysSegment(361, NemesysField.UNKNOWN),
-        NemesysSegment(363, NemesysField.UNKNOWN),
-        NemesysSegment(368, NemesysField.UNKNOWN),
-        NemesysSegment(371, NemesysField.UNKNOWN),
-        NemesysSegment(373, NemesysField.UNKNOWN),
-        NemesysSegment(378, NemesysField.UNKNOWN),
-        NemesysSegment(381, NemesysField.UNKNOWN),
-        NemesysSegment(383, NemesysField.UNKNOWN),
-        NemesysSegment(388, NemesysField.UNKNOWN),
-        NemesysSegment(391, NemesysField.UNKNOWN),
-        NemesysSegment(393, NemesysField.UNKNOWN),
-        NemesysSegment(398, NemesysField.UNKNOWN),
-        NemesysSegment(401, NemesysField.UNKNOWN),
-        NemesysSegment(403, NemesysField.UNKNOWN),
-        NemesysSegment(408, NemesysField.UNKNOWN),
-        NemesysSegment(411, NemesysField.UNKNOWN),
-        NemesysSegment(413, NemesysField.UNKNOWN),
-        NemesysSegment(418, NemesysField.UNKNOWN),
-        NemesysSegment(421, NemesysField.UNKNOWN),
-        NemesysSegment(423, NemesysField.UNKNOWN),
-        NemesysSegment(429, NemesysField.UNKNOWN),
-        NemesysSegment(432, NemesysField.UNKNOWN),
-        NemesysSegment(434, NemesysField.UNKNOWN),
-        NemesysSegment(440, NemesysField.UNKNOWN),
-        NemesysSegment(443, NemesysField.UNKNOWN),
-        NemesysSegment(494, NemesysField.UNKNOWN),
-        NemesysSegment(496, NemesysField.UNKNOWN),
-        NemesysSegment(498, NemesysField.UNKNOWN),
-        NemesysSegment(500, NemesysField.UNKNOWN),
-        NemesysSegment(502, NemesysField.UNKNOWN),
-        NemesysSegment(504, NemesysField.UNKNOWN),
-        NemesysSegment(506, NemesysField.UNKNOWN),
-        NemesysSegment(508, NemesysField.UNKNOWN),
-        NemesysSegment(510, NemesysField.UNKNOWN)
+        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
+        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
+        NemesysSegment(4, NemesysField.UNKNOWN),     // 12
+        NemesysSegment(5, NemesysField.UNKNOWN),     // "vorname"
+        NemesysSegment(13, NemesysField.UNKNOWN),    // "Max"
+        NemesysSegment(17, NemesysField.UNKNOWN),    // "nachname"
+        NemesysSegment(26, NemesysField.UNKNOWN),    // "Mustermann"
+        NemesysSegment(37, NemesysField.UNKNOWN),    // "username"
+        NemesysSegment(46, NemesysField.UNKNOWN),    // "max"
+        NemesysSegment(50, NemesysField.UNKNOWN),    // "email"
+        NemesysSegment(56, NemesysField.UNKNOWN),    // "bob@gmx.de"
+        NemesysSegment(67, NemesysField.UNKNOWN),    // "profile"
+        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes Objekt beginnt
+        NemesysSegment(76, NemesysField.UNKNOWN),    // "age"
+        NemesysSegment(80, NemesysField.UNKNOWN),    // 76
+        NemesysSegment(82, NemesysField.UNKNOWN),    // "country"
+        NemesysSegment(90, NemesysField.UNKNOWN),    // "Australien"
+        NemesysSegment(101, NemesysField.UNKNOWN),   // "is_active"
+        NemesysSegment(111, NemesysField.UNKNOWN)    // false
+    )
+
+    val segments2 = listOf(
+        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
+        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
+        NemesysSegment(4, NemesysField.UNKNOWN),     // 112
+        NemesysSegment(6, NemesysField.UNKNOWN),     // "nachname"
+        NemesysSegment(15, NemesysField.UNKNOWN),    // "Neumann"
+        NemesysSegment(23, NemesysField.UNKNOWN),    // "username"
+        NemesysSegment(32, NemesysField.UNKNOWN),    // "neumannxXx"
+        NemesysSegment(43, NemesysField.UNKNOWN),    // "email"
+        NemesysSegment(49, NemesysField.UNKNOWN),    // "neumann@outlook.de"
+        NemesysSegment(68, NemesysField.UNKNOWN),    // "hobbys"
+        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes "hobbys"-Objekt
+        NemesysSegment(76, NemesysField.UNKNOWN),    // "hobby1"
+        NemesysSegment(83, NemesysField.UNKNOWN),    // "Fußball"
+        NemesysSegment(92, NemesysField.UNKNOWN),    // "hobby2"
+        NemesysSegment(99, NemesysField.UNKNOWN),    // "Basketball"
+        NemesysSegment(110, NemesysField.UNKNOWN),   // "profile"
+        NemesysSegment(118, NemesysField.UNKNOWN),   // verschachteltes "profile"-Objekt
+        NemesysSegment(119, NemesysField.UNKNOWN),   // "age"
+        NemesysSegment(123, NemesysField.UNKNOWN),   // 18
+        NemesysSegment(124, NemesysField.UNKNOWN),   // "country"
+        NemesysSegment(132, NemesysField.UNKNOWN),   // "Deutschland"
+        NemesysSegment(144, NemesysField.UNKNOWN),   // "is_active"
+        NemesysSegment(154, NemesysField.UNKNOWN)    // true
     )
 
 
 
     val messages = mutableMapOf(
-        0 to NemesysParsedMessage(segments1, message1, 0)
+        0 to NemesysParsedMessage(segments1, message1, 0),
+        1 to NemesysParsedMessage(segments2, message2, 1)
     )
 
     return messages
