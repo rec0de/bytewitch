@@ -3,6 +3,7 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import looksLikeUtf8String
 
 
 // Once again reusing OPack classes
@@ -99,6 +100,7 @@ class UbjsonParser : ParseCompanion() {
                     readInt(bytes, 4)
 
                 val stringBytes = readBytes(bytes, byteLength.toInt())
+                check(looksLikeUtf8String(stringBytes, enableLengthBias = false) > 0.5) { "UBJSON string has implausible content: ${stringBytes.hex()}" }
                 OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             'H' -> {

@@ -289,7 +289,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "4d500305" to Pair("Apple MsgPack header", null),
         "7b22" to Pair("JSON dict", null),
         "3a290a" to Pair("Smile Data Format", "https://github.com/FasterXML/smile-format-specification"),
-        "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR")
+        "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR"),
+        "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

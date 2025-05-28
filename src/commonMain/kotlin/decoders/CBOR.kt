@@ -3,6 +3,7 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import looksLikeUtf8String
 
 
 // CBOR is basically MsgPack is basically OPack, so we'll re-use classes
@@ -105,8 +106,11 @@ class CborParser : ParseCompanion() {
                     }
                     OPString(string, Pair(start, lastConsumedBytePosition))
                 }
-                else
-                    OPString(readBytes(bytes, length.toInt()).decodeToString(), Pair(start, lastConsumedBytePosition))
+                else {
+                    val stringBytes = readBytes(bytes, length.toInt())
+                    check(looksLikeUtf8String(stringBytes, false) > 0.5) { "cbor string with implausible content: ${stringBytes.hex()}" }
+                    OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
+                }
             }
             4 -> {
                 val length = readCount(bytes, count)

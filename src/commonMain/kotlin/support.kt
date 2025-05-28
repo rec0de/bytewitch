@@ -75,7 +75,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     // multiple different rare characters are super suspicious
     // a message consisting of only rare characters from one particular bin, however, is plausible
     // and single rare CJK characters may also occur in otherwise common CJK text
-    val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) max(rareNonAsciiShare * 2, 0.5) else if(hasRareCJK || rareNonAsciiShare < 0.05) rareNonAsciiShare else (1-rareNonAsciiShare)
+    val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) max(rareNonAsciiShare * 2, 0.2) else if(hasRareCJK || rareNonAsciiShare < 0.05) rareNonAsciiShare else (1-rareNonAsciiShare)
 
     // CJK characters are the most likely to generate "randomly" and should usually not co-occur with non-CJK characters, excluding common ASCII
     val cjk = bins[0] + bins[1] + bins[2] + bins[7] + bins[10]
@@ -101,6 +101,8 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
 
 fun looksLikeUtf8String(data: ByteArray, enableLengthBias: Boolean = true): Double {
     val string = data.decodeToString()
+
+    //Logger.log("looks like utf8 called for $string")
 
     // there are a lot of ways to cause decoding errors
     // random / non-UTF-8 bytes should trigger them reliably
