@@ -242,22 +242,35 @@ class NemesysTestset {
         val bytes = "62706c6973743137a0d0000000000000007f114870726564696374696f6e466f7243617465676f726965733a636f6e73756d65723a63726974657269613a6c696d69743a70726f7669646573466565646261636b3a7265706c793a007f111b76363040303a38513136513234403332513430423438403f353200a0d00000000000000011061101d0cc000000000000007724636c617373007d4e5344696374696f6e61727900784e532e6b65797300a0b7000000000000007b4e532e6f626a6563747300a0cc000000000000001101b0e0".fromHex()
 
         val expectedSegments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(0, NemesysField.STRING), // BPLIST
+            NemesysSegment(6, NemesysField.STRING),  // version
             NemesysSegment(8, NemesysField.UNKNOWN),
-            NemesysSegment(17, NemesysField.UNKNOWN),
-            NemesysSegment(92, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.UNKNOWN), // predictionFor... type
+            NemesysSegment(19, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN), // predictionFor... length
+            NemesysSegment(20, NemesysField.STRING), // predictionFor... text
+            NemesysSegment(92, NemesysField.UNKNOWN), // v60@0:8Q16Q24@32Q40B48@?52 type
+            NemesysSegment(94, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN), // v60@0:8Q16Q24@32Q40B48@?52 length
+            NemesysSegment(95, NemesysField.STRING), // v60@0:8Q16Q24@32Q40B48@?52 text
             NemesysSegment(122, NemesysField.UNKNOWN),
-            NemesysSegment(131, NemesysField.UNKNOWN),
-            NemesysSegment(133, NemesysField.UNKNOWN),
+            NemesysSegment(131, NemesysField.UNKNOWN), // 6 type
+            NemesysSegment(132, NemesysField.UNKNOWN), // 6
+            NemesysSegment(133, NemesysField.UNKNOWN), // 1 type
+            NemesysSegment(134, NemesysField.UNKNOWN), // 1
             NemesysSegment(135, NemesysField.UNKNOWN),
-            NemesysSegment(144, NemesysField.UNKNOWN),
-            NemesysSegment(152, NemesysField.UNKNOWN),
-            NemesysSegment(166, NemesysField.UNKNOWN),
+            NemesysSegment(144, NemesysField.UNKNOWN), // class type
+            NemesysSegment(145, NemesysField.STRING), // class
+            NemesysSegment(152, NemesysField.UNKNOWN), // NSDIRECTONARY type
+            NemesysSegment(153, NemesysField.STRING), // NSDIRECTONARY
+            NemesysSegment(166, NemesysField.UNKNOWN), // NS.keys type
+            NemesysSegment(167, NemesysField.STRING), // NS.keys
             NemesysSegment(175, NemesysField.UNKNOWN),
-            NemesysSegment(184, NemesysField.UNKNOWN),
+            NemesysSegment(184, NemesysField.UNKNOWN), // NS.objects type
+            NemesysSegment(185, NemesysField.STRING), // NS.objects
             NemesysSegment(196, NemesysField.UNKNOWN),
-            NemesysSegment(205, NemesysField.UNKNOWN),
-            NemesysSegment(207, NemesysField.UNKNOWN)
+            NemesysSegment(205, NemesysField.UNKNOWN), // 1 type
+            NemesysSegment(206, NemesysField.UNKNOWN), // 1
+            NemesysSegment(207, NemesysField.UNKNOWN), // true
+            NemesysSegment(208, NemesysField.UNKNOWN) // end
         )
 
 
@@ -272,20 +285,22 @@ class NemesysTestset {
         val bytes = "62706c697374313513c7000000000000801200000000a44776403a404040004f10ce61636b6e6f776c656467654f7574676f696e674d65737361676557697468475549443a616c7465726e61746543616c6c6261636b49443a666f724163636f756e7457697468556e6971756549443aa3108710881087a37f10a432303841303836302d373535392d343731362d424136352d434332363638334644413235407f10a436433836343332372d364441452d344133312d394137362d3731434135454533363839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".fromHex()
 
         val expectedSegments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(0, NemesysField.STRING), // bplist
+            NemesysSegment(6, NemesysField.STRING), // version
+            NemesysSegment(8, NemesysField.UNKNOWN), // bplist
             NemesysSegment(22, NemesysField.UNKNOWN),
-            NemesysSegment(24, NemesysField.UNKNOWN),
+            NemesysSegment(24, NemesysField.STRING), // v@:@@@
             NemesysSegment(31, NemesysField.UNKNOWN),
             NemesysSegment(34, NemesysField.UNKNOWN),
-            NemesysSegment(112, NemesysField.UNKNOWN),
-            NemesysSegment(113, NemesysField.UNKNOWN),
-            NemesysSegment(115, NemesysField.UNKNOWN),
-            NemesysSegment(117, NemesysField.UNKNOWN),
-            NemesysSegment(119, NemesysField.UNKNOWN),
-            NemesysSegment(120, NemesysField.UNKNOWN),
-            NemesysSegment(159, NemesysField.UNKNOWN),
-            NemesysSegment(160, NemesysField.UNKNOWN),
-            NemesysSegment(199, NemesysField.UNKNOWN)
+            NemesysSegment(112, NemesysField.UNKNOWN), // array
+            NemesysSegment(113, NemesysField.UNKNOWN), // 7
+            NemesysSegment(115, NemesysField.UNKNOWN), // 8
+            NemesysSegment(117, NemesysField.UNKNOWN), // 7
+            NemesysSegment(119, NemesysField.UNKNOWN), // array
+            NemesysSegment(120, NemesysField.UNKNOWN), // 208A0860-7559-4716-BA65-CC26683FDA25
+            NemesysSegment(159, NemesysField.UNKNOWN), // 0x
+            NemesysSegment(160, NemesysField.UNKNOWN), // 6C864327-6DAE-4A31-9A76-71CA5EE36890
+            NemesysSegment(199, NemesysField.UNKNOWN) // end
         )
 
 
@@ -300,17 +315,26 @@ class NemesysTestset {
         val bytes = "62706c69737431351367000000000000801200000000d478636c69656e744944756576656e747c70726f636573732d6e616d657973686f756c644c6f6710977e55494b69742d4b6579626f6172647f109156697375616c50616972696e674861636b74506f737400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".fromHex()
 
         val expectedSegments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(22, NemesysField.UNKNOWN),
-            NemesysSegment(23, NemesysField.UNKNOWN),
-            NemesysSegment(32, NemesysField.UNKNOWN),
-            NemesysSegment(38, NemesysField.UNKNOWN),
-            NemesysSegment(51, NemesysField.UNKNOWN),
-            NemesysSegment(61, NemesysField.UNKNOWN),
-            NemesysSegment(63, NemesysField.UNKNOWN),
-            NemesysSegment(78, NemesysField.UNKNOWN),
-            NemesysSegment(98, NemesysField.UNKNOWN),
-            NemesysSegment(103, NemesysField.UNKNOWN)
+            NemesysSegment(0, NemesysField.STRING), // bplist
+            NemesysSegment(6, NemesysField.STRING), // version
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(22, NemesysField.UNKNOWN), // array
+            NemesysSegment(23, NemesysField.UNKNOWN), // clientID type
+            NemesysSegment(24, NemesysField.STRING), // clientID
+            NemesysSegment(32, NemesysField.UNKNOWN), // event type
+            NemesysSegment(33, NemesysField.STRING), // event
+            NemesysSegment(38, NemesysField.UNKNOWN), // process-name type
+            NemesysSegment(39, NemesysField.STRING), // process-name
+            NemesysSegment(51, NemesysField.UNKNOWN), // shouldLog type
+            NemesysSegment(52, NemesysField.STRING), // shouldLog
+            NemesysSegment(61, NemesysField.UNKNOWN), // 23
+            NemesysSegment(63, NemesysField.UNKNOWN), // UIKit-Keyboard type
+            NemesysSegment(64, NemesysField.STRING), // UIKit-Keyboard type
+            NemesysSegment(78, NemesysField.UNKNOWN), // VisualPairingHack type
+            NemesysSegment(81, NemesysField.STRING), // VisualPairingHack
+            NemesysSegment(98, NemesysField.UNKNOWN), // Post type
+            NemesysSegment(99, NemesysField.STRING), // Post
+            NemesysSegment(103, NemesysField.UNKNOWN) // end
         )
 
         val parsed = NemesysParser().parse(bytes, msgIndex = 0)
@@ -325,23 +349,35 @@ class NemesysTestset {
 
         val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map with 6 entries)
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 -> "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... -> "successProbability"
+            NemesysSegment(1, NemesysField.UNKNOWN),            // A2 69 64 -> "id" type
+            NemesysSegment(2, NemesysField.STRING),            // A2 69 64 -> "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037 type
+            NemesysSegment(5, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037
+            NemesysSegment(7, NemesysField.UNKNOWN),            // B2 ... -> "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),            // B2 ... -> "successProbability"
             NemesysSegment(26, NemesysField.UNKNOWN),           // CB 3F E0 00 00 00 00 00 00 -> 0.5
-            NemesysSegment(35, NemesysField.STRING),           // AA ... -> "isEligible"
+            NemesysSegment(35, NemesysField.UNKNOWN),           // AA ... -> "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),           // AA ... -> "isEligible"
             NemesysSegment(46, NemesysField.UNKNOWN),          // C3 -> true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... -> "name"
-            NemesysSegment(52, NemesysField.STRING),           // AA ... -> "Franz Karl"
-            NemesysSegment(63, NemesysField.STRING),           // AA ... -> "highlights"
+            NemesysSegment(47, NemesysField.UNKNOWN),           // A4 ... -> "name" type
+            NemesysSegment(48, NemesysField.STRING),           // A4 ... -> "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),           // AA ... -> "Franz Karl" type
+            NemesysSegment(53, NemesysField.STRING),           // AA ... -> "Franz Karl"
+            NemesysSegment(63, NemesysField.UNKNOWN),           // AA ... -> "highlights" type
+            NemesysSegment(64, NemesysField.STRING),           // AA ... -> "highlights"
             NemesysSegment(74, NemesysField.UNKNOWN),            // 92 -> array of 2 strings
-            NemesysSegment(75, NemesysField.STRING),           // B5 ... -> "Scholarship recipient"
-            NemesysSegment(97, NemesysField.STRING),           // B8 ... -> "Relevant work experience"
-            NemesysSegment(122, NemesysField.STRING),          // AA ... -> "attributes"
+            NemesysSegment(75, NemesysField.UNKNOWN),           // B5 ... -> "Scholarship recipient" type
+            NemesysSegment(76, NemesysField.STRING),           // B5 ... -> "Scholarship recipient"
+            NemesysSegment(97, NemesysField.UNKNOWN),           // B8 ... -> "Relevant work experience" type
+            NemesysSegment(98, NemesysField.STRING),           // B8 ... -> "Relevant work experience"
+            NemesysSegment(122, NemesysField.UNKNOWN),          // AA ... -> "attributes" type
+            NemesysSegment(123, NemesysField.STRING),          // AA ... -> "attributes"
             NemesysSegment(133, NemesysField.UNKNOWN),             // 82 -> map with 2 entries
-            NemesysSegment(134, NemesysField.STRING),          // A6 ... -> "vision"
+            NemesysSegment(134, NemesysField.UNKNOWN),          // A6 ... -> "vision" type
+            NemesysSegment(135, NemesysField.STRING),          // A6 ... -> "vision"
             NemesysSegment(141, NemesysField.UNKNOWN),          // CB ... -> 0.9
-            NemesysSegment(150, NemesysField.STRING),          // AB ... -> "athleticism"
+            NemesysSegment(150, NemesysField.UNKNOWN),          // AB ... -> "athleticism" type
+            NemesysSegment(151, NemesysField.STRING),          // AB ... -> "athleticism"
             NemesysSegment(162, NemesysField.UNKNOWN)           // CB ... -> 0.3
         )
 
@@ -357,23 +393,35 @@ class NemesysTestset {
 
         val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map mit 6 Einträgen)
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C6 → 4038
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
+            NemesysSegment(1, NemesysField.UNKNOWN),            // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),            // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C6 → 4038 type
+            NemesysSegment(5, NemesysField.UNKNOWN),            // CD 0F C6 → 4038
+            NemesysSegment(7, NemesysField.UNKNOWN),            // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),            // B2 ... → "successProbability"
             NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.82
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
+            NemesysSegment(35, NemesysField.UNKNOWN),           // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),           // AA ... → "isEligible"
             NemesysSegment(46, NemesysField.UNKNOWN),          // C3 → true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // AD ... → "Amira Solberg"
-            NemesysSegment(66, NemesysField.STRING),           // AA ... → "highlights"
+            NemesysSegment(47, NemesysField.UNKNOWN),           // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),           // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),           // AD ... → "Amira Solberg" type
+            NemesysSegment(53, NemesysField.STRING),           // AD ... → "Amira Solberg"
+            NemesysSegment(66, NemesysField.UNKNOWN),           // AA ... → "highlights" type
+            NemesysSegment(67, NemesysField.STRING),           // AA ... → "highlights"
             NemesysSegment(77, NemesysField.UNKNOWN),            // 92 → Array mit 2 Strings
-            NemesysSegment(78, NemesysField.STRING),           // B8 ... → "International internship"
-            NemesysSegment(103, NemesysField.STRING),          // B2 ... → "Published research"
-            NemesysSegment(122, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(78, NemesysField.UNKNOWN),           // B8 ... → "International internship" type
+            NemesysSegment(79, NemesysField.STRING),           // B8 ... → "International internship"
+            NemesysSegment(103, NemesysField.UNKNOWN),          // B2 ... → "Published research" type
+            NemesysSegment(104, NemesysField.STRING),          // B2 ... → "Published research"
+            NemesysSegment(122, NemesysField.UNKNOWN),          // AA ... → "attributes" type
+            NemesysSegment(123, NemesysField.STRING),          // AA ... → "attributes"
             NemesysSegment(133, NemesysField.UNKNOWN),             // 82 → Map mit 2 Einträgen
-            NemesysSegment(134, NemesysField.STRING),          // A6 ... → "vision"
+            NemesysSegment(134, NemesysField.UNKNOWN),          // A6 ... → "vision" type
+            NemesysSegment(135, NemesysField.STRING),          // A6 ... → "vision"
             NemesysSegment(141, NemesysField.UNKNOWN),           // 01 → 1
-            NemesysSegment(142, NemesysField.STRING),          // AB ... → "athleticism"
+            NemesysSegment(142, NemesysField.UNKNOWN),          // AB ... → "athleticism" type
+            NemesysSegment(143, NemesysField.STRING),          // AB ... → "athleticism"
             NemesysSegment(154, NemesysField.UNKNOWN)           // CB ... → 0.7
         )
 
@@ -388,26 +436,39 @@ class NemesysTestset {
         val bytes = "86A26964CD0FC7B27375636365737350726F626162696C697479CB3FD6666666666666AA6973456C696769626C65C2A46E616D65AD4A6F6E61732052696368746572AA686967686C696768747392AE566F6C756E7465657220776F726BB842617369632070726F6772616D6D696E6720736B696C6C73AA6174747269627574657382A6766973696F6ECB3FE3333333333333AB6174686C6574696369736DCB3FE999999999999A".fromHex()
 
         val expectedSegments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),               // 86 → map mit 6 Einträgen
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C7 → 4039
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
-            NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.35
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
-            NemesysSegment(46, NemesysField.UNKNOWN),          // C2 → false
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // AD ... → "Jonas Richter"
-            NemesysSegment(66, NemesysField.STRING),           // AA ... → "highlights"
-            NemesysSegment(77, NemesysField.UNKNOWN),            // 92 → array mit 2 Strings
-            NemesysSegment(78, NemesysField.STRING),           // AE ... → "Volunteer work"
-            NemesysSegment(93, NemesysField.STRING),           // B8 ... → "Basic programming skills"
-            NemesysSegment(118, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map mit 6 Einträgen)
+            NemesysSegment(1, NemesysField.UNKNOWN),               // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),                // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),               // CD 0F C7 → 4039 type
+            NemesysSegment(5, NemesysField.UNKNOWN),               // CD 0F C7 → 4039
+            NemesysSegment(7, NemesysField.UNKNOWN),               // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),                // B2 ... → "successProbability"
+            NemesysSegment(26, NemesysField.UNKNOWN),              // CB ... → 0.35
+            NemesysSegment(35, NemesysField.UNKNOWN),              // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),               // AA ... → "isEligible"
+            NemesysSegment(46, NemesysField.UNKNOWN),              // C2 → false
+            NemesysSegment(47, NemesysField.UNKNOWN),              // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),               // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),              // AD ... → "Jonas Richter" type
+            NemesysSegment(53, NemesysField.STRING),               // AD ... → "Jonas Richter"
+            NemesysSegment(66, NemesysField.UNKNOWN),              // AA ... → "highlights" type
+            NemesysSegment(67, NemesysField.STRING),               // AA ... → "highlights"
+            NemesysSegment(77, NemesysField.UNKNOWN),              // 92 → array mit 2 Strings
+            NemesysSegment(78, NemesysField.UNKNOWN),              // AE ... → "Volunteer work" type
+            NemesysSegment(79, NemesysField.STRING),               // AE ... → "Volunteer work"
+            NemesysSegment(93, NemesysField.UNKNOWN),              // B8 ... → "Basic programming skills" type
+            NemesysSegment(94, NemesysField.STRING),               // B8 ... → "Basic programming skills"
+            NemesysSegment(118, NemesysField.UNKNOWN),             // AA ... → "attributes" type
+            NemesysSegment(119, NemesysField.STRING),              // AA ... → "attributes"
             NemesysSegment(129, NemesysField.UNKNOWN),             // 82 → map mit 2 Einträgen
-            NemesysSegment(130, NemesysField.STRING),          // A6 ... → "vision"
-            NemesysSegment(137, NemesysField.UNKNOWN),          // CB ... → 0.6
-            NemesysSegment(146, NemesysField.STRING),          // AB ... → "athleticism"
-            NemesysSegment(158, NemesysField.UNKNOWN)           // CB ... → 0.8
+            NemesysSegment(130, NemesysField.UNKNOWN),             // A6 ... → "vision" type
+            NemesysSegment(131, NemesysField.STRING),              // A6 ... → "vision"
+            NemesysSegment(137, NemesysField.UNKNOWN),             // CB ... → 0.6
+            NemesysSegment(146, NemesysField.UNKNOWN),             // AB ... → "athleticism" type
+            NemesysSegment(147, NemesysField.STRING),              // AB ... → "athleticism"
+            NemesysSegment(158, NemesysField.UNKNOWN)              // CB ... → 0.8
         )
+
 
         val parsed = NemesysParser().parse(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
@@ -421,25 +482,38 @@ class NemesysTestset {
 
         val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 → map mit 6 Einträgen
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C8 → 4040
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
-            NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.94
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
-            NemesysSegment(46, NemesysField.UNKNOWN),          // C3 → true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // A9 ... → "Lina Chen"
-            NemesysSegment(62, NemesysField.STRING),           // AA ... → "highlights"
-            NemesysSegment(73, NemesysField.UNKNOWN),            // 92 → array mit 2 Strings
-            NemesysSegment(74, NemesysField.STRING),           // B0 ... → "Top of her class"
-            NemesysSegment(91, NemesysField.STRING),           // B0 ... → "Leadership award"
-            NemesysSegment(108, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(1, NemesysField.UNKNOWN),               // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),                // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),               // CD 0F C8 → 4040 type
+            NemesysSegment(5, NemesysField.UNKNOWN),               // CD 0F C8 → 4040
+            NemesysSegment(7, NemesysField.UNKNOWN),               // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),                // B2 ... → "successProbability"
+            NemesysSegment(26, NemesysField.UNKNOWN),              // CB ... → 0.94
+            NemesysSegment(35, NemesysField.UNKNOWN),              // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),               // AA ... → "isEligible"
+            NemesysSegment(46, NemesysField.UNKNOWN),              // C3 → true
+            NemesysSegment(47, NemesysField.UNKNOWN),              // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),               // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),              // A9 ... → "Lina Chen" type
+            NemesysSegment(53, NemesysField.STRING),               // A9 ... → "Lina Chen"
+            NemesysSegment(62, NemesysField.UNKNOWN),              // AA ... → "highlights" type
+            NemesysSegment(63, NemesysField.STRING),               // AA ... → "highlights"
+            NemesysSegment(73, NemesysField.UNKNOWN),              // 92 → array mit 2 Strings
+            NemesysSegment(74, NemesysField.UNKNOWN),              // B0 ... → "Top of her class" type
+            NemesysSegment(75, NemesysField.STRING),               // B0 ... → "Top of her class"
+            NemesysSegment(91, NemesysField.UNKNOWN),              // B0 ... → "Leadership award" type
+            NemesysSegment(92, NemesysField.STRING),               // B0 ... → "Leadership award"
+            NemesysSegment(108, NemesysField.UNKNOWN),             // AA ... → "attributes" type
+            NemesysSegment(109, NemesysField.STRING),              // AA ... → "attributes"
             NemesysSegment(119, NemesysField.UNKNOWN),             // 82 → map mit 2 Einträgen
-            NemesysSegment(120, NemesysField.STRING),          // A6 ... → "vision"
-            NemesysSegment(127, NemesysField.UNKNOWN),          // CB ... → 0.95
-            NemesysSegment(136, NemesysField.STRING),          // AB ... → "athleticism"
-            NemesysSegment(148, NemesysField.UNKNOWN)           // CB ... → 0.5
+            NemesysSegment(120, NemesysField.UNKNOWN),             // A6 ... → "vision" type
+            NemesysSegment(121, NemesysField.STRING),              // A6 ... → "vision"
+            NemesysSegment(127, NemesysField.UNKNOWN),             // CB ... → 0.95
+            NemesysSegment(136, NemesysField.UNKNOWN),             // AB ... → "athleticism" type
+            NemesysSegment(137, NemesysField.STRING),              // AB ... → "athleticism"
+            NemesysSegment(148, NemesysField.UNKNOWN)              // CB ... → 0.5
         )
+
 
         val parsed = NemesysParser().parse(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
@@ -887,90 +961,138 @@ class NemesysTestset {
 
         val segments1 = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map with 6 entries)
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 -> "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... -> "successProbability"
+            NemesysSegment(1, NemesysField.UNKNOWN),            // A2 69 64 -> "id" type
+            NemesysSegment(2, NemesysField.STRING),            // A2 69 64 -> "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037 type
+            NemesysSegment(5, NemesysField.UNKNOWN),            // CD 0F C5 -> 4037
+            NemesysSegment(7, NemesysField.UNKNOWN),            // B2 ... -> "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),            // B2 ... -> "successProbability"
             NemesysSegment(26, NemesysField.UNKNOWN),           // CB 3F E0 00 00 00 00 00 00 -> 0.5
-            NemesysSegment(35, NemesysField.STRING),           // AA ... -> "isEligible"
+            NemesysSegment(35, NemesysField.UNKNOWN),           // AA ... -> "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),           // AA ... -> "isEligible"
             NemesysSegment(46, NemesysField.UNKNOWN),          // C3 -> true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... -> "name"
-            NemesysSegment(52, NemesysField.STRING),           // AA ... -> "Franz Karl"
-            NemesysSegment(63, NemesysField.STRING),           // AA ... -> "highlights"
+            NemesysSegment(47, NemesysField.UNKNOWN),           // A4 ... -> "name" type
+            NemesysSegment(48, NemesysField.STRING),           // A4 ... -> "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),           // AA ... -> "Franz Karl" type
+            NemesysSegment(53, NemesysField.STRING),           // AA ... -> "Franz Karl"
+            NemesysSegment(63, NemesysField.UNKNOWN),           // AA ... -> "highlights" type
+            NemesysSegment(64, NemesysField.STRING),           // AA ... -> "highlights"
             NemesysSegment(74, NemesysField.UNKNOWN),            // 92 -> array of 2 strings
-            NemesysSegment(75, NemesysField.STRING),           // B5 ... -> "Scholarship recipient"
-            NemesysSegment(97, NemesysField.STRING),           // B8 ... -> "Relevant work experience"
-            NemesysSegment(122, NemesysField.STRING),          // AA ... -> "attributes"
+            NemesysSegment(75, NemesysField.UNKNOWN),           // B5 ... -> "Scholarship recipient" type
+            NemesysSegment(76, NemesysField.STRING),           // B5 ... -> "Scholarship recipient"
+            NemesysSegment(97, NemesysField.UNKNOWN),           // B8 ... -> "Relevant work experience" type
+            NemesysSegment(98, NemesysField.STRING),           // B8 ... -> "Relevant work experience"
+            NemesysSegment(122, NemesysField.UNKNOWN),          // AA ... -> "attributes" type
+            NemesysSegment(123, NemesysField.STRING),          // AA ... -> "attributes"
             NemesysSegment(133, NemesysField.UNKNOWN),             // 82 -> map with 2 entries
-            NemesysSegment(134, NemesysField.STRING),          // A6 ... -> "vision"
+            NemesysSegment(134, NemesysField.UNKNOWN),          // A6 ... -> "vision" type
+            NemesysSegment(135, NemesysField.STRING),          // A6 ... -> "vision"
             NemesysSegment(141, NemesysField.UNKNOWN),          // CB ... -> 0.9
-            NemesysSegment(150, NemesysField.STRING),          // AB ... -> "athleticism"
+            NemesysSegment(150, NemesysField.UNKNOWN),          // AB ... -> "athleticism" type
+            NemesysSegment(151, NemesysField.STRING),          // AB ... -> "athleticism"
             NemesysSegment(162, NemesysField.UNKNOWN)           // CB ... -> 0.3
         )
 
         val segments2 = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map mit 6 Einträgen)
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C6 → 4038
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
+            NemesysSegment(1, NemesysField.UNKNOWN),            // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),            // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C6 → 4038 type
+            NemesysSegment(5, NemesysField.UNKNOWN),            // CD 0F C6 → 4038
+            NemesysSegment(7, NemesysField.UNKNOWN),            // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),            // B2 ... → "successProbability"
             NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.82
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
+            NemesysSegment(35, NemesysField.UNKNOWN),           // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),           // AA ... → "isEligible"
             NemesysSegment(46, NemesysField.UNKNOWN),          // C3 → true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // AD ... → "Amira Solberg"
-            NemesysSegment(66, NemesysField.STRING),           // AA ... → "highlights"
+            NemesysSegment(47, NemesysField.UNKNOWN),           // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),           // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),           // AD ... → "Amira Solberg" type
+            NemesysSegment(53, NemesysField.STRING),           // AD ... → "Amira Solberg"
+            NemesysSegment(66, NemesysField.UNKNOWN),           // AA ... → "highlights" type
+            NemesysSegment(67, NemesysField.STRING),           // AA ... → "highlights"
             NemesysSegment(77, NemesysField.UNKNOWN),            // 92 → Array mit 2 Strings
-            NemesysSegment(78, NemesysField.STRING),           // B8 ... → "International internship"
-            NemesysSegment(103, NemesysField.STRING),          // B2 ... → "Published research"
-            NemesysSegment(122, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(78, NemesysField.UNKNOWN),           // B8 ... → "International internship" type
+            NemesysSegment(79, NemesysField.STRING),           // B8 ... → "International internship"
+            NemesysSegment(103, NemesysField.UNKNOWN),          // B2 ... → "Published research" type
+            NemesysSegment(104, NemesysField.STRING),          // B2 ... → "Published research"
+            NemesysSegment(122, NemesysField.UNKNOWN),          // AA ... → "attributes" type
+            NemesysSegment(123, NemesysField.STRING),          // AA ... → "attributes"
             NemesysSegment(133, NemesysField.UNKNOWN),             // 82 → Map mit 2 Einträgen
-            NemesysSegment(134, NemesysField.STRING),          // A6 ... → "vision"
+            NemesysSegment(134, NemesysField.UNKNOWN),          // A6 ... → "vision" type
+            NemesysSegment(135, NemesysField.STRING),          // A6 ... → "vision"
             NemesysSegment(141, NemesysField.UNKNOWN),           // 01 → 1
-            NemesysSegment(142, NemesysField.STRING),          // AB ... → "athleticism"
+            NemesysSegment(142, NemesysField.UNKNOWN),          // AB ... → "athleticism" type
+            NemesysSegment(143, NemesysField.STRING),          // AB ... → "athleticism"
             NemesysSegment(154, NemesysField.UNKNOWN)           // CB ... → 0.7
         )
 
         val segments3 = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),               // 86 → map mit 6 Einträgen
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C7 → 4039
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
-            NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.35
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
-            NemesysSegment(46, NemesysField.UNKNOWN),          // C2 → false
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // AD ... → "Jonas Richter"
-            NemesysSegment(66, NemesysField.STRING),           // AA ... → "highlights"
-            NemesysSegment(77, NemesysField.UNKNOWN),            // 92 → array mit 2 Strings
-            NemesysSegment(78, NemesysField.STRING),           // AE ... → "Volunteer work"
-            NemesysSegment(93, NemesysField.STRING),           // B8 ... → "Basic programming skills"
-            NemesysSegment(118, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(0, NemesysField.UNKNOWN),               // 86 (map mit 6 Einträgen)
+            NemesysSegment(1, NemesysField.UNKNOWN),               // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),                // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),               // CD 0F C7 → 4039 type
+            NemesysSegment(5, NemesysField.UNKNOWN),               // CD 0F C7 → 4039
+            NemesysSegment(7, NemesysField.UNKNOWN),               // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),                // B2 ... → "successProbability"
+            NemesysSegment(26, NemesysField.UNKNOWN),              // CB ... → 0.35
+            NemesysSegment(35, NemesysField.UNKNOWN),              // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),               // AA ... → "isEligible"
+            NemesysSegment(46, NemesysField.UNKNOWN),              // C2 → false
+            NemesysSegment(47, NemesysField.UNKNOWN),              // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),               // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),              // AD ... → "Jonas Richter" type
+            NemesysSegment(53, NemesysField.STRING),               // AD ... → "Jonas Richter"
+            NemesysSegment(66, NemesysField.UNKNOWN),              // AA ... → "highlights" type
+            NemesysSegment(67, NemesysField.STRING),               // AA ... → "highlights"
+            NemesysSegment(77, NemesysField.UNKNOWN),              // 92 → array mit 2 Strings
+            NemesysSegment(78, NemesysField.UNKNOWN),              // AE ... → "Volunteer work" type
+            NemesysSegment(79, NemesysField.STRING),               // AE ... → "Volunteer work"
+            NemesysSegment(93, NemesysField.UNKNOWN),              // B8 ... → "Basic programming skills" type
+            NemesysSegment(94, NemesysField.STRING),               // B8 ... → "Basic programming skills"
+            NemesysSegment(118, NemesysField.UNKNOWN),             // AA ... → "attributes" type
+            NemesysSegment(119, NemesysField.STRING),              // AA ... → "attributes"
             NemesysSegment(129, NemesysField.UNKNOWN),             // 82 → map mit 2 Einträgen
-            NemesysSegment(130, NemesysField.STRING),          // A6 ... → "vision"
-            NemesysSegment(137, NemesysField.UNKNOWN),          // CB ... → 0.6
-            NemesysSegment(146, NemesysField.STRING),          // AB ... → "athleticism"
-            NemesysSegment(158, NemesysField.UNKNOWN)           // CB ... → 0.8
+            NemesysSegment(130, NemesysField.UNKNOWN),             // A6 ... → "vision" type
+            NemesysSegment(131, NemesysField.STRING),              // A6 ... → "vision"
+            NemesysSegment(137, NemesysField.UNKNOWN),             // CB ... → 0.6
+            NemesysSegment(146, NemesysField.UNKNOWN),             // AB ... → "athleticism" type
+            NemesysSegment(147, NemesysField.STRING),              // AB ... → "athleticism"
+            NemesysSegment(158, NemesysField.UNKNOWN)              // CB ... → 0.8
         )
 
         val segments4 = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),               // 86 → map mit 6 Einträgen
-            NemesysSegment(1, NemesysField.STRING),            // A2 69 64 → "id"
-            NemesysSegment(4, NemesysField.UNKNOWN),            // CD 0F C8 → 4040
-            NemesysSegment(7, NemesysField.STRING),            // B2 ... → "successProbability"
-            NemesysSegment(26, NemesysField.UNKNOWN),           // CB ... → 0.94
-            NemesysSegment(35, NemesysField.STRING),           // AA ... → "isEligible"
-            NemesysSegment(46, NemesysField.UNKNOWN),          // C3 → true
-            NemesysSegment(47, NemesysField.STRING),           // A4 ... → "name"
-            NemesysSegment(52, NemesysField.STRING),           // A9 ... → "Lina Chen"
-            NemesysSegment(62, NemesysField.STRING),           // AA ... → "highlights"
-            NemesysSegment(73, NemesysField.UNKNOWN),            // 92 → array mit 2 Strings
-            NemesysSegment(74, NemesysField.STRING),           // B0 ... → "Top of her class"
-            NemesysSegment(91, NemesysField.STRING),           // B0 ... → "Leadership award"
-            NemesysSegment(108, NemesysField.STRING),          // AA ... → "attributes"
+            NemesysSegment(1, NemesysField.UNKNOWN),               // A2 69 64 → "id" type
+            NemesysSegment(2, NemesysField.STRING),                // A2 69 64 → "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),               // CD 0F C8 → 4040 type
+            NemesysSegment(5, NemesysField.UNKNOWN),               // CD 0F C8 → 4040
+            NemesysSegment(7, NemesysField.UNKNOWN),               // B2 ... → "successProbability" type
+            NemesysSegment(8, NemesysField.STRING),                // B2 ... → "successProbability"
+            NemesysSegment(26, NemesysField.UNKNOWN),              // CB ... → 0.94
+            NemesysSegment(35, NemesysField.UNKNOWN),              // AA ... → "isEligible" type
+            NemesysSegment(36, NemesysField.STRING),               // AA ... → "isEligible"
+            NemesysSegment(46, NemesysField.UNKNOWN),              // C3 → true
+            NemesysSegment(47, NemesysField.UNKNOWN),              // A4 ... → "name" type
+            NemesysSegment(48, NemesysField.STRING),               // A4 ... → "name"
+            NemesysSegment(52, NemesysField.UNKNOWN),              // A9 ... → "Lina Chen" type
+            NemesysSegment(53, NemesysField.STRING),               // A9 ... → "Lina Chen"
+            NemesysSegment(62, NemesysField.UNKNOWN),              // AA ... → "highlights" type
+            NemesysSegment(63, NemesysField.STRING),               // AA ... → "highlights"
+            NemesysSegment(73, NemesysField.UNKNOWN),              // 92 → array mit 2 Strings
+            NemesysSegment(74, NemesysField.UNKNOWN),              // B0 ... → "Top of her class" type
+            NemesysSegment(75, NemesysField.STRING),               // B0 ... → "Top of her class"
+            NemesysSegment(91, NemesysField.UNKNOWN),              // B0 ... → "Leadership award" type
+            NemesysSegment(92, NemesysField.STRING),               // B0 ... → "Leadership award"
+            NemesysSegment(108, NemesysField.UNKNOWN),             // AA ... → "attributes" type
+            NemesysSegment(109, NemesysField.STRING),              // AA ... → "attributes"
             NemesysSegment(119, NemesysField.UNKNOWN),             // 82 → map mit 2 Einträgen
-            NemesysSegment(120, NemesysField.STRING),          // A6 ... → "vision"
-            NemesysSegment(127, NemesysField.UNKNOWN),          // CB ... → 0.95
-            NemesysSegment(136, NemesysField.STRING),          // AB ... → "athleticism"
-            NemesysSegment(148, NemesysField.UNKNOWN)           // CB ... → 0.5
+            NemesysSegment(120, NemesysField.UNKNOWN),             // A6 ... → "vision" type
+            NemesysSegment(121, NemesysField.STRING),              // A6 ... → "vision"
+            NemesysSegment(127, NemesysField.UNKNOWN),             // CB ... → 0.95
+            NemesysSegment(136, NemesysField.UNKNOWN),             // AB ... → "athleticism" type
+            NemesysSegment(137, NemesysField.STRING),              // AB ... → "athleticism"
+            NemesysSegment(148, NemesysField.UNKNOWN)              // CB ... → 0.5
         )
 
         val messages = mapOf(
@@ -981,53 +1103,168 @@ class NemesysTestset {
         )
 
         val expectedAlignments = setOf(
-            Triple(0, 1, Pair(0, 0)), Triple(0, 1, Pair(1, 1)), Triple(0, 1, Pair(2, 2)),
-            Triple(0, 1, Pair(3, 3)), Triple(0, 1, Pair(4, 4)), Triple(0, 1, Pair(5, 5)),
-            Triple(0, 1, Pair(6, 6)), Triple(0, 1, Pair(7, 7)), Triple(0, 1, Pair(8, 8)),
-            Triple(0, 1, Pair(9, 9)), Triple(0, 1, Pair(10, 10)), Triple(0, 1, Pair(11, 11)),
-            Triple(0, 1, Pair(12, 12)), Triple(0, 1, Pair(13, 13)), Triple(0, 1, Pair(14, 14)),
-            Triple(0, 1, Pair(15, 15)), Triple(0, 1, Pair(16, 16)), Triple(0, 1, Pair(17, 17)),
-            Triple(0, 1, Pair(18, 18)),
-
-            Triple(0, 2, Pair(0, 0)), Triple(0, 2, Pair(1, 1)), Triple(0, 2, Pair(2, 2)),
-            Triple(0, 2, Pair(3, 3)), Triple(0, 2, Pair(4, 4)), Triple(0, 2, Pair(5, 5)),
-            Triple(0, 2, Pair(6, 6)), Triple(0, 2, Pair(7, 7)), Triple(0, 2, Pair(8, 8)),
-            Triple(0, 2, Pair(9, 9)), Triple(0, 2, Pair(10, 10)), Triple(0, 2, Pair(11, 11)),
-            Triple(0, 2, Pair(12, 12)), Triple(0, 2, Pair(13, 13)), Triple(0, 2, Pair(14, 14)),
-            Triple(0, 2, Pair(15, 15)), Triple(0, 2, Pair(16, 16)), Triple(0, 2, Pair(17, 17)),
-            Triple(0, 2, Pair(18, 18)),
-
-            Triple(0, 3, Pair(0, 0)), Triple(0, 3, Pair(1, 1)), Triple(0, 3, Pair(2, 2)),
-            Triple(0, 3, Pair(3, 3)), Triple(0, 3, Pair(4, 4)), Triple(0, 3, Pair(5, 5)),
-            Triple(0, 3, Pair(6, 6)), Triple(0, 3, Pair(7, 7)), Triple(0, 3, Pair(8, 8)),
-            Triple(0, 3, Pair(9, 9)), Triple(0, 3, Pair(10, 10)), Triple(0, 3, Pair(11, 11)),
-            Triple(0, 3, Pair(12, 12)), Triple(0, 3, Pair(13, 13)), Triple(0, 3, Pair(14, 14)),
-            Triple(0, 3, Pair(15, 15)), Triple(0, 3, Pair(16, 16)), Triple(0, 3, Pair(17, 17)),
-            Triple(0, 3, Pair(18, 18)),
-
-            Triple(1, 2, Pair(0, 0)), Triple(1, 2, Pair(1, 1)), Triple(1, 2, Pair(2, 2)),
-            Triple(1, 2, Pair(3, 3)), Triple(1, 2, Pair(4, 4)), Triple(1, 2, Pair(5, 5)),
-            Triple(1, 2, Pair(6, 6)), Triple(1, 2, Pair(7, 7)), Triple(1, 2, Pair(8, 8)),
-            Triple(1, 2, Pair(9, 9)), Triple(1, 2, Pair(10, 10)), Triple(1, 2, Pair(11, 11)),
-            Triple(1, 2, Pair(12, 12)), Triple(1, 2, Pair(13, 13)), Triple(1, 2, Pair(14, 14)),
-            Triple(1, 2, Pair(15, 15)), Triple(1, 2, Pair(16, 16)), Triple(1, 2, Pair(17, 17)),
-            Triple(1, 2, Pair(18, 18)),
-
-            Triple(1, 3, Pair(0, 0)), Triple(1, 3, Pair(1, 1)), Triple(1, 3, Pair(2, 2)),
-            Triple(1, 3, Pair(3, 3)), Triple(1, 3, Pair(4, 4)), Triple(1, 3, Pair(5, 5)),
-            Triple(1, 3, Pair(6, 6)), Triple(1, 3, Pair(7, 7)), Triple(1, 3, Pair(8, 8)),
-            Triple(1, 3, Pair(9, 9)), Triple(1, 3, Pair(10, 10)), Triple(1, 3, Pair(11, 11)),
-            Triple(1, 3, Pair(12, 12)), Triple(1, 3, Pair(13, 13)), Triple(1, 3, Pair(14, 14)),
-            Triple(1, 3, Pair(15, 15)), Triple(1, 3, Pair(16, 16)), Triple(1, 3, Pair(17, 17)),
-            Triple(1, 3, Pair(18, 18)),
-
-            Triple(2, 3, Pair(0, 0)), Triple(2, 3, Pair(1, 1)), Triple(2, 3, Pair(2, 2)),
-            Triple(2, 3, Pair(3, 3)), Triple(2, 3, Pair(4, 4)), Triple(2, 3, Pair(5, 5)),
-            Triple(2, 3, Pair(6, 6)), Triple(2, 3, Pair(7, 7)), Triple(2, 3, Pair(8, 8)),
-            Triple(2, 3, Pair(9, 9)), Triple(2, 3, Pair(10, 10)), Triple(2, 3, Pair(11, 11)),
-            Triple(2, 3, Pair(12, 12)), Triple(2, 3, Pair(13, 13)), Triple(2, 3, Pair(14, 14)),
-            Triple(2, 3, Pair(15, 15)), Triple(2, 3, Pair(16, 16)), Triple(2, 3, Pair(17, 17)),
-            Triple(2, 3, Pair(18, 18))
+            Triple(0, 1, Pair(0, 0)),
+            Triple(0, 2, Pair(0, 0)),
+            Triple(0, 3, Pair(0, 0)),
+            Triple(1, 2, Pair(0, 0)),
+            Triple(1, 3, Pair(0, 0)),
+            Triple(2, 3, Pair(0, 0)),
+            Triple(3, 2, Pair(1, 1)),
+            Triple(3, 1, Pair(1, 1)),
+            Triple(3, 0, Pair(1, 1)),
+            Triple(2, 1, Pair(1, 1)),
+            Triple(2, 0, Pair(1, 1)),
+            Triple(1, 0, Pair(1, 1)),
+            Triple(0, 1, Pair(2, 2)),
+            Triple(0, 2, Pair(2, 2)),
+            Triple(0, 3, Pair(2, 2)),
+            Triple(1, 2, Pair(2, 2)),
+            Triple(1, 3, Pair(2, 2)),
+            Triple(2, 3, Pair(2, 2)),
+            Triple(3, 2, Pair(3, 3)),
+            Triple(3, 1, Pair(3, 3)),
+            Triple(3, 0, Pair(3, 3)),
+            Triple(2, 1, Pair(3, 3)),
+            Triple(2, 0, Pair(3, 3)),
+            Triple(1, 0, Pair(3, 3)),
+            Triple(0, 1, Pair(4, 4)),
+            Triple(0, 2, Pair(4, 4)),
+            Triple(0, 3, Pair(4, 4)),
+            Triple(1, 2, Pair(4, 4)),
+            Triple(1, 3, Pair(4, 4)),
+            Triple(2, 3, Pair(4, 4)),
+            Triple(3, 2, Pair(5, 5)),
+            Triple(3, 1, Pair(5, 5)),
+            Triple(3, 0, Pair(5, 5)),
+            Triple(2, 1, Pair(5, 5)),
+            Triple(2, 0, Pair(5, 5)),
+            Triple(1, 0, Pair(5, 5)),
+            Triple(0, 1, Pair(6, 6)),
+            Triple(0, 2, Pair(6, 6)),
+            Triple(0, 3, Pair(6, 6)),
+            Triple(1, 2, Pair(6, 6)),
+            Triple(1, 3, Pair(6, 6)),
+            Triple(2, 3, Pair(6, 6)),
+            Triple(3, 2, Pair(7, 7)),
+            Triple(3, 1, Pair(7, 7)),
+            Triple(3, 0, Pair(7, 7)),
+            Triple(2, 1, Pair(7, 7)),
+            Triple(2, 0, Pair(7, 7)),
+            Triple(1, 0, Pair(7, 7)),
+            Triple(0, 1, Pair(8, 8)),
+            Triple(0, 2, Pair(8, 8)),
+            Triple(0, 3, Pair(8, 8)),
+            Triple(1, 2, Pair(8, 8)),
+            Triple(1, 3, Pair(8, 8)),
+            Triple(2, 3, Pair(8, 8)),
+            Triple(3, 2, Pair(9, 9)),
+            Triple(3, 1, Pair(9, 9)),
+            Triple(3, 0, Pair(9, 9)),
+            Triple(2, 1, Pair(9, 9)),
+            Triple(2, 0, Pair(9, 9)),
+            Triple(1, 0, Pair(9, 9)),
+            Triple(0, 1, Pair(10, 10)),
+            Triple(0, 2, Pair(10, 10)),
+            Triple(0, 3, Pair(10, 10)),
+            Triple(1, 2, Pair(10, 10)),
+            Triple(1, 3, Pair(10, 10)),
+            Triple(2, 3, Pair(10, 10)),
+            Triple(3, 2, Pair(11, 11)),
+            Triple(3, 1, Pair(11, 11)),
+            Triple(3, 0, Pair(11, 11)),
+            Triple(2, 1, Pair(11, 11)),
+            Triple(2, 0, Pair(11, 11)),
+            Triple(1, 0, Pair(11, 11)),
+            Triple(0, 1, Pair(12, 12)),
+            Triple(0, 2, Pair(12, 12)),
+            Triple(0, 3, Pair(12, 12)),
+            Triple(1, 2, Pair(12, 12)),
+            Triple(1, 3, Pair(12, 12)),
+            Triple(2, 3, Pair(12, 12)),
+            Triple(3, 2, Pair(13, 13)),
+            Triple(3, 1, Pair(13, 13)),
+            Triple(3, 0, Pair(13, 13)),
+            Triple(2, 1, Pair(13, 13)),
+            Triple(2, 0, Pair(13, 13)),
+            Triple(1, 0, Pair(13, 13)),
+            Triple(0, 1, Pair(14, 14)),
+            Triple(0, 2, Pair(14, 14)),
+            Triple(0, 3, Pair(14, 14)),
+            Triple(1, 2, Pair(14, 14)),
+            Triple(1, 3, Pair(14, 14)),
+            Triple(2, 3, Pair(14, 14)),
+            Triple(0, 1, Pair(15, 15)),
+            Triple(0, 2, Pair(15, 15)),
+            Triple(0, 3, Pair(15, 15)),
+            Triple(1, 2, Pair(15, 15)),
+            Triple(1, 3, Pair(15, 15)),
+            Triple(2, 3, Pair(15, 15)),
+            Triple(3, 2, Pair(16, 16)),
+            Triple(3, 1, Pair(16, 16)),
+            Triple(3, 0, Pair(16, 16)),
+            Triple(2, 1, Pair(16, 16)),
+            Triple(2, 0, Pair(16, 16)),
+            Triple(1, 0, Pair(16, 16)),
+            Triple(0, 1, Pair(26, 26)),
+            Triple(0, 2, Pair(26, 26)),
+            Triple(0, 3, Pair(26, 26)),
+            Triple(1, 2, Pair(26, 26)),
+            Triple(1, 3, Pair(26, 26)),
+            Triple(2, 3, Pair(26, 26)),
+            Triple(3, 2, Pair(27, 27)),
+            Triple(3, 1, Pair(27, 27)),
+            Triple(3, 0, Pair(27, 27)),
+            Triple(2, 1, Pair(27, 27)),
+            Triple(2, 0, Pair(27, 27)),
+            Triple(1, 0, Pair(27, 27)),
+            Triple(0, 1, Pair(25, 25)),
+            Triple(0, 2, Pair(25, 25)),
+            Triple(0, 3, Pair(25, 25)),
+            Triple(1, 2, Pair(25, 25)),
+            Triple(1, 3, Pair(25, 25)),
+            Triple(2, 3, Pair(25, 25)),
+            Triple(3, 2, Pair(28, 28)),
+            Triple(3, 1, Pair(28, 28)),
+            Triple(3, 0, Pair(28, 28)),
+            Triple(2, 1, Pair(28, 28)),
+            Triple(2, 0, Pair(28, 28)),
+            Triple(1, 0, Pair(28, 28)),
+            Triple(0, 1, Pair(29, 29)),
+            Triple(0, 2, Pair(29, 29)),
+            Triple(0, 3, Pair(29, 29)),
+            Triple(1, 2, Pair(29, 29)),
+            Triple(1, 3, Pair(29, 29)),
+            Triple(2, 3, Pair(29, 29)),
+            Triple(3, 2, Pair(30, 30)),
+            Triple(3, 1, Pair(30, 30)),
+            Triple(3, 0, Pair(30, 30)),
+            Triple(2, 1, Pair(30, 30)),
+            Triple(2, 0, Pair(30, 30)),
+            Triple(1, 0, Pair(30, 30)),
+            Triple(3, 2, Pair(23, 23)),
+            Triple(3, 1, Pair(23, 23)),
+            Triple(3, 0, Pair(23, 23)),
+            Triple(2, 1, Pair(23, 23)),
+            Triple(2, 0, Pair(23, 23)),
+            Triple(1, 0, Pair(23, 23)),
+            Triple(0, 1, Pair(24, 24)),
+            Triple(0, 2, Pair(24, 24)),
+            Triple(0, 3, Pair(24, 24)),
+            Triple(1, 2, Pair(24, 24)),
+            Triple(1, 3, Pair(24, 24)),
+            Triple(2, 3, Pair(24, 24)),
+            Triple(3, 2, Pair(22, 22)),
+            Triple(3, 1, Pair(22, 22)),
+            Triple(3, 0, Pair(22, 22)),
+            Triple(2, 1, Pair(22, 22)),
+            Triple(2, 0, Pair(22, 22)),
+            Triple(1, 0, Pair(22, 22)),
+            Triple(3, 2, Pair(17, 17)),
+            Triple(3, 1, Pair(17, 17)),
+            Triple(3, 0, Pair(17, 17)),
+            Triple(2, 1, Pair(17, 17)),
+            Triple(2, 0, Pair(17, 17)),
+            Triple(1, 0, Pair(17, 17))
         )
 
         printSequenceAlignmentResult(3, messages, expectedAlignments)
