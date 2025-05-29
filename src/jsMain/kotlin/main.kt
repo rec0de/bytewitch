@@ -137,29 +137,23 @@ fun applyLiveDecodeListeners() {
 }
 
 fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
-    val message1 = "A76269640C67766F726E616D65634D6178686E6163686E616D656A4D75737465726D616E6E68757365726E616D65636D617865656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E7472796A4175737472616C69656E6969735F616374697665F4".fromHex()
-    val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
+    val message1 = "62706c6973743030d30102030405065173516651625c636f6d2e6b696b2e636861741105ffa107d208090a0b516851645f102036366137626435396665376639613763323265623436336436646233393730342341d95c3031cf51a2080f1113152225272c2e30530000000000000101000000000000000c0000000000000000000000000000005c".fromHex()
+    // val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
 
     val segments1 = listOf(
-        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
-        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
-        NemesysSegment(4, NemesysField.UNKNOWN),     // 12
-        NemesysSegment(5, NemesysField.UNKNOWN),     // "vorname"
-        NemesysSegment(13, NemesysField.UNKNOWN),    // "Max"
-        NemesysSegment(17, NemesysField.UNKNOWN),    // "nachname"
-        NemesysSegment(26, NemesysField.UNKNOWN),    // "Mustermann"
-        NemesysSegment(37, NemesysField.UNKNOWN),    // "username"
-        NemesysSegment(46, NemesysField.UNKNOWN),    // "max"
-        NemesysSegment(50, NemesysField.UNKNOWN),    // "email"
-        NemesysSegment(56, NemesysField.UNKNOWN),    // "bob@gmx.de"
-        NemesysSegment(67, NemesysField.UNKNOWN),    // "profile"
-        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes Objekt beginnt
-        NemesysSegment(76, NemesysField.UNKNOWN),    // "age"
-        NemesysSegment(80, NemesysField.UNKNOWN),    // 76
-        NemesysSegment(82, NemesysField.UNKNOWN),    // "country"
-        NemesysSegment(90, NemesysField.UNKNOWN),    // "Australien"
-        NemesysSegment(101, NemesysField.UNKNOWN),   // "is_active"
-        NemesysSegment(111, NemesysField.UNKNOWN)    // false
+        NemesysSegment(0, NemesysField.UNKNOWN),     // Start der BPList
+        NemesysSegment(8, NemesysField.UNKNOWN),     // Start des Root-Objekts (Dictionary)
+        NemesysSegment(15, NemesysField.UNKNOWN),    // "s"
+        NemesysSegment(17, NemesysField.UNKNOWN),    // "f"
+        NemesysSegment(19, NemesysField.UNKNOWN),    // "b"
+        NemesysSegment(21, NemesysField.UNKNOWN),    // "com.kik.chat"
+        NemesysSegment(34, NemesysField.UNKNOWN),    // 1535
+        NemesysSegment(37, NemesysField.UNKNOWN),    // Start des Arrays
+        NemesysSegment(39, NemesysField.UNKNOWN),    // Start des Dictionary-Objekts im Array
+        NemesysSegment(44, NemesysField.UNKNOWN),    // "h"
+        NemesysSegment(46, NemesysField.UNKNOWN),    // "d"
+        NemesysSegment(48, NemesysField.UNKNOWN),    // "66a7bd59fe7f9a7c22eb463d6db39704"
+        NemesysSegment(83, NemesysField.UNKNOWN),
     )
 
     val segments2 = listOf(
@@ -192,7 +186,7 @@ fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
 
     val messages = mutableMapOf(
         0 to NemesysParsedMessage(segments1, message1, 0),
-        1 to NemesysParsedMessage(segments2, message2, 1)
+        // 1 to NemesysParsedMessage(segments2, message2, 1)
     )
 
     return messages
