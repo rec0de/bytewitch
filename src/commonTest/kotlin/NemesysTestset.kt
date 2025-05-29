@@ -5,11 +5,59 @@ import kotlin.test.*
 
 
 class NemesysTestset {
+    private var totalTP = 0
+    private var totalFP = 0
+    private var totalFN = 0
 
-    private val parser = NemesysParser()
+    private fun printFinalScore() {
+        val precision = totalTP.toDouble() / (totalTP + totalFP).coerceAtLeast(1)
+        val recall = totalTP.toDouble() / (totalTP + totalFN).coerceAtLeast(1)
+        val finalF1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
+
+        println("===== Final Evaluation =====")
+        println("Total True Positives: $totalTP")
+        println("Total False Positives: $totalFP")
+        println("Total False Negatives: $totalFN")
+        println("Final Precision: ${(precision * 100).toInt()}%")
+        println("Final Recall: ${(recall * 100).toInt()}%")
+        println("Final F1 Score: ${(finalF1 * 100).toInt()}%")
+
+        assertTrue(finalF1 >= 1, "F1 score should be at least 80%")
+    }
 
     @Test
-    fun testSegmentParsing1() {
+    fun runSegmentationTests() {
+        testSegmentParsing1()
+        testSegmentParsing2()
+        testSegmentParsing3()
+        testSegmentParsing4()
+        testSegmentParsing5()
+        testSegmentParsing6()
+        testSegmentParsing7()
+        testSegmentParsing8()
+        testSegmentParsing9()
+        testSegmentParsing10()
+        testSegmentParsing11()
+        testSegmentParsing12()
+        testSegmentParsing13()
+        testSegmentParsing14()
+        testSegmentParsing15()
+        testSegmentParsing16()
+
+        printFinalScore()
+    }
+
+    @Test
+    fun runSequenceAlignmentTests() {
+        testSequenceAlignment1()
+        testSequenceAlignment2()
+        testSequenceAlignment3()
+        testSequenceAlignment4()
+
+        printFinalScore()
+    }
+
+    private fun testSegmentParsing1() {
         val bytes = "081611b892473a80d6c641".fromHex()
 
         val expectedSegments = listOf(
@@ -23,8 +71,7 @@ class NemesysTestset {
         printSegmentParsingResult(1, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing2() {
+    private fun testSegmentParsing2() {
         val bytes = "08031163b719da7fd6c641".fromHex()
 
         val expectedSegments = listOf(
@@ -38,8 +85,7 @@ class NemesysTestset {
         printSegmentParsingResult(2, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing3() {
+    private fun testSegmentParsing3() {
         val bytes = "080b11c80664df7fd6c641".fromHex()
 
         val expectedSegments = listOf(
@@ -53,8 +99,7 @@ class NemesysTestset {
         printSegmentParsingResult(3, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing4() {
+    private fun testSegmentParsing4() {
         val bytes = "3081D0308183020100300F310D300B06035504030C0474657374302A300506032B6570032100FB16E6BD645FB03D755D0C207042BF80AA7CBA385BECDB9C19FCFE0BC95B1898A041303F06092A864886F70D01090E31323030302E0603551D1104273025A023060A2B060104018237140203A0150C136164647265737340646F6D61696E2E74657374300506032B6570034100529E457A71C5D6B67344653EEF0885FBF0F56DFC83445D1DCD6CF6B25E389E5B6EF222E31CEDDA21F393616A6A66568383506ADCBEC571BEC87F8C9902C1390B".fromHex()
 
         val expectedSegments = listOf(
@@ -130,8 +175,7 @@ class NemesysTestset {
         printSegmentParsingResult(4, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing5() {
+    private fun testSegmentParsing5() {
         val bytes = "0821b10132010c3f2f5cd941da0104080010009a02bf010a3b636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e4661636554696d6550726f766964657212084661636554696d651a6466696c653a2f2f2f707269766174652f7661722f636f6e7461696e6572732f42756e646c652f4170706c69636174696f6e2f30323639344631412d303138312d343031342d423036342d4536303938333636464431342f4661636554696d652e6170702f2002280130013801400048006803680278019a02de010a17636f6d2e6170706c652e636f726574656c6570686f6e79200228053001380040014801680278018a0107080212033131328a0107080212033131308a0107080212033131328a0107080212033131308a0107080212033931318a0107080212033131328a0107080212033030308a01060802120230388a0107080212033131308a0107080212033939398a0107080212033131388a0107080212033131398a0107080212033132308a0107080212033132328a0107080212033931318a0107080212033131328a0108080212042a3931318a010808021204233931319a02450a31636f6d2e6170706c652e74656c6570686f6e797574696c69746965732e63616c6c7365727669636573642e54696e43616e200128013001380040004800680368027800".fromHex()
 
         val expectedSegments = listOf(
@@ -237,8 +281,7 @@ class NemesysTestset {
         printSegmentParsingResult(5, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing6() {
+    private fun testSegmentParsing6() {
         val bytes = "62706c6973743137a0d0000000000000007f114870726564696374696f6e466f7243617465676f726965733a636f6e73756d65723a63726974657269613a6c696d69743a70726f7669646573466565646261636b3a7265706c793a007f111b76363040303a38513136513234403332513430423438403f353200a0d00000000000000011061101d0cc000000000000007724636c617373007d4e5344696374696f6e61727900784e532e6b65797300a0b7000000000000007b4e532e6f626a6563747300a0cc000000000000001101b0e0".fromHex()
 
         val expectedSegments = listOf(
@@ -280,8 +323,7 @@ class NemesysTestset {
         printSegmentParsingResult(6, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing7() {
+    private fun testSegmentParsing7() {
         val bytes = "62706c697374313513c7000000000000801200000000a44776403a404040004f10ce61636b6e6f776c656467654f7574676f696e674d65737361676557697468475549443a616c7465726e61746543616c6c6261636b49443a666f724163636f756e7457697468556e6971756549443aa3108710881087a37f10a432303841303836302d373535392d343731362d424136352d434332363638334644413235407f10a436433836343332372d364441452d344133312d394137362d3731434135454533363839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".fromHex()
 
         val expectedSegments = listOf(
@@ -310,8 +352,7 @@ class NemesysTestset {
         printSegmentParsingResult(7, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing8() {
+    private fun testSegmentParsing8() {
         val bytes = "62706c69737431351367000000000000801200000000d478636c69656e744944756576656e747c70726f636573732d6e616d657973686f756c644c6f6710977e55494b69742d4b6579626f6172647f109156697375616c50616972696e674861636b74506f737400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".fromHex()
 
         val expectedSegments = listOf(
@@ -343,8 +384,7 @@ class NemesysTestset {
         printSegmentParsingResult(8, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing9() {
+    private fun testSegmentParsing9() {
         val bytes = "86A26964CD0FC5B27375636365737350726F626162696C697479CB3FE0000000000000AA6973456C696769626C65C3A46E616D65AA4672616E7A204B61726CAA686967686C696768747392B55363686F6C61727368697020726563697069656E74B852656C6576616E7420776F726B20657870657269656E6365AA6174747269627574657382A6766973696F6ECB3FECCCCCCCCCCCCDAB6174686C6574696369736DCB3FD3333333333333".fromHex()
 
         val expectedSegments = listOf(
@@ -387,8 +427,7 @@ class NemesysTestset {
         printSegmentParsingResult(9, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing10() {
+    private fun testSegmentParsing10() {
         val bytes = "86A26964CD0FC6B27375636365737350726F626162696C697479CB3FEA3D70A3D70A3DAA6973456C696769626C65C3A46E616D65AD416D69726120536F6C62657267AA686967686C696768747392B8496E7465726E6174696F6E616C20696E7465726E73686970B25075626C6973686564207265736561726368AA6174747269627574657382A6766973696F6E01AB6174686C6574696369736DCB3FE6666666666666".fromHex()
 
         val expectedSegments = listOf(
@@ -431,8 +470,7 @@ class NemesysTestset {
         printSegmentParsingResult(10, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing11() {
+    private fun testSegmentParsing11() {
         val bytes = "86A26964CD0FC7B27375636365737350726F626162696C697479CB3FD6666666666666AA6973456C696769626C65C2A46E616D65AD4A6F6E61732052696368746572AA686967686C696768747392AE566F6C756E7465657220776F726BB842617369632070726F6772616D6D696E6720736B696C6C73AA6174747269627574657382A6766973696F6ECB3FE3333333333333AB6174686C6574696369736DCB3FE999999999999A".fromHex()
 
         val expectedSegments = listOf(
@@ -476,8 +514,7 @@ class NemesysTestset {
         printSegmentParsingResult(11, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing12() {
+    private fun testSegmentParsing12() {
         val bytes = "86A26964CD0FC8B27375636365737350726F626162696C697479CB3FEE147AE147AE14AA6973456C696769626C65C3A46E616D65A94C696E61204368656EAA686967686C696768747392B0546F70206F662068657220636C617373B04C656164657273686970206177617264AA6174747269627574657382A6766973696F6ECB3FEE666666666666AB6174686C6574696369736DCB3FE0000000000000".fromHex()
 
         val expectedSegments = listOf(
@@ -521,8 +558,7 @@ class NemesysTestset {
         printSegmentParsingResult(12, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing13() {
+    private fun testSegmentParsing13() {
         val bytes = "19010000026973626e00120000003937382d302d30362d3131323030382d3400027469746c650016000000546f204b696c6c2061204d6f636b696e67626972640003617574686f72002d0000000266697273744e616d65000700000048617270657200026c6173744e616d6500040000004c65650000107075626c69736865645965617200a80700000467656e72657300300000000230000800000046696374696f6e0002310008000000436c617373696300023200060000004c6567616c0000037072696365002700000001616d6f756e74007b14ae47e1fa29400263757272656e63790004000000555344000008617661696c61626c65000101726174696e6700333333333333134010696e53746f636b002200000000".fromHex()
 
         val expectedSegments = listOf(
@@ -596,9 +632,7 @@ class NemesysTestset {
         printSegmentParsingResult(13, expectedSegments, actualSegments)
     }
 
-
-    @Test
-    fun testSegmentParsing14() {
+    private fun testSegmentParsing14() {
         val bytes = "06010000026973626e00120000003937382d302d373433322d373335362d3500027469746c650010000000416e67656c7320262044656d6f6e730003617574686f72002c0000000266697273744e616d65000400000044616e00026c6173744e616d65000600000042726f776e0000107075626c69736865645965617200d00700000467656e726573002400000002300009000000546872696c6c657200023100080000004d7973746572790000037072696365002700000001616d6f756e74007b14ae47e1fa23400263757272656e63790004000000555344000008617661696c61626c65000101726174696e6700666666666666104010696e53746f636b000c00000000".fromHex()
 
         val expectedSegments = listOf(
@@ -669,8 +703,7 @@ class NemesysTestset {
         printSegmentParsingResult(14, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing15() {
+    private fun testSegmentParsing15() {
         val bytes = "1b010000026973626e00120000003937382d312d3235302d33303636392d3800027469746c650015000000546865204d69646e69676874204c6962726172790003617574686f72002c0000000266697273744e616d6500050000004d61747400026c6173744e616d650005000000486169670000107075626c69736865645965617200e40700000467656e72657300380000000230000800000046616e74617379000231000e0000005068696c6f736f70686963616c000232000800000046696374696f6e0000037072696365002300000010616d6f756e7400100000000263757272656e63790004000000555344000008617661696c61626c65000001726174696e6700000000000000124010696e53746f636b000000000000".fromHex()
 
         val expectedSegments = listOf(
@@ -744,8 +777,7 @@ class NemesysTestset {
         printSegmentParsingResult(15, expectedSegments, actualSegments)
     }
 
-    @Test
-    fun testSegmentParsing16() {
+    private fun testSegmentParsing16() {
         val bytes = "1e010000026973626e00120000003937382d312d393834382d373736372d3000027469746c65000e00000041746f6d6963204861626974730003617574686f72002e0000000266697273744e616d6500060000004a616d657300026c6173744e616d650006000000436c6561720000107075626c69736865645965617200e20700000467656e726573003c0000000230000a00000053656c662d68656c70000231000d00000050726f647563746976697479000232000b00000050737963686f6c6f67790000037072696365002700000001616d6f756e740000000000008032400263757272656e63790004000000555344000008617661696c61626c65000101726174696e67009a9999999999134010696e53746f636b003900000000".fromHex()
 
         val expectedSegments = listOf(
@@ -819,50 +851,61 @@ class NemesysTestset {
         printSegmentParsingResult(16, expectedSegments, actualSegments)
     }
 
-    private fun printSegmentParsingResult(testNumber: Int, expectedSegments: List<NemesysSegment>, actualSegments: List<NemesysSegment>, ) {
-        val truePositives = expectedSegments.count { expected ->
-            actualSegments.any { actual ->
-                actual.offset == expected.offset && actual.fieldType == expected.fieldType
-            }
-        }
+    private fun printSegmentParsingResult(
+        testNumber: Int,
+        expectedSegments: List<NemesysSegment>,
+        actualSegments: List<NemesysSegment>, ) {
+        val tp = expectedSegments.count { e -> actualSegments.any { a -> a.offset == e.offset && a.fieldType == e.fieldType } }
+        val fp = actualSegments.count { a -> expectedSegments.none { e -> a.offset == e.offset && a.fieldType == e.fieldType } }
+        val fn = expectedSegments.size - tp
 
-        val falsePositives = actualSegments.count { actual ->
-            expectedSegments.none { expected ->
-                actual.offset == expected.offset && actual.fieldType == expected.fieldType
-            }
-        }
+        totalTP += tp
+        totalFP += fp
+        totalFN += fn
 
-        val precision = truePositives.toDouble() / (truePositives + falsePositives).coerceAtLeast(1)
-        val recall = truePositives.toDouble() / expectedSegments.size
+        val precision = tp.toDouble() / (tp + fp).coerceAtLeast(1)
+        val recall = tp.toDouble() / expectedSegments.size
         val f1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
 
         println("----- testSegmentParsing$testNumber -----")
-        println("True Positives: $truePositives")
-        println("False Positives: $falsePositives")
+        println("True Positives: $tp")
+        println("False Positives: $fp")
         println("Precision: ${(precision * 100).toInt()}%")
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
-
-        assertTrue(f1 >= 0.8, "F1 score should be at least 80%")
     }
 
-    private fun printSequenceAlignmentResult(testNumber: Int, messages: Map<Int, NemesysParsedMessage>, expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>) {
+    private fun printSequenceAlignmentResult(
+        testNumber: Int,
+        messages: Map<Int, NemesysParsedMessage>,
+        expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
+    ) {
         val alignments = NemesysSequenceAlignment.alignSegments(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
 
-        val correctMatches = foundAlignments.intersect(expectedAlignments.toSet())
-        val accuracy = correctMatches.size.toDouble() / expectedAlignments.size
+        val tp = foundAlignments.intersect(expectedAlignments).size
+        val fp = foundAlignments.subtract(expectedAlignments).size
+        val fn = expectedAlignments.subtract(foundAlignments).size
+
+        totalTP += tp
+        totalFP += fp
+        totalFN += fn
+
+        val precision = tp.toDouble() / (tp + fp).coerceAtLeast(1)
+        val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
+        val f1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
 
         println("----- testSequenceAlignment$testNumber -----")
-        println("Correct matches: ${correctMatches.size} of ${expectedAlignments.size}")
-        println("Alignment Accuracy: ${(accuracy * 100).toInt()}%")
-
-        assertTrue(accuracy >= 0.8, "At least 80% of the alignments should be correct")
+        println("True Positives: $tp")
+        println("False Positives: $fp")
+        println("False Negatives: $fn")
+        println("Precision: ${(precision * 100).toInt()}%")
+        println("Recall: ${(recall * 100).toInt()}%")
+        println("F1 Score: ${(f1 * 100).toInt()}%")
     }
 
 
-    @Test
-    fun testSequenceAlignment1() {
+    private fun testSequenceAlignment1() {
         val message1 = "081611b892473a80d6c641".fromHex()
         val message2 = "08031163b719da7fd6c641".fromHex()
         val message3 = "080b11c80664df7fd6c641".fromHex()
@@ -890,8 +933,7 @@ class NemesysTestset {
         printSequenceAlignmentResult(1, messages, expectedAlignments)
     }
 
-    @Test
-    fun testSequenceAlignment2() {
+    private fun testSequenceAlignment2() {
         val message1 = "62706c6973743030d4010203040506070852704751635165526c535f102438424139413938422d393842462d344331332d414545332d453430463946433631433344100b5a70726f64756374696f6e11c80008111416181b42444f0000000000000101000000000000000900000000000000000000000000000052".fromHex()
         val message2 = "62706c6973743030d40102030405060708526d53527047516351651114005f102441303634324536462d463239452d343346362d394441442d424437323846343832463933100b5a70726f64756374696f6e08111417191b1e45470000000000000101000000000000000900000000000000000000000000000052".fromHex()
         val message3 = "62706c6973743030d301020304050651635270475165100a5f102438424139413938422d393842462d344331332d414545332d4534304639464336314333445a70726f64756374696f6e080f111416183f000000000000010100000000000000070000000000000000000000000000004a".fromHex()
@@ -952,8 +994,7 @@ class NemesysTestset {
         printSequenceAlignmentResult(2, messages, expectedAlignments)
     }
 
-    @Test
-    fun testSequenceAlignment3() {
+    private fun testSequenceAlignment3() {
         val message1 = "86A26964CD0FC5B27375636365737350726F626162696C697479CB3FE0000000000000AA6973456C696769626C65C3A46E616D65AA4672616E7A204B61726CAA686967686C696768747392B55363686F6C61727368697020726563697069656E74B852656C6576616E7420776F726B20657870657269656E6365AA6174747269627574657382A6766973696F6ECB3FECCCCCCCCCCCCDAB6174686C6574696369736DCB3FD3333333333333".fromHex()
         val message2 = "86A26964CD0FC6B27375636365737350726F626162696C697479CB3FEA3D70A3D70A3DAA6973456C696769626C65C3A46E616D65AD416D69726120536F6C62657267AA686967686C696768747392B8496E7465726E6174696F6E616C20696E7465726E73686970B25075626C6973686564207265736561726368AA6174747269627574657382A6766973696F6E01AB6174686C6574696369736DCB3FE6666666666666".fromHex()
         val message3 = "86A26964CD0FC7B27375636365737350726F626162696C697479CB3FD6666666666666AA6973456C696769626C65C2A46E616D65AD4A6F6E61732052696368746572AA686967686C696768747392AE566F6C756E7465657220776F726BB842617369632070726F6772616D6D696E6720736B696C6C73AA6174747269627574657382A6766973696F6ECB3FE3333333333333AB6174686C6574696369736DCB3FE999999999999A".fromHex()
@@ -1271,8 +1312,7 @@ class NemesysTestset {
     }
 
 
-    @Test
-    fun testSequenceAlignment4() {
+    private fun testSequenceAlignment4() {
         val message1 = "19010000026973626e00120000003937382d302d30362d3131323030382d3400027469746c650016000000546f204b696c6c2061204d6f636b696e67626972640003617574686f72002d0000000266697273744e616d65000700000048617270657200026c6173744e616d6500040000004c65650000107075626c69736865645965617200a80700000467656e72657300300000000230000800000046696374696f6e0002310008000000436c617373696300023200060000004c6567616c0000037072696365002700000001616d6f756e74007b14ae47e1fa29400263757272656e63790004000000555344000008617661696c61626c65000101726174696e6700333333333333134010696e53746f636b002200000000".fromHex()
         val message2 = "06010000026973626e00120000003937382d302d373433322d373335362d3500027469746c650010000000416e67656c7320262044656d6f6e730003617574686f72002c0000000266697273744e616d65000400000044616e00026c6173744e616d65000600000042726f776e0000107075626c69736865645965617200d00700000467656e726573002400000002300009000000546872696c6c657200023100080000004d7973746572790000037072696365002700000001616d6f756e74007b14ae47e1fa23400263757272656e63790004000000555344000008617661696c61626c65000101726174696e6700666666666666104010696e53746f636b000c00000000".fromHex()
         val message3 = "1b010000026973626e00120000003937382d312d3235302d33303636392d3800027469746c650015000000546865204d69646e69676874204c6962726172790003617574686f72002c0000000266697273744e616d6500050000004d61747400026c6173744e616d650005000000486169670000107075626c69736865645965617200e40700000467656e72657300380000000230000800000046616e74617379000231000e0000005068696c6f736f70686963616c000232000800000046696374696f6e0000037072696365002300000010616d6f756e7400100000000263757272656e63790004000000555344000008617661696c61626c65000001726174696e6700000000000000124010696e53746f636b000000000000".fromHex()
