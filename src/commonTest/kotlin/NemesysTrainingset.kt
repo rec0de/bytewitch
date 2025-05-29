@@ -421,6 +421,104 @@ class NemesysTrainingset {
     }
 
     @Test
+    fun testSegmentParsing12() {
+        val bytes = "62706c6973743030d4010203040506070c582476657273696f6e592461726368697665725424746f7058246f626a6563747312000186a05f100f4e534b657965644172636869766572d208090a0b52313152313080048001a70d0e13141b1f2055246e756c6cd20f1011125624636c6173735a6964656e746966696572800380025f102753697269427574746f6e4964656e7469666965724c6f6e675072657373486f6d65427574746f6ed2151617185a24636c6173736e616d655824636c61737365735f101c534153427574746f6e4964656e7469666965725472616e73706f7274a2191a5f101c534153427574746f6e4964656e7469666965725472616e73706f7274584e534f626a656374d20f1c1d1e597472616e73706f727480068005233fd999999999999ad2151621225f101853415354696d65496e74657276616c5472616e73706f7274a2231a5f101853415354696d65496e74657276616c5472616e73706f727400080011001a00240029003200370049004e005100540056005800600066006b0072007d007f008100ab00b000bb00c400e300e60105010e0113011d011f0121012a012f014a014d0000000000000201000000000000002400000000000000000000000000000168".fromHex()
+
+        val expectedSegments = listOf(
+            NemesysSegment(0, NemesysField.STRING), // bplist
+            NemesysSegment(6, NemesysField.STRING), // version
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(107, NemesysField.UNKNOWN), // $class type
+            NemesysSegment(108, NemesysField.STRING), // $class
+            NemesysSegment(114, NemesysField.UNKNOWN),
+            NemesysSegment(176, NemesysField.UNKNOWN), // $classname type
+            NemesysSegment(177, NemesysField.STRING), // $classname
+            NemesysSegment(187, NemesysField.UNKNOWN), // $classes type
+            NemesysSegment(188, NemesysField.STRING), // $classes
+            NemesysSegment(196, NemesysField.UNKNOWN),
+            NemesysSegment(261, NemesysField.UNKNOWN), // NSObject type
+            NemesysSegment(262, NemesysField.STRING), // NSObject
+            NemesysSegment(270, NemesysField.UNKNOWN),
+            NemesysSegment(275, NemesysField.UNKNOWN), // transport type
+            NemesysSegment(276, NemesysField.STRING), // transport
+            NemesysSegment(285, NemesysField.UNKNOWN),
+            NemesysSegment(289, NemesysField.UNKNOWN), // 0.4
+            NemesysSegment(298, NemesysField.UNKNOWN),
+            NemesysSegment(303, NemesysField.UNKNOWN), // SASTimeIntervalTransport type
+            NemesysSegment(305, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN), // SASTimeIntervalTransport length
+            NemesysSegment(306, NemesysField.STRING), // SASTimeIntervalTransport
+            NemesysSegment(330, NemesysField.UNKNOWN),
+            NemesysSegment(333, NemesysField.UNKNOWN), // SASTimeIntervalTransport type
+            NemesysSegment(335, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN), // SASTimeIntervalTransport length
+            NemesysSegment(336, NemesysField.STRING), // SASTimeIntervalTransport
+            NemesysSegment(360, NemesysField.UNKNOWN),
+        )
+
+        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val actualSegments = parsed.segments
+
+        printSegmentParsingResult(12, expectedSegments, actualSegments)
+    }
+
+    @Test
+    fun testSegmentParsing13() {
+        val bytes = "62706c6973743137a09d000000000000007d6e6f746966794576656e743a007b76323440303a3840313600a09d00000000000000d09d000000000000007724636c617373007f11154157417474656e74696f6e4c6f73744576656e74007a74696d657374616d700023bb3f1656df6392407f1115617474656e74696f6e4c6f737454696d656f75740023000000000000000079746167496e646578001100".fromHex()
+
+        val expectedSegments = listOf(
+            NemesysSegment(0, NemesysField.STRING), // bplist
+            NemesysSegment(6, NemesysField.STRING), // version
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.UNKNOWN), // notifyEvent: type
+            NemesysSegment(18, NemesysField.STRING), // notifyEvent
+            NemesysSegment(31, NemesysField.UNKNOWN), // v24@0:8@16 type
+            NemesysSegment(32, NemesysField.STRING), // v24@0:8@16
+            NemesysSegment(43, NemesysField.UNKNOWN),
+            NemesysSegment(52, NemesysField.UNKNOWN), // array
+            NemesysSegment(61, NemesysField.UNKNOWN), // $class type
+            NemesysSegment(62, NemesysField.STRING), // $class
+            NemesysSegment(69, NemesysField.UNKNOWN), // AWAttentionLostEvent type
+            NemesysSegment(71, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN), // AWAttentionLostEvent length
+            NemesysSegment(72, NemesysField.STRING), // AWAttentionLostEvent
+            NemesysSegment(93, NemesysField.UNKNOWN), // timestamp type
+            NemesysSegment(94, NemesysField.STRING), // timestamp
+            NemesysSegment(104, NemesysField.UNKNOWN), // 1176.968101833
+            NemesysSegment(113, NemesysField.UNKNOWN), // attentionLostTimeout type
+            NemesysSegment(115, NemesysField.UNKNOWN), // attentionLostTimeout length
+            NemesysSegment(116, NemesysField.STRING), // attentionLostTimeout
+            NemesysSegment(137, NemesysField.UNKNOWN), // 0
+            NemesysSegment(146, NemesysField.UNKNOWN), // tagIndex type
+            NemesysSegment(147, NemesysField.STRING), // tagIndex
+            NemesysSegment(156, NemesysField.UNKNOWN), // 0
+        )
+
+        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val actualSegments = parsed.segments
+
+        printSegmentParsingResult(13, expectedSegments, actualSegments)
+    }
+
+    @Test
+    fun testSegmentParsing14() {
+        val bytes = "e1435f7064917c05551af2daa06d876143cdb07a6e567ccbcbfcdbdce3428ed3b8574c7f1206d2160b3defe511de723182e53d03b6df59ab59eeaffd1d3ee64604cdb8e587410b4d40798dcecbfa90d03abab825995f57563840c74bd7cd0601020320cb38831888b37dc3760ebb155d13d7b6ee85e96f1eed096efed34a2c80190c64".fromHex()
+
+        val expectedSegments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.UNKNOWN), // _pd type
+            NemesysSegment(2, NemesysField.STRING), // _pd
+            NemesysSegment(5, NemesysField.UNKNOWN),
+            NemesysSegment(7, NemesysField.UNKNOWN),
+            NemesysSegment(94, NemesysField.UNKNOWN),
+            NemesysSegment(97, NemesysField.UNKNOWN),
+            NemesysSegment(99, NemesysField.UNKNOWN),
+        )
+
+        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val actualSegments = parsed.segments
+
+        printSegmentParsingResult(14, expectedSegments, actualSegments)
+    }
+
+    @Test
     fun testSequenceAlignment1() {
         val message1 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
         val message2 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102446394532423231352d393431372d344141372d413439302d384446364539443445364639080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
