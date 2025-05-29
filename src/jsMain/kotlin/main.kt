@@ -136,7 +136,7 @@ fun applyLiveDecodeListeners() {
     }
 }
 
-fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
+/*fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
     val message1 = "62706c6973743030d30102030405065173516651625c636f6d2e6b696b2e636861741105ffa107d208090a0b516851645f102036366137626435396665376639613763323265623436336436646233393730342341d95c3031cf51a2080f1113152225272c2e30530000000000000101000000000000000c0000000000000000000000000000005c".fromHex()
     // val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
 
@@ -251,7 +251,7 @@ fun exportAlignments(): String {
     return """val expectedAlignments = setOf(
         ${triplets.joinToString(",\n    ")}
     )"""
-}
+}*/
 
 
 fun decode(tryhard: Boolean) {
@@ -342,7 +342,7 @@ fun decode(tryhard: Boolean) {
 
 }
 
-fun includeAlignmentForTesting() {
+/*fun includeAlignmentForTesting() {
     val output = document.getElementById("output") as HTMLDivElement
     val testingMessages = getTestingData()
     val messageBox = document.createElement("DIV") as HTMLDivElement
@@ -358,7 +358,7 @@ fun includeAlignmentForTesting() {
         if (message != null) {
             nemesysContent.innerHTML = NemesysRenderer.render(message)
         } else {
-            nemesysContent.innerText = "Fehler: Nachricht $index ist null."
+            nemesysContent.innerText = "Error: message $index is null"
         }
 
         nemesysResult.appendChild(nemesysName)
@@ -373,7 +373,7 @@ fun includeAlignmentForTesting() {
         console.log(exportAlignments())
     }
     document.body?.appendChild(btn)
-}
+}*/
 
 // rerender nemesys html view
 fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
