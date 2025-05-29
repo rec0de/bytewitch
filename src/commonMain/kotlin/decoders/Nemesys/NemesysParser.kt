@@ -13,6 +13,35 @@ class NemesysParser {
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
+    // parse bytewise and see every byte as one field without using Nemesys
+    fun parseBytewise(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+        val segmentPairs: List<Pair<Int, NemesysField>> = setBytewiseSegmentBoundaries(bytes)
+        val segments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
+
+        return NemesysParsedMessage(segments, bytes, msgIndex)
+    }
+
+    // every byte is one field. only use pre- and postprocessing to merge bytes together
+    private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>>{
+        val taken = BooleanArray(bytes.size) { false }
+
+        // preProcessing to detect length fields
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        val dynamicSegments = mutableListOf<Pair<Int, NemesysField>>()
+        for (i in bytes.indices) { // go through each byte
+            if (!taken[i]) {
+                val slice = byteArrayOf(bytes[i])
+                // do some post processing to merge bytes together
+                val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.second ?: NemesysField.UNKNOWN
+                dynamicSegments.add(i to type)
+            }
+        }
+
+        return (fixedSegments + dynamicSegments).sortedBy { it.first }.distinctBy { it.first }
+    }
+
+
     // count how often every segment exists
     fun countSegmentValues(messages: List<NemesysParsedMessage>, minSegmentLength: Int = 2): Map<ByteArray, Int> {
         val segmentValueCounts = mutableMapOf<ByteArray, Int>()
