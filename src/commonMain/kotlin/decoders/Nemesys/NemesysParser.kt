@@ -14,7 +14,7 @@ class NemesysParser {
     }
 
     // parse bytewise and see every byte as one field without using Nemesys
-    fun parseBytewise(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
         val segmentPairs: List<Pair<Int, NemesysField>> = setBytewiseSegmentBoundaries(bytes)
         val segments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
 
