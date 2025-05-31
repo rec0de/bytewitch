@@ -92,7 +92,6 @@ fun main() {
         deleteDataBox.onclick = {
             if (dataContainer.children.length > 1) { // there need to be at least one data container left
                 removeTextArea(dataContainer)
-
             }
         }
 
@@ -119,6 +118,10 @@ fun removeTextArea(dataContainer: Element) {
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement
     output.removeChild(output.lastElementChild!!)
+
+    // reset floatview
+    val floatview = document.getElementById("floatview") as HTMLDivElement
+    floatview.innerHTML = ""
 }
 
 
@@ -129,7 +132,7 @@ fun applyLiveDecodeListeners() {
         val ta = textareas[i] as HTMLTextAreaElement
         ta.oninput = {
             if (liveDecodeEnabled)
-                decodeTextarea(false, ta, i)
+                decode(false)
         }
     }
 }
@@ -252,27 +255,30 @@ fun exportAlignments(): String {
 }*/
 
 
-fun decodeTextarea(tryhard: Boolean, ta: HTMLTextAreaElement, taIndex: Int) {
+// decode one specific byte sequence
+fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
-    val inputText = ta.value.trim()
-    if (inputText.isEmpty()) return // only decode input text areas that are in use
+    floatview.innerHTML = ""
+    noDecodeYet.style.display = "none"
 
     // decode input
-    val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if (result.isNotEmpty()) {
         bytefinder.style.display = "flex"
 
         // check if message-output container already exists
-        val className = "message-output-$taIndex"
-        var messageBox = output.querySelector(".$className") as? HTMLDivElement
+        val messageId = "message-output-$taIndex"
+        var messageBox = document.getElementById(messageId) as? HTMLDivElement
 
         if (messageBox == null) {
             messageBox = document.createElement("DIV") as HTMLDivElement
-            messageBox.classList.add(className)
+            messageBox.id = messageId
+            messageBox.classList.add("message-output") // apply layout CSS
             output.appendChild(messageBox)
         } else {
             messageBox.innerHTML = "" // clear old content
@@ -316,22 +322,20 @@ fun decodeTextarea(tryhard: Boolean, ta: HTMLTextAreaElement, taIndex: Int) {
     }
 }
 
-
+// decode all text areas
 fun decode(tryhard: Boolean) {
-    val output = document.getElementById("output") as HTMLDivElement
-    val floatview = document.getElementById("floatview") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
-
-    // Reset output
-    output.innerHTML = ""
-    floatview.innerHTML = ""
-    bytefinder.style.display = "none"
-
-    // decode all inputs
     val textareas = document.querySelectorAll(".input_area")
-    for (i in 0 until textareas.length) { // TODO currently if an input changes it reloads all parser
+    for (i in 0 until textareas.length) {
+        // get bytes from textarea
         val textarea = textareas[i] as HTMLTextAreaElement
-        decodeTextarea(tryhard, textarea, i)
+        val inputText = textarea.value.trim()
+        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+
+        // only decode text area if input changed
+        val oldBytes = parsedMessages[i]?.bytes
+        if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
+            decodeBytes(tryhard, bytes, i)
+        }
     }
 
     // refine nemesys fields and rerender html content
@@ -341,6 +345,7 @@ fun decode(tryhard: Boolean) {
         rerenderNemesys(msg.msgIndex, msg)
     }
 
+    // for sequence alignment
     val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
     attachSequenceAlignmentListeners(alignedSegment)
 
@@ -348,7 +353,6 @@ fun decode(tryhard: Boolean) {
 
     // TODO for testing purposes only
     // includeAlignmentForTesting()
-
 }
 
 /*fun includeAlignmentForTesting() {
