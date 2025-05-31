@@ -390,20 +390,15 @@ fun decode(tryhard: Boolean) {
 
 // rerender nemesys html view
 fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
-    val output = document.getElementById("output") as? HTMLDivElement ?: return
-    val messageBox = output.children[msgIndex] as? HTMLDivElement ?: return
-    val oldWrapper = messageBox.querySelector(".nemesys") as? HTMLElement ?: return
+    val messageBox = document.getElementById("message-output-$msgIndex") as HTMLDivElement
+    val oldWrapper = messageBox.querySelector(".nemesys") as HTMLDivElement
 
-    val newHTML = NemesysRenderer.render(parsed)
+    // create new div with new nemesys content
     val temp = document.createElement("div") as HTMLDivElement
+    val newHTML = NemesysRenderer.render(parsed)
     temp.innerHTML = newHTML
 
-    val newWrapper = temp.firstElementChild as? HTMLElement
-    if (newWrapper == null) {
-        console.error("Newly rendered .nemesys could not be parsed")
-        return
-    }
-
+    val newWrapper = temp.firstElementChild as HTMLElement
     oldWrapper.replaceWith(newWrapper)
 
     // attach javascript handlers
