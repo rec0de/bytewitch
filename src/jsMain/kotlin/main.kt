@@ -1,4 +1,3 @@
-import bitmage.fromHex
 import bitmage.hex
 import decoders.Nemesys.*
 import kotlinx.browser.document
@@ -12,7 +11,6 @@ import org.khronos.webgl.Uint8Array
 import org.w3c.dom.events.MouseEvent
 
 import org.w3c.dom.events.Event
-import org.w3c.dom.events.KeyboardEvent
 
 
 var liveDecodeEnabled = true
@@ -131,7 +129,7 @@ fun applyLiveDecodeListeners() {
         val ta = textareas[i] as HTMLTextAreaElement
         ta.oninput = {
             if (liveDecodeEnabled)
-                decode(false)
+                decodeTextarea(false, ta, i)
         }
     }
 }
@@ -254,6 +252,71 @@ fun exportAlignments(): String {
 }*/
 
 
+fun decodeTextarea(tryhard: Boolean, ta: HTMLTextAreaElement, taIndex: Int) {
+    val output = document.getElementById("output") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+
+    val inputText = ta.value.trim()
+    if (inputText.isEmpty()) return // only decode input text areas that are in use
+
+    // decode input
+    val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+    val result = ByteWitch.analyze(bytes, tryhard)
+
+    if (result.isNotEmpty()) {
+        bytefinder.style.display = "flex"
+
+        // check if message-output container already exists
+        val className = "message-output-$taIndex"
+        var messageBox = output.querySelector(".$className") as? HTMLDivElement
+
+        if (messageBox == null) {
+            messageBox = document.createElement("DIV") as HTMLDivElement
+            messageBox.classList.add(className)
+            output.appendChild(messageBox)
+        } else {
+            messageBox.innerHTML = "" // clear old content
+        }
+
+        result.forEach {
+            val parseResult = document.createElement("DIV") as HTMLDivElement
+
+            val parseName = document.createElement("H3") as HTMLHeadingElement
+            parseName.innerText = it.first
+
+            val parseContent = document.createElement("DIV") as HTMLDivElement
+            parseContent.classList.add("parsecontent")
+            parseContent.innerHTML = it.second.renderHTML()
+
+            attachRangeListeners(parseContent, taIndex)
+
+            parseResult.appendChild(parseName)
+            parseResult.appendChild(parseContent)
+            messageBox.appendChild(parseResult)
+        }
+
+        // for nemesys (and float view)
+        val nemesysParsed = NemesysParser().parse(bytes, taIndex)
+        parsedMessages[taIndex] = nemesysParsed // besides nemesys this is also needed for the float view
+
+        val nemesysResult = document.createElement("DIV") as HTMLDivElement
+        val nemesysName = document.createElement("H3") as HTMLHeadingElement
+        nemesysName.innerText = "nemesysparser"
+
+        val nemesysContent = document.createElement("DIV") as HTMLDivElement
+        nemesysContent.classList.add("parsecontent")
+        nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
+
+        attachRangeListeners(nemesysContent, taIndex)
+        attachNemesysButtons(nemesysContent, bytes, taIndex)
+
+        nemesysResult.appendChild(nemesysName)
+        nemesysResult.appendChild(nemesysContent)
+        messageBox.appendChild(nemesysResult)
+    }
+}
+
+
 fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -266,63 +329,9 @@ fun decode(tryhard: Boolean) {
 
     // decode all inputs
     val textareas = document.querySelectorAll(".input_area")
-    for (i in 0 until textareas.length) {
+    for (i in 0 until textareas.length) { // TODO currently if an input changes it reloads all parser
         val textarea = textareas[i] as HTMLTextAreaElement
-        val inputText = textarea.value.trim()
-        if (inputText.isEmpty()) continue // only decode input text areas that are in use
-
-        // decode input
-        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
-        val result = ByteWitch.analyze(bytes, tryhard)
-
-
-
-        if (result.isNotEmpty()) {
-            bytefinder.style.display = "flex"
-
-            // create a container for this message
-            val messageBox = document.createElement("DIV") as HTMLDivElement
-            messageBox.classList.add("message-output")
-
-            // TODO currently if an input changes it reloads all parser
-            result.forEach {
-                val parseResult = document.createElement("DIV") as HTMLDivElement
-
-                val parseName = document.createElement("H3") as HTMLHeadingElement
-                parseName.innerText = it.first
-
-                val parseContent = document.createElement("DIV") as HTMLDivElement
-                parseContent.classList.add("parsecontent")
-                parseContent.innerHTML = it.second.renderHTML()
-
-                attachRangeListeners(parseContent, i)
-
-                parseResult.appendChild(parseName)
-                parseResult.appendChild(parseContent)
-                messageBox.appendChild(parseResult)
-            }
-
-            // for nemesys (and float view)
-            val nemesysParsed = NemesysParser().parse(bytes, i)
-            parsedMessages[i] = nemesysParsed // besides nemesys this is also needed for the float view
-
-            val nemesysResult = document.createElement("DIV") as HTMLDivElement
-            val nemesysName = document.createElement("H3") as HTMLHeadingElement
-            nemesysName.innerText = "nemesysparser"
-
-            val nemesysContent = document.createElement("DIV") as HTMLDivElement
-            nemesysContent.classList.add("parsecontent")
-            nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
-
-            attachRangeListeners(nemesysContent, i)
-            attachNemesysButtons(nemesysContent, bytes, i)
-
-            nemesysResult.appendChild(nemesysName)
-            nemesysResult.appendChild(nemesysContent)
-            messageBox.appendChild(nemesysResult)
-
-            output.appendChild(messageBox)
-        }
+        decodeTextarea(tryhard, textarea, i)
     }
 
     // refine nemesys fields and rerender html content
