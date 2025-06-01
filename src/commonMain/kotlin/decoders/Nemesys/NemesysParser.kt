@@ -13,15 +13,23 @@ class NemesysParser {
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
-    // parse bytewise and see every byte as one field without using Nemesys
-    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+    // parse bytewise and see every byte as one field without using Nemesys and without using Postprocessing
+    fun parseBytewiseWithoutOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
         val segmentPairs: List<Pair<Int, NemesysField>> = setBytewiseSegmentBoundaries(bytes)
         val segments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
 
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
-    // every byte is one field. only use pre- and postprocessing to merge bytes together
+    // parse bytewise and see every byte as one field without using Nemesys
+    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+        val segmentPairs: List<Pair<Int, NemesysField>> = setBytewiseSegmentBoundariesWithOptimization(bytes)
+        val segments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
+
+        return NemesysParsedMessage(segments, bytes, msgIndex)
+    }
+
+    // every byte is one field. don't use postprocessing
     private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>>{
         val taken = BooleanArray(bytes.size) { false }
 
@@ -36,6 +44,41 @@ class NemesysParser {
                 val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.second ?: NemesysField.UNKNOWN
                 dynamicSegments.add(i to type)
             }
+        }
+
+        return (fixedSegments + dynamicSegments).sortedBy { it.first }.distinctBy { it.first }
+    }
+
+    // every byte is one field. only use pre- and postprocessing to merge bytes together
+    private fun setBytewiseSegmentBoundariesWithOptimization(bytes: ByteArray): List<Pair<Int, NemesysField>>{
+        val taken = BooleanArray(bytes.size) { false }
+
+        // preProcessing to detect length fields
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        // find free ranges
+        val freeRanges = mutableListOf<Pair<Int, Int>>()
+        var currentStart: Int? = null
+        for (i in bytes.indices) {
+            if (!taken[i]) {
+                if (currentStart == null) currentStart = i
+            } else {
+                if (currentStart != null) {
+                    freeRanges.add(currentStart to i)
+                    currentStart = null
+                }
+            }
+        }
+        if (currentStart != null) {
+            freeRanges.add(currentStart to bytes.size)
+        }
+
+        // set field boundaries after every byte
+        val dynamicSegments = mutableListOf<Pair<Int, NemesysField>>()
+        for ((start, end) in freeRanges) {
+            val boundaries = (start..end).toMutableList()
+            val segments = postProcessing(boundaries, bytes)
+            dynamicSegments.addAll(segments)
         }
 
         return (fixedSegments + dynamicSegments).sortedBy { it.first }.distinctBy { it.first }
