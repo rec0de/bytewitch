@@ -7,9 +7,7 @@ import kotlin.math.ln
 class NemesysParser {
     // this finds all segment boundaries and returns a nemesys object that can be called to get the html code
     fun parse(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        val segmentPairs: List<Pair<Int, NemesysField>> = findSegmentBoundaries(bytes)
-        val segments = segmentPairs.map { (offset, type) -> NemesysSegment(offset, type) }
-
+        val segments = findSegmentBoundaries(bytes)
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
@@ -231,7 +229,7 @@ class NemesysParser {
     }
 
     // find segmentation boundaries
-    private fun findSegmentBoundaries(bytes: ByteArray): List<Pair<Int, NemesysField>> {
+    private fun findSegmentBoundaries(bytes: ByteArray): List<NemesysSegment> {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
 
         // pre processing
@@ -254,7 +252,7 @@ class NemesysParser {
             freeRanges.add(currentStart to bytes.size)
         }
 
-        val dynamicSegments = mutableListOf<Pair<Int, NemesysField>>()
+        val dynamicSegments = mutableListOf<NemesysSegment>()
         for ((start, end) in freeRanges) {
             val slice = bytes.sliceArray(start until end)
             val deltaBC = computeDeltaBC(slice)
@@ -264,7 +262,7 @@ class NemesysParser {
 
             // Safety check (it mostly enters if the bytes are too short)
             if (smoothed.isEmpty()) {
-                dynamicSegments.add(start to NemesysField.UNKNOWN)
+                dynamicSegments.add(NemesysSegment(start, NemesysField.UNKNOWN))
                 continue
             }
 
@@ -283,12 +281,12 @@ class NemesysParser {
 
             // add relativeStart to the boundaries
             for ((relativeStart, type) in improved) {
-                dynamicSegments.add((start + relativeStart) to type)
+                dynamicSegments.add(NemesysSegment(start + relativeStart, type))
             }
         }
 
         // combine segments together
-        return (fixedSegments + dynamicSegments).sortedBy { it.first }.distinctBy { it.first }
+        return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
     }
 
 
@@ -726,7 +724,7 @@ class NemesysParser {
 
     // handle length field payload and add it to the result
     fun handlePrintablePayload(
-        bytes: ByteArray, taken: BooleanArray, result: MutableList<Pair<Int, NemesysField>>,
+        bytes: ByteArray, taken: BooleanArray, result: MutableList<NemesysSegment>,
         offset: Int, lengthFieldSize: Int, payloadLength: Int, bigEndian: Boolean
     ): Int? {
         // check if payload is printable
@@ -746,11 +744,11 @@ class NemesysParser {
 
         // finally add fields
         if (bigEndian) {
-            result.add(offset to NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)
+            result.add(NemesysSegment(offset,NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN))
         } else {
-            result.add(offset to NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+            result.add(NemesysSegment(offset,NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
         }
-        result.add(payloadStart to NemesysField.STRING_PAYLOAD)
+        result.add(NemesysSegment(payloadStart,NemesysField.STRING_PAYLOAD))
         for (j in offset until payloadEnd) taken[j] = true
 
         return payloadEnd
@@ -760,7 +758,7 @@ class NemesysParser {
     fun checkLengthPrefixedSegment(
         bytes: ByteArray,
         taken: BooleanArray,
-        result: MutableList<Pair<Int, NemesysField>>,
+        result: MutableList<NemesysSegment>,
         offset: Int,
         lengthFieldSize: Int,
         bigEndian: Boolean
@@ -781,26 +779,27 @@ class NemesysParser {
 
 
     // detect length prefixes and the corresponding payload
-    fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<Pair<Int, NemesysField>> {
-        val result = mutableListOf<Pair<Int, NemesysField>>()
+    fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<NemesysSegment> {
+        val segments = mutableListOf<NemesysSegment>()
         var i = 0
 
         while (i < bytes.size - 1) {
             // Try 2-byte length field (big endian)
-            var newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 2, true)
+            var newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, true)
             if (newIndex != null) {
                 i = newIndex
                 continue
             }
+
             // Try 2-byte length field (little endian)
-            newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 2, false)
+            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, false)
             if (newIndex != null) {
                 i = newIndex
                 continue
             }
 
             // Try 1-byte length field
-            newIndex = checkLengthPrefixedSegment(bytes, taken, result, i, 1, true)
+            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 1, true)
             if (newIndex != null) {
                 i = newIndex
                 continue
@@ -809,9 +808,8 @@ class NemesysParser {
             i++
         }
 
-        return result.distinctBy { it.first }.sortedBy { it.first }
+        return segments.distinctBy { it.offset }.sortedBy { it.offset }
     }
-
 }
 
 // this object is used as a tool for nemesys parser and renderer
