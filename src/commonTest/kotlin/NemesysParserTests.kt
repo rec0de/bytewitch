@@ -170,18 +170,18 @@ class NemesysParserTests {
         val message = "48656C6C6F00576F726C6421".fromHex() // "Hello\0World!"
         val boundaries = mutableListOf(5, 6) // Segments: ["Hello"], ["\0"], ["World!"]
 
-        val expectedValue1 = mutableListOf<Pair<Int, NemesysField>>()
-        expectedValue1.add(Pair(0, NemesysField.UNKNOWN))
-        expectedValue1.add(Pair(5, NemesysField.UNKNOWN))
-        expectedValue1.add(Pair(6, NemesysField.UNKNOWN))
+        val expectedValue1 = mutableListOf<NemesysSegment>()
+        expectedValue1.add(NemesysSegment(0, NemesysField.UNKNOWN))
+        expectedValue1.add(NemesysSegment(5, NemesysField.UNKNOWN))
+        expectedValue1.add(NemesysSegment(6, NemesysField.UNKNOWN))
         val merged = parser.mergeCharSequences(boundaries, message)
         assertEquals(expectedValue1, merged) // No merge since '\0' breaks text sequence
 
         val message2 = "48656C6C6F20576F726C6421".fromHex() // "Hello World!"
         val boundaries2 = mutableListOf(6) // ["Hello "], ["World!"]
 
-        val expectedValue2 = mutableListOf<Pair<Int, NemesysField>>()
-        expectedValue2.add(Pair(0, NemesysField.STRING))
+        val expectedValue2 = mutableListOf<NemesysSegment>()
+        expectedValue2.add(NemesysSegment(0, NemesysField.STRING))
         val merged2 = parser.mergeCharSequences(boundaries2, message2)
         assertEquals(expectedValue2, merged2) // Full merge, as both are text segments
     }
@@ -191,13 +191,13 @@ class NemesysParserTests {
         // check if 00 is added to the previous string
         var bytes = "556c6d00037a".fromHex()
 
-        var segments = mutableListOf<Pair<Int, NemesysField>>()
-        segments.add(Pair(0, NemesysField.STRING))
-        segments.add(Pair(3, NemesysField.UNKNOWN))
+        var segments = mutableListOf<NemesysSegment>()
+        segments.add(NemesysSegment(0, NemesysField.STRING))
+        segments.add(NemesysSegment(3, NemesysField.UNKNOWN))
 
-        var expectedResult = mutableListOf<Pair<Int, NemesysField>>()
-        expectedResult.add(Pair(0, NemesysField.STRING))
-        expectedResult.add(Pair(4, NemesysField.UNKNOWN))
+        var expectedResult = mutableListOf<NemesysSegment>()
+        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
+        expectedResult.add(NemesysSegment(4, NemesysField.UNKNOWN))
         var actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -206,13 +206,13 @@ class NemesysParserTests {
         // check if 00 is added to the next field
         bytes = "015bf9000003".fromHex()
 
-        segments = mutableListOf<Pair<Int, NemesysField>>()
-        segments.add(Pair(0, NemesysField.UNKNOWN))
-        segments.add(Pair(4, NemesysField.UNKNOWN))
+        segments = mutableListOf<NemesysSegment>()
+        segments.add(NemesysSegment(0, NemesysField.UNKNOWN))
+        segments.add(NemesysSegment(4, NemesysField.UNKNOWN))
 
-        expectedResult = mutableListOf<Pair<Int, NemesysField>>()
-        expectedResult.add(Pair(0, NemesysField.UNKNOWN))
-        expectedResult.add(Pair(3, NemesysField.UNKNOWN))
+        expectedResult = mutableListOf<NemesysSegment>()
+        expectedResult.add(NemesysSegment(0, NemesysField.UNKNOWN))
+        expectedResult.add(NemesysSegment(3, NemesysField.UNKNOWN))
         actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -221,13 +221,13 @@ class NemesysParserTests {
         // check that 00 won't be added to the string because x0 row is too long
         bytes = "7d6e6f746966794576656e743a00000000".fromHex()
 
-        segments = mutableListOf<Pair<Int, NemesysField>>()
-        segments.add(Pair(0, NemesysField.STRING))
-        segments.add(Pair(13, NemesysField.UNKNOWN))
+        segments = mutableListOf<NemesysSegment>()
+        segments.add(NemesysSegment(0, NemesysField.STRING))
+        segments.add(NemesysSegment(13, NemesysField.UNKNOWN))
 
-        expectedResult = mutableListOf<Pair<Int, NemesysField>>()
-        expectedResult.add(Pair(0, NemesysField.STRING))
-        expectedResult.add(Pair(13, NemesysField.UNKNOWN))
+        expectedResult = mutableListOf<NemesysSegment>()
+        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
+        expectedResult.add(NemesysSegment(13, NemesysField.UNKNOWN))
         actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -280,7 +280,7 @@ class NemesysParserTests {
     @Test
     fun testNoMergeDueToLowEntropy() {
         val bytes = byteArrayOf(0x00.toByte(), 0x00.toByte(), 0x11.toByte(), 0x11.toByte())
-        val segments = listOf(0 to NemesysField.UNKNOWN, 2 to NemesysField.UNKNOWN)
+        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(2, NemesysField.UNKNOWN))
 
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(segments, result) // no merging, because of low entropy
@@ -292,8 +292,8 @@ class NemesysParserTests {
             0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
             0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte()  // Segment 2
         )
-        val segments = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
-        val expected = listOf(0 to NemesysField.UNKNOWN) // merge together
+        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
+        val expected = listOf(NemesysSegment(0, NemesysField.UNKNOWN)) // merge together
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)
     }
@@ -304,9 +304,9 @@ class NemesysParserTests {
             0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
             0x8A.toByte(), 0x4F.toByte(), 0x2D.toByte(), 0x10.toByte() // Segment 2
         )
-        val segments = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
+        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
         // no merging because first two bytes are too similar
-        val expected = listOf(0 to NemesysField.UNKNOWN, 4 to NemesysField.UNKNOWN)
+        val expected = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)
     }
@@ -314,7 +314,7 @@ class NemesysParserTests {
     @Test
     fun testNoMergeDueToDifferentFieldTypes() {
         val bytes = byteArrayOf(0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), 0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte())
-        val segments = listOf(0 to NemesysField.STRING, 4 to NemesysField.UNKNOWN)
+        val segments = listOf(NemesysSegment(0, NemesysField.STRING), NemesysSegment(4, NemesysField.UNKNOWN))
         val expected = segments // no merging because of different field types
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)

@@ -451,13 +451,13 @@ class NemesysParser {
     }
 
     // merge consecutive fields together if both are printable char values
-    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<Pair<Int, NemesysField>> {
-        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
+    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<NemesysSegment> {
+        val mergedSegments = mutableListOf<NemesysSegment>()
 
         // if no boundary detected set start boundary to 0
         if (boundaries.isEmpty()) {
-            mergedBoundaries.add(Pair(0, NemesysField.UNKNOWN))
-            return mergedBoundaries
+            mergedSegments.add(NemesysSegment(0, NemesysField.UNKNOWN))
+            return mergedSegments
         }
 
         boundaries.add(0, 0)
@@ -486,20 +486,19 @@ class NemesysParser {
                 }
             }
 
-            mergedBoundaries.add(Pair(start, fieldType))
+            mergedSegments.add(NemesysSegment(start, fieldType))
             i++
         }
 
-        return mergedBoundaries
+        return mergedSegments
     }
 
     // try to improve boundaries by shifting them a bit
-    private fun postProcessing(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
+    private fun postProcessing(boundaries: MutableList<Int>, bytes: ByteArray): List<NemesysSegment> {
         var result = mergeCharSequences(boundaries, bytes)
         result = slideCharWindow(result, bytes)
         result = nullByteTransitions(result, bytes)
         result = entropyMerge(result, bytes)
-
         return result
     }
 
@@ -524,23 +523,23 @@ class NemesysParser {
 
     // merge two segments based on their entropy
     fun entropyMerge(
-        segments: List<Pair<Int, NemesysField>>,
+        segments: List<NemesysSegment>,
         bytes: ByteArray
-    ): MutableList<Pair<Int, NemesysField>> {
-        val result = mutableListOf<Pair<Int, NemesysField>>()
+    ): MutableList<NemesysSegment> {
+        val result = mutableListOf<NemesysSegment>()
 
         var index = 0
         while (index < segments.size) {
             // get current segment
             val (start, fieldType) = segments[index]
-            val end = if (index + 1 < segments.size) segments[index + 1].first else bytes.size
+            val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
             val currentSegment = bytes.sliceArray(start until end)
             val currentEntropy = calculateShannonEntropy(currentSegment)
 
             if (index + 1 < segments.size) { // check if a following segment exists
                 val (nextStart, nextFieldType) = segments[index + 1]
                 if (fieldType == nextFieldType) {  // check that both field have the same field type
-                    val nextEnd = if (index + 2 < segments.size) segments[index + 2].first else bytes.size
+                    val nextEnd = if (index + 2 < segments.size) segments[index + 2].offset else bytes.size
                     val nextSegment = bytes.sliceArray(nextStart until nextEnd)
                     val nextEntropy = calculateShannonEntropy(nextSegment)
 
@@ -556,7 +555,7 @@ class NemesysParser {
 
                         if (xorEntropy > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
                             // merge segments together
-                            result.add(Pair(start, fieldType))
+                            result.add(NemesysSegment(start, fieldType))
                             index += 2 // skip the following field because we want to merge it to this one
                             continue
                         }
@@ -565,7 +564,7 @@ class NemesysParser {
             }
 
             // add regular boundary if we didn't merge any segments
-            result.add(Pair(start, fieldType))
+            result.add(NemesysSegment(start, fieldType))
             index++
         }
 
@@ -574,14 +573,12 @@ class NemesysParser {
 
     // shift null bytes to the right field
     fun nullByteTransitions(
-        segments: List<Pair<Int, NemesysField>>,
+        segments: MutableList<NemesysSegment>,
         bytes: ByteArray
-    ): MutableList<Pair<Int, NemesysField>> {
-        val result = segments.toMutableList()
-
-        for (i in 1 until result.size) {
-            val (prevStart, prevType) = result[i - 1]
-            val (currStart, currType) = result[i]
+    ): MutableList<NemesysSegment> {
+        for (i in 1 until segments.size) {
+            val (prevStart, prevType) = segments[i - 1]
+            val (currStart, currType) = segments[i]
 
             // Rule 1: allocate nullbytes to string field
             if (prevType == NemesysField.STRING) {
@@ -592,10 +589,9 @@ class NemesysParser {
                 }
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (extra in 1..2) {
-                    result[i] = (currStart + extra) to currType
+                    segments[i] = NemesysSegment(currStart + extra, currType)
                 }
             }
-
 
             // Rule 2: nullbytes before UNKNOWN
             if (currType != NemesysField.STRING) {
@@ -609,26 +605,25 @@ class NemesysParser {
 
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (count in 1..2) {
-                    result[i] = (currStart - count) to currType
+                    segments[i] = NemesysSegment(currStart - count, currType)
                 }
             }
-
         }
 
-        return result.sortedBy { it.first }.distinctBy { it.first }.toMutableList()
+        return segments.sortedBy { it.offset }.distinctBy { it.offset }.toMutableList()
     }
 
 
     // check if left or right byte of char sequence is also part of it
-    private fun slideCharWindow(segments: List<Pair<Int, NemesysField>>, bytes: ByteArray): MutableList<Pair<Int, NemesysField>> {
-        val improved = mutableListOf<Pair<Int, NemesysField>>()
+    private fun slideCharWindow(segments: List<NemesysSegment>, bytes: ByteArray): MutableList<NemesysSegment> {
+        val improved = mutableListOf<NemesysSegment>()
 
         var newEnd = 0
 
         for (i in segments.indices) {
             // get start and end of segment
             var (start, type) = segments[i]
-            val end = if (i + 1 < segments.size) segments[i + 1].first else bytes.size
+            val end = if (i + 1 < segments.size) segments[i + 1].offset else bytes.size
 
             // need to check if we already changed the start value in the last round by shifting the boundary
             if (start < newEnd) {
@@ -650,9 +645,9 @@ class NemesysParser {
                     newEnd++
                 }
 
-                improved.add(newStart to NemesysField.STRING)
+                improved.add(NemesysSegment(0, NemesysField.STRING))
             } else {
-                improved.add(start to type)
+                improved.add(NemesysSegment(start, type))
             }
         }
 
