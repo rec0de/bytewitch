@@ -1,6 +1,8 @@
 import bitmage.fromHex
 import bitmage.hex
 import decoders.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
 
@@ -95,13 +97,10 @@ object ByteWitch {
         return collectedBytes
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun decodeBase64(base64Data: String): ByteArray {
-        // Decode Base64 directly into raw bytes
         return try {
-            js("atob(base64Data)").unsafeCast<String>()
-                .toCharArray()
-                .map { it.code.toByte() }
-                .toByteArray()
+            Base64.Default.decode(base64Data)
         }
         catch (e: Exception) {
             byteArrayOf()
