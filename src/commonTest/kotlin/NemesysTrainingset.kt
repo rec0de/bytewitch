@@ -21,7 +21,7 @@ class NemesysTrainingset {
         println("Final Recall: ${(recall * 100).toInt()}%")
         println("Final F1 Score: ${(finalF1 * 100).toInt()}%")
 
-        assertTrue(finalF1 >= 1, "F1 score should be at least 80%")
+        assertTrue(finalF1 >= 2, "F1 score should be at least 80%")
     }
 
     private fun printSegmentParsingResult(
@@ -79,7 +79,9 @@ class NemesysTrainingset {
         println("F1 Score: ${(f1 * 100).toInt()}%")
     }
 
-    private fun printSegmentationWithSequenceAlignmentResult(
+    // if you wann align "big" with "small" that it starts from to left to the right
+    // so it aligns "b"<->"s", "i"<->"m", "g"<->"l" and the last "l" of small doesn't get any alignment
+    /*private fun printSegmentationWithSequenceAlignmentResultOld(
         testNumber: Int,
         actualMessages: Map<Int, NemesysParsedMessage>,
         expectedSegments: Map<Int, NemesysParsedMessage>,
@@ -98,8 +100,8 @@ class NemesysTrainingset {
             val (segmentIndexA, segmentIndexB) = segmentPair
             val msgA = expectedSegments[protocolA] ?: return@flatMap emptyList()
             val msgB = expectedSegments[protocolB] ?: return@flatMap emptyList()
-            val rangeA = getByteRange(msgA, segmentIndexA)
-            val rangeB = getByteRange(msgB, segmentIndexB)
+            val rangeA = NemesysUtil.getByteRange(msgA, segmentIndexA)
+            val rangeB = NemesysUtil.getByteRange(msgB, segmentIndexB)
             val overlap = minOf(rangeA.count(), rangeB.count()) // get shorter field
 
             // correspond bytes in descending order until the short field is full
@@ -110,8 +112,8 @@ class NemesysTrainingset {
         val actualAlignedBytes = actualAlignments.flatMap { aligned ->
             val msgA = actualMessages[aligned.protocolA] ?: return@flatMap emptyList()
             val msgB = actualMessages[aligned.protocolB] ?: return@flatMap emptyList()
-            val rangeA = getByteRange(msgA, aligned.segmentIndexA)
-            val rangeB = getByteRange(msgB, aligned.segmentIndexB)
+            val rangeA = NemesysUtil.getByteRange(msgA, aligned.segmentIndexA)
+            val rangeB = NemesysUtil.getByteRange(msgB, aligned.segmentIndexB)
             val overlap = minOf(rangeA.count(), rangeB.count()) // get shorter field
 
             // correspond bytes in descending order until the short field is full
@@ -137,8 +139,174 @@ class NemesysTrainingset {
         println("Precision: ${(precision * 100).toInt()}%")
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
+    }*/
+
+
+    // calculate byte-wise sequence alignment result
+    private fun createByteAlignments(
+        messages: Map<Int, NemesysParsedMessage>, // Map<ProtocolIndex, NemesysParsedMessage>
+        alignments: List<AlignedSegment>
+    ): Map<Pair<Int, Int>, Set<Pair<Int, Int>>> { // Map<Pair<ProtocolIndex, ByteIndex>, Set<Pair<ProtocolIndex, ByteIndex>>>
+        val result = mutableMapOf<Pair<Int, Int>, MutableSet<Pair<Int, Int>>>()
+
+        for ((protoA, protoB, segIdxA, segIdxB, _) in alignments) {
+            val msgA = messages[protoA] ?: continue
+            val msgB = messages[protoB] ?: continue
+
+            val rangeA = NemesysUtil.getByteRange(msgA, segIdxA)
+            val rangeB = NemesysUtil.getByteRange(msgB, segIdxB)
+
+            for (byteA in rangeA) {
+                val keyA = protoA to byteA
+                result.getOrPut(keyA) { mutableSetOf() }.addAll(rangeB.map { protoB to it })
+            }
+
+            for (byteB in rangeB) {
+                val keyB = protoB to byteB
+                result.getOrPut(keyB) { mutableSetOf() }.addAll(rangeA.map { protoA to it })
+            }
+        }
+
+        return result
     }
 
+    private fun convertExpectedAlignmentsToAligned(
+        expected: Set<Triple<Int, Int, Pair<Int, Int>>>
+    ): List<AlignedSegment> {
+        return expected.map { (protoA, protoB, pair) ->
+            AlignedSegment(protoA, protoB, pair.first, pair.second, 0.0)
+        }
+    }
+
+    private fun computeByteLevelConfusionMatrix(
+        actual: Map<Pair<Int, Int>, Set<Pair<Int, Int>>>,
+        expected: Map<Pair<Int, Int>, Set<Pair<Int, Int>>>
+    ): Triple<Int, Int, Int> {
+        val actualPairs = actual.flatMap { (a, bs) ->
+            bs.map { b -> canonicalPair(a, b) }
+        }.toSet()
+
+        val expectedPairs = expected.flatMap { (a, bs) ->
+            bs.map { b -> canonicalPair(a, b) }
+        }.toSet()
+
+        val tpPairs = actualPairs intersect expectedPairs
+        val fpPairs = actualPairs subtract expectedPairs
+        val fnPairs = expectedPairs subtract actualPairs
+
+        return Triple(tpPairs.size, fpPairs.size, fnPairs.size)
+    }
+
+    private fun canonicalPair(a: Pair<Int, Int>, b: Pair<Int, Int>): Pair<Pair<Int, Int>, Pair<Int, Int>> {
+        return if (a.first < b.first || (a.first == b.first && a.second <= b.second)) {
+            a to b
+        } else {
+            b to a
+        }
+    }
+
+
+    private fun printSegmentationWithSequenceAlignmentResult(
+        testNumber: Int,
+        actualMessages: Map<Int, NemesysParsedMessage>,
+        expectedSegments: Map<Int, NemesysParsedMessage>,
+        expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
+    ) {
+        val actualAlignments = NemesysSequenceAlignment.alignSegments(actualMessages)
+
+        // get the byte-wise alignment
+        val actualByteAlignments = createByteAlignments(actualMessages, actualAlignments)
+        val expectedByteAlignments = createByteAlignments(expectedSegments, convertExpectedAlignmentsToAligned(expectedAlignments))
+
+        val (tp, fp, fn) = computeByteLevelConfusionMatrix(actualByteAlignments, expectedByteAlignments)
+
+        totalTP += tp
+        totalFP += fp
+        totalFN += fn
+
+        val precision = if (tp + fp > 0) tp.toDouble() / (tp + fp) else 0.0
+        val recall = if (tp + fn > 0) tp.toDouble() / (tp + fn) else 0.0
+        val f1 = if (precision + recall > 0) 2 * precision * recall / (precision + recall) else 0.0
+
+        println("----- testSegmentationWithSequenceAlignment$testNumber -----")
+        println("True Positive Bytes: $tp")
+        println("False Positive Bytes: $fp")
+        println("False Negative Bytes: $fn")
+        println("Precision: ${(precision * 100).toInt()}%")
+        println("Recall: ${(recall * 100).toInt()}%")
+        println("F1 Score: ${(f1 * 100).toInt()}%")
+    }
+
+
+    // return <byte number, corresponding segment number>
+    fun bytesToSegment(
+        actualMessage: NemesysParsedMessage,
+        expectedMessage: NemesysParsedMessage
+    ): Map<Int, Int> {
+        val result = mutableMapOf<Int, Int>()
+
+        actualMessage.segments.forEachIndexed { index, _ ->
+            val byteRange = NemesysUtil.getByteRange(actualMessage, index)
+            val bestSegmentIndex = getBestSegmentToIndex(actualMessage, index, expectedMessage)
+            for (i in byteRange) {
+                result[i] = bestSegmentIndex
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * @param actualMessage is the given message
+     * @param actualSegmentIndex is the segment index of actual message
+     * @param expectedSegments is the expected segmentation with the right segment indexes
+     *
+     * @return the right segment index that the actual segment belongs to
+     */
+    fun getBestSegmentToIndex(
+        actualMessage: NemesysParsedMessage,
+        actualSegmentIndex: Int,
+        expectedSegments: NemesysParsedMessage
+    ): Int {
+        val actualStart = actualMessage.segments[actualSegmentIndex].offset
+        val actualEnd = actualMessage.segments.getOrNull(actualSegmentIndex + 1)?.offset ?: actualMessage.bytes.size
+        val actualSegmentBytes = actualMessage.bytes.sliceArray(actualStart until actualEnd)
+
+        // search for segment that fully include the actual segment
+        for ((index, segment) in expectedSegments.segments.withIndex()) {
+            val start = segment.offset
+            val end = expectedSegments.segments.getOrNull(index + 1)?.offset ?: expectedSegments.bytes.size
+
+            if (actualStart >= start && actualEnd <= end) {
+                return index // completely fits in this segment
+            }
+        }
+
+        // if it doesn't fit one segment completely so return closes one
+        var bestIndex = -1
+        var bestScore = Double.MAX_VALUE
+
+        for ((index, segment) in expectedSegments.segments.withIndex()) {
+            val start = segment.offset
+            val end = expectedSegments.segments.getOrNull(index + 1)?.offset ?: expectedSegments.bytes.size
+
+            val overlaps = actualStart < end && actualEnd > start
+            if (!overlaps) continue
+
+            val expectedBytes = expectedSegments.bytes.sliceArray(start until end)
+            val score = NemesysSequenceAlignment.canberraUlmDissimilarity(
+                actualSegmentBytes, expectedBytes,
+                NemesysField.UNKNOWN, NemesysField.UNKNOWN
+            )
+
+            if (score < bestScore) {
+                bestScore = score
+                bestIndex = index
+            }
+        }
+
+        return bestIndex
+    }
 
     @Test
     fun runSegmentationTests() {
@@ -907,6 +1075,7 @@ class NemesysTrainingset {
 
         printSequenceAlignmentResult(3, messages, expectedAlignments)
     }
+
 
     private fun testSegmentationWithSequenceAlignment1() {
         val message1 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
