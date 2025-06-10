@@ -63,6 +63,12 @@ fun ByteArray.indicesOfAllSubsequences(target: ByteArray): Set<Int> {
     return matches
 }
 
+fun ByteArray.toBinaryString(): String {
+    return this.joinToString("") { byte ->
+        byte.toUByte().toString(2).padStart(8, '0')
+    }
+}
+
 // Integers
 
 fun ULong.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): ULong {
