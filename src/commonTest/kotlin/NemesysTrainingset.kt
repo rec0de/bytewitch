@@ -21,7 +21,7 @@ class NemesysTrainingset {
         println("Final Recall: ${(recall * 100).toInt()}%")
         println("Final F1 Score: ${(finalF1 * 100).toInt()}%")
 
-        assertTrue(finalF1 >= 2, "F1 score should be at least 80%")
+        assertTrue(false, "F1 score should be at least 80%")
     }
 
     private fun printSegmentParsingResult(
@@ -346,6 +346,11 @@ class NemesysTrainingset {
         printFinalScore()
     }
 
+    // to easily change the parser for segment parsing Tests
+    private fun parserForSegmentParsing(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+        return NemesysParser().parseSmartWithFullOptimization(bytes, msgIndex)
+    }
+
     private fun testSegmentParsing1() {
         val bytes = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
 
@@ -365,7 +370,7 @@ class NemesysTrainingset {
             NemesysSegment(72, NemesysField.UNKNOWN)
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(1, expectedSegments, actualSegments)
@@ -390,7 +395,7 @@ class NemesysTrainingset {
             NemesysSegment(72, NemesysField.UNKNOWN)
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(2, expectedSegments, actualSegments)
@@ -427,7 +432,7 @@ class NemesysTrainingset {
             NemesysSegment(86, NemesysField.UNKNOWN)   // true
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(3, expectedSegments, actualSegments)
@@ -465,7 +470,7 @@ class NemesysTrainingset {
         )
 
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(4, expectedSegments, actualSegments)
@@ -511,7 +516,7 @@ class NemesysTrainingset {
             NemesysSegment(111, NemesysField.UNKNOWN)    // false
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(5, expectedSegments, actualSegments)
@@ -563,7 +568,7 @@ class NemesysTrainingset {
             NemesysSegment(154, NemesysField.UNKNOWN)    // true
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(6, expectedSegments, actualSegments)
@@ -597,7 +602,7 @@ class NemesysTrainingset {
             NemesysSegment(83, NemesysField.UNKNOWN),
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(7, expectedSegments, actualSegments)
@@ -639,7 +644,7 @@ class NemesysTrainingset {
             NemesysSegment(218, NemesysField.UNKNOWN)       // end
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(8, expectedSegments, actualSegments)
@@ -655,7 +660,7 @@ class NemesysTrainingset {
             NemesysSegment(3, NemesysField.UNKNOWN)
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(9, expectedSegments, actualSegments)
@@ -676,7 +681,7 @@ class NemesysTrainingset {
             NemesysSegment(27, NemesysField.UNKNOWN)
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(10, expectedSegments, actualSegments)
@@ -698,7 +703,7 @@ class NemesysTrainingset {
             NemesysSegment(40, NemesysField.UNKNOWN)
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(11, expectedSegments, actualSegments)
@@ -737,7 +742,7 @@ class NemesysTrainingset {
             NemesysSegment(360, NemesysField.UNKNOWN),
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(12, expectedSegments, actualSegments)
@@ -773,7 +778,7 @@ class NemesysTrainingset {
             NemesysSegment(156, NemesysField.UNKNOWN), // 0
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(13, expectedSegments, actualSegments)
@@ -793,7 +798,7 @@ class NemesysTrainingset {
             NemesysSegment(99, NemesysField.UNKNOWN),
         )
 
-        val parsed = NemesysParser().parse(bytes, msgIndex = 0)
+        val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(14, expectedSegments, actualSegments)
@@ -1081,8 +1086,8 @@ class NemesysTrainingset {
         val message1 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
         val message2 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102446394532423231352d393431372d344141372d413439302d384446364539443445364639080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
 
-        val parsed1 = NemesysParser().parse(message1, msgIndex = 0)
-        val parsed2 = NemesysParser().parse(message2, msgIndex = 1)
+        val parsed1 = parserForSegmentParsing(message1, msgIndex = 0)
+        val parsed2 = parserForSegmentParsing(message2, msgIndex = 1)
         val allParsed = mapOf(0 to parsed1, 1 to parsed2)
 
         val actualSegment1 = listOf(
@@ -1149,8 +1154,8 @@ class NemesysTrainingset {
         val message1 = "A5626964187B68757365726E616D6565616C69636565656D61696C71616C696365406578616D706C652E636F6D6770726F66696C65A263616765181E67636F756E747279674765726D616E796969735F616374697665F5".fromHex()
         val message2 = "A56269640368757365726E616D6563626F6265656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E747279635553416969735F616374697665F4".fromHex()
 
-        val parsed1 = NemesysParser().parse(message1, msgIndex = 0)
-        val parsed2 = NemesysParser().parse(message2, msgIndex = 1)
+        val parsed1 = parserForSegmentParsing(message1, msgIndex = 0)
+        val parsed2 = parserForSegmentParsing(message2, msgIndex = 1)
         val allParsed = mapOf(0 to parsed1, 1 to parsed2)
 
         val actualSegment1 = listOf(
@@ -1254,8 +1259,8 @@ class NemesysTrainingset {
         val message1 = "A76269640C67766F726E616D65634D6178686E6163686E616D656A4D75737465726D616E6E68757365726E616D65636D617865656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E7472796A4175737472616C69656E6969735F616374697665F4".fromHex()
         val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
 
-        val parsed1 = NemesysParser().parse(message1, msgIndex = 0)
-        val parsed2 = NemesysParser().parse(message2, msgIndex = 1)
+        val parsed1 = parserForSegmentParsing(message1, msgIndex = 0)
+        val parsed2 = parserForSegmentParsing(message2, msgIndex = 1)
         val allParsed = mapOf(0 to parsed1, 1 to parsed2)
 
         val actualSegment1 = listOf(
