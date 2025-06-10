@@ -14,6 +14,9 @@ kotlin {
         binaries.executable()
         browser {
             commonWebpackConfig {
+                devServer = devServer?.copy(
+                    open = false // verhindert das automatische Öffnen des Browsers
+                )
             }
             testTask {
                 useKarma {
