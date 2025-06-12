@@ -9,7 +9,7 @@ import htmlEscape
 import kotlin.math.absoluteValue
 
 // based on https://medium.com/@karaiskc/understanding-apples-binary-property-list-format-281e6da00dbd
-class BPListParser(private val nestedDecode: Boolean = true) {
+class BPListParser() {
 
     private val objectMap = mutableMapOf<Int, BPListObject>()
     private var objectRefSize = 0
@@ -21,8 +21,10 @@ class BPListParser(private val nestedDecode: Boolean = true) {
 
     companion object : ByteWitchDecoder {
         override val name = "bplist"
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean,ByteWitchResult?> {
-            return Pair(data.size > 8 && data.sliceArray(0 until 7).decodeToString() == "bplist0", null)
+
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+            val confidence = if(data.size > 8 && data.sliceArray(0 until 7).decodeToString() == "bplist0") 1.0 else 0.0
+            return Pair(confidence, null)
         }
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
@@ -206,12 +208,7 @@ class BPListParser(private val nestedDecode: Boolean = true) {
                 val effectiveOffset = tmp.second
 
                 val data = bytes.sliceArray(effectiveOffset until effectiveOffset+byteLen)
-
-                // decode nested bplists
-                return if(decodesAsValid(data).first && nestedDecode)
-                    BPListParser().parseCodable(data, effectiveOffset)
-                else
-                    BPData(data, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+byteLen))
+                BPData(data, Pair(sourceOffset+offset, sourceOffset+effectiveOffset+byteLen))
             }
             // ASCII string
             in 0x50 until 0x60 -> {

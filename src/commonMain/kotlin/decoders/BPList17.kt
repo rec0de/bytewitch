@@ -11,12 +11,12 @@ class BPList17 {
     companion object : ByteWitchDecoder {
         override val name = "bplist17"
 
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
             if (data.size < 8) {
-                return Pair(false, null)
+                return Pair(0.0, null)
             }
             val headerString = data.sliceArray(0 until 8).decodeToString()
-            return Pair(headerString == "bplist17" || headerString == "bplist16", null)
+            return if(headerString == "bplist17" || headerString == "bplist16") Pair(1.0, null) else Pair(0.0, null)
         }
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {

@@ -9,6 +9,7 @@ import bitmage.fromIndex
 import bitmage.hex
 import dateFromUTCString
 import htmlEscape
+import looksLikeUtf8String
 
 class ASN1BER : ParseCompanion() {
 
@@ -93,7 +94,10 @@ class ASN1BER : ParseCompanion() {
                     ASN1Sequence(tag, len, elements, byteRange)
                 }
                 // Strings
-                12, in 18..22, in 25..30 -> ASN1String(tag, len, payload.decodeToString(), byteRange)
+                12, in 18..22, in 25..30 -> {
+                    check(looksLikeUtf8String(payload, false) > 0.5) { "ASN.1 string with implausible content: ${payload.hex()}" }
+                    ASN1String(tag, len, payload.decodeToString(), byteRange)
+                }
                 // Time
                 23 -> {
                     val string = payload.decodeToString()

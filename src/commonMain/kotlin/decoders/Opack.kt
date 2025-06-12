@@ -42,10 +42,10 @@ class OpackParser : ParseCompanion() {
         }
 
         // single bytes are often false-positive detected as booleans
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if(data.size < 3)
-                return Pair(false, null)
-            return super.decodesAsValid(data)
+                return Pair(0.0, null)
+            return super.confidence(data, sourceOffset)
         }
     }
 

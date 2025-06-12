@@ -10,18 +10,16 @@ import kotlin.math.*
 object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
-
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
         val effectiveData = stripNullTerminator(data)
 
         val nullTerminatorBonus = if(effectiveData.size == data.size-1) 0.2 else 0.0
 
         try {
             val score = looksLikeUtf8String(effectiveData)
-            return min(score+nullTerminatorBonus, 1.0)
+            return Pair(min(score+nullTerminatorBonus, 1.0), null)
         } catch (e: Exception) {
-            return 0.0
+            return Pair(0.0, null)
         }
     }
 
@@ -30,7 +28,7 @@ object Utf8Decoder : ByteWitchDecoder {
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-        return if(confidence(data) > 0.25)
+        return if(confidence(data, 0).first > 0.25)
             decode(data, 0)
         else
             null
@@ -49,27 +47,25 @@ object Utf8Decoder : ByteWitchDecoder {
 object Utf16Decoder : ByteWitchDecoder {
     override val name = "utf16"
 
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         // utf16 should be even byte length
         if(data.size % 2 == 1)
-            return 0.0
+            return Pair(0.0, null)
 
         try {
             val string = Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE()
-            return looksLikeUtf16String(string)
+            return Pair(looksLikeUtf16String(string), null)
         } catch (e: Exception) {
-            return 0.0
+            return Pair(0.0, null)
         }
     }
-
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-        return if(confidence(data) > 0.25)
+        return if(confidence(data, 0).first > 0.25)
             decode(data, 0)
         else
             null
@@ -89,11 +85,6 @@ object IEEE754 : ByteWitchDecoder {
         //Logger.log("number plausibility: positive $positiveBonus exponent $exponent / $magnitudeScore roundness $mantissaComplexity stringLength $stringLength total $score")
         return score
     }
-
-    /*fun score(double: Long): Double {
-        val parts = dissectDouble(double)
-        return looksReasonable(parts.first, parts.second, parts.third, valueBE, isDouble = true)
-    }*/
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         when(data.size) {
@@ -149,12 +140,9 @@ object EntropyDetector : ByteWitchDecoder {
 
     override fun tryhardDecode(data: ByteArray) = null
 
-    override fun decodesAsValid(data: ByteArray) = Pair(true, null)
-
     // we'll display entropy indicators in quick decode results (if no other decode is available) given sufficient length
     // (for small payloads entropy doesn't really say anything)
-    override fun confidence(data: ByteArray) = if(data.size > 10) 0.76 else 0.00
-
+    override fun confidence(data: ByteArray, sourceOffset: Int) = if(data.size > 10) Pair(0.76, null) else Pair(0.00, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) =
         if(data.size > 100)
@@ -313,7 +301,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
     }
 
     // we only want this to kick in as a last-ditch effort on a tryhard decode
-    override fun decodesAsValid(data: ByteArray) = Pair(false, null)
+    override fun confidence(data: ByteArray, sourceOffset: Int) = Pair(0.0, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) = BWString("you should not see this", Pair(sourceOffset, sourceOffset))
 }

@@ -10,23 +10,21 @@ import kotlin.math.min
 object GenericTLV : ByteWitchDecoder {
     override val name = "generic-tlv"
 
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.0, null)
-
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         if(data.size < 3)
-            return 0.0
+            return Pair(0.0, null)
 
         val lengthPrefixes = listOf(testLengthPrefixAtOffset(data, 0), testLengthPrefixAtOffset(data, 1), testLengthPrefixAtOffset(data, 2))
 
         if(lengthPrefixes.all { it == null })
-            return 0.0
+            return Pair(0.0, null)
 
         val validPrefix = lengthPrefixes.first { it != null }!!
         val payloadLen = validPrefix.first
 
         // TLVs with a payload length of less than 5 bytes are considered uncertain decodings
         // (add 1 to distinguish zero-length TLVs from completely invalid decodes)
-        return min((payloadLen+1).toDouble()/6, 1.0)
+        return Pair(min((payloadLen+1).toDouble()/6, 1.0), null)
     }
 
     private fun testLengthPrefixAtOffset(bytes: ByteArray, offset: Int): Triple<Int, Int, ByteOrder>? {
