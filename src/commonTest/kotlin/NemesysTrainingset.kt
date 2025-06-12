@@ -348,7 +348,7 @@ class NemesysTrainingset {
 
     // to easily change the parser for segment parsing Tests
     private fun parserForSegmentParsing(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        return NemesysParser().parseSmartWithFullOptimization(bytes, msgIndex)
+        return NemesysParser().parse(bytes, msgIndex)
     }
 
     private fun testSegmentParsing1() {

@@ -208,7 +208,10 @@ class NemesysParser {
     // create a random parser - just for comparison reasons
     fun parseRandom(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
         val segments = mutableListOf<NemesysSegment>()
-        val random = Random(msgIndex.toLong()) // set seed
+
+        // set seed for randomizer
+        val seed = bytes.contentHashCode()
+        val random = Random(seed)
 
         var index = 0
         while (index < bytes.size) {
@@ -223,7 +226,7 @@ class NemesysParser {
     }
 
 
-    // every byte is one field. don't use postprocessing
+    // every byte is one field. don't use postprocessing but pre processing
     private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<NemesysSegment>{
         val taken = BooleanArray(bytes.size) { false }
 
@@ -687,6 +690,7 @@ class NemesysParser {
 
             for (i in minIndex..< maxIndex) {
                 val delta = kotlin.math.abs(smoothedDeltaBC[i] - smoothedDeltaBC[i+1])
+                // val delta = smoothedDeltaBC[i] - smoothedDeltaBC[i+1] works even better
                 if (delta > maxDeltaValue) {
                     maxDeltaValue = delta
                     maxDeltaIndex = i + 2
