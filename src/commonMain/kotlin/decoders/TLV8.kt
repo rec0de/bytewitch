@@ -30,20 +30,18 @@ object TLV8 : ByteWitchDecoder {
         return Tlv8Result(tlvs, Pair(sourceOffset, sourceOffset+data.size))
     }
 
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         try {
             val res = decode(data, 0) as Tlv8Result
 
             val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
             val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
 
-            return 1.0 - zeroLengthPenalty
+            return Pair(1.0 - zeroLengthPenalty, res)
         } catch (e: Exception) {
-            return 0.0
+            return Pair(0.0, null)
         }
     }
-
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.33, null)
 }
 
 class Tlv8Result(val tlvs: List<Tlv8Entry>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
