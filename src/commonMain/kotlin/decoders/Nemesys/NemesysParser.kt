@@ -273,7 +273,7 @@ class NemesysParser {
             val rising = findRisingDeltas(extrema)
 
             // find inflection point in risingDeltas -> those are considered as boundaries
-            val inflection = findInflectionPoints(rising, smoothed)
+            val inflection = findInflectionPoints(rising, deltaBC)
 
             // merge consecutive text segments together
             // val boundaries = mergeCharSequences(preBoundaries, bytes)
@@ -414,7 +414,7 @@ class NemesysParser {
 
     // find inflection point based on maximum delta in rising deltas
     // it adds +2 on the result to because the segment highlighting counts differently
-    fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, smoothedDeltaBC: DoubleArray): MutableList<Int> {
+    fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, deltaBC: DoubleArray): MutableList<Int> {
         val boundaries = mutableListOf<Int>()
 
         for ((minIndex, maxIndex) in risingDeltas) {
@@ -422,7 +422,7 @@ class NemesysParser {
             var maxDeltaValue = 0.0
 
             for (i in minIndex..< maxIndex) {
-                val delta = kotlin.math.abs(smoothedDeltaBC[i] - smoothedDeltaBC[i+1])
+                val delta = kotlin.math.abs(deltaBC[i] - deltaBC[i+1])
                 if (delta > maxDeltaValue) {
                     maxDeltaValue = delta
                     maxDeltaIndex = i + 2
