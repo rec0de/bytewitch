@@ -119,8 +119,8 @@ fun attachRangeListeners(element: Element) {
             floatview.innerHTML = floatview.textContent!! // re-set previous highlights
             val text = floatview.childNodes[0]!!
             val range = document.createRange()
-            range.setStart(text, start*2);
-            range.setEnd(text, end*2);
+            range.setStart(text, start / 4);
+            range.setEnd(text, (end + 1) / 4);
             range.surroundContents(document.createElement("span"))
 
             evt.stopPropagation()
