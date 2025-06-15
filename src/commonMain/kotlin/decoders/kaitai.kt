@@ -3,6 +3,7 @@ package decoders
 import bitmage.hex
 import bitmage.toBinaryString
 import com.ionspin.kotlin.bignum.Endianness
+import kotlin.js.iterator
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -168,55 +169,61 @@ enums:
 
         val ethernetYaml = JsYaml.load(ethernetStruct)
 
-        var seqProcessing = true
-        var seqID = 0
-        var currentOffset = sourceOffset
+        return processSeq(ethernetYaml.meta.id, ethernetYaml, ethernetYaml.seq, data, sourceOffset)
+    }
 
+    fun processSeq(id: String, yamlStruct: dynamic, seqStruct: dynamic, data: ByteArray, sourceOffset: Int) : ByteWitchResult {
+        var currentOffset = 0
+        /*
+        Entweder data als ByteArray und Bitshiften
+        var test = 13  -> 1101
+        test[6..8] = 1
+        test and 0b00000111 >> 0 = -> 101
+        test and 0b00111000 >> 3 = -> 001
+        oder data als BooleanArray
+        */
         val kaitaiBytesList = mutableListOf<ByteWitchResult>()
         //val types = mutableSetOf<Type>()
 
-        while (seqProcessing) {
-            val element = ethernetYaml.seq[seqID]
-
-            val type = Type(ethernetYaml, element)
+        for (element in seqStruct) {
+            val type = Type(yamlStruct, element)
             if (type.sizeIsUntilEOS) {
                 type.sizeInBits = (data.size - currentOffset) * 8
             }
 
-            console.log("size: ${type.sizeInBits/8}")
+            val elementId = element.id
 
-            val id = element.id
-            val endianness = Endianness.LITTLE
-            val value = data.slice(currentOffset.. currentOffset + type.sizeInBits/8 as Int -1 ).toByteArray()
-            val sourceByteRange = Pair(currentOffset, currentOffset + type.sizeInBits/8 as Int)
+            var kaitaiElement : ByteWitchResult // List<ByteWitchResult>
+            val value = data.sliceArray(currentOffset.. currentOffset + type.sizeInBits/ 8 -1)
+            val sourceByteRange = Pair(currentOffset + sourceOffset, currentOffset + type.sizeInBits/8 + sourceOffset)
 
-            var kaitaiElement : ByteWitchResult
-            if (type.usedDisplayStyle == displayStyle.BINARY) {
-                kaitaiElement = KaitaiBinary(
-                    id,
-                    endianness,
-                    value,
-                    sourceByteRange
-                )
-            } else { //displayStyle.HEX as the fallback
-                kaitaiElement = KaitaiBytes(
-                    id,
-                    endianness,
-                    value,
-                    sourceByteRange
-                )
+            if (type.subTypes.isNotEmpty()) {
+                kaitaiElement = processSeq(elementId, yamlStruct, yamlStruct.types[element.type].seq, value, sourceOffset + currentOffset)
+            } else {
+                val endianness = Endianness.LITTLE
+                if (type.usedDisplayStyle == displayStyle.BINARY) {
+                    kaitaiElement = KaitaiBinary(
+                        elementId,
+                        endianness,
+                        value,
+                        sourceByteRange
+                    )
+                } else { //displayStyle.HEX as the fallback
+                    kaitaiElement = KaitaiBytes(
+                        elementId,
+                        endianness,
+                        value,
+                        sourceByteRange
+                    )
+                }
             }
 
             kaitaiBytesList.add(kaitaiElement)
 
-            seqID += 1
             currentOffset += type.sizeInBits/8
-            if (seqID > 5) {
-                seqProcessing = false
-            }
         }
 
-        return KaitaiResult(kaitaiBytesList, Pair(0, 100))
+        return KaitaiResult(id, kaitaiBytesList, Pair(sourceOffset, data.size + sourceOffset))
     }
 
     override fun confidence(data: ByteArray): Double {
@@ -226,9 +233,9 @@ enums:
     override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.33, null)
 }
 
-class KaitaiResult(val kaitaiBytesList: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiResult(val id: String, val kaitaiBytesList: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${kaitaiBytesList.joinToString("") { it.renderHTML() }}</div>"
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${kaitaiBytesList.joinToString("") { it.renderHTML() }})</div>"
     }
 }
 
