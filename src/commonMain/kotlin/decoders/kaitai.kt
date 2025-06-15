@@ -1,11 +1,8 @@
 package decoders
 
-import bitmage.ByteOrder
-import bitmage.fromBytes
 import bitmage.hex
 import bitmage.toBinaryString
 import com.ionspin.kotlin.bignum.Endianness
-import kotlin.collections.mutableSetOf
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -18,11 +15,11 @@ enum class displayStyle {
     HEX, BINARY, NUMBER, STRING
 }
 
-class Type(yamlStruct: dynamic, typeStruct: dynamic) {
+class Type(yamlStruct: dynamic, elementStruct: dynamic) {
 
     var sizeInBits: Int = 0
     var sizeIsUntilEOS: Boolean = false
-    var name: String = typeStruct.toString()
+    var type: String = elementStruct.type.toString()
     var endianness: Endianness
     var usedDisplayStyle: displayStyle = displayStyle.HEX
     var subTypes: MutableList<Type> = mutableListOf<Type>()
@@ -34,25 +31,40 @@ class Type(yamlStruct: dynamic, typeStruct: dynamic) {
             endianness = Endianness.LITTLE
         }
 
-        if (typeStruct.size != undefined) {
-            sizeInBits = typeStruct.size * 8
+        if (elementStruct.size != undefined) {
+            sizeInBits = elementStruct.size * 8
         } else {
-            if (yamlStruct.types[name] == undefined) {
-                sizeInBits = 16
-                usedDisplayStyle = displayStyle.BINARY
+            if (elementStruct["size-eos"]) {
+                sizeIsUntilEOS = true
+            } else if (yamlStruct.types[this.type] == undefined) {  // should be its own if not else if, as size-eos can be made of subtypes
+                if (this.type == "strz") {
+                    sizeIsUntilEOS = true
+                    usedDisplayStyle = displayStyle.STRING
+                } else {
+                    if (this.type.startsWith("s")) {  // signed int
+                        sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+                        usedDisplayStyle = displayStyle.NUMBER
+                    } else if (this.type.startsWith("u")) {  // unsigned int
+                        sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+                        usedDisplayStyle = displayStyle.NUMBER
+                    } else if (this.type.startsWith("f")) {  // float
+                        sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+                        usedDisplayStyle = displayStyle.NUMBER
+                    } else if (this.type.startsWith("b")) {  // binary
+                        sizeInBits = this.type.filter { it.isDigit() }.toInt()
+                        usedDisplayStyle = displayStyle.BINARY
+                    } else {
+                        throw RuntimeException()
+                    }
+                }
             } else {
                 sizeInBits = 0
-                for (subTypeStruct in typeStruct.seq) {
-                    var subType = Type(yamlStruct, subTypeStruct)
+                for (subElementStruct in yamlStruct.types[this.type].seq) {
+                    var subType = Type(yamlStruct, subElementStruct)
                     subTypes.add(subType)
                     sizeInBits += subType.sizeInBits
                 }
             }
-        }
-        if (typeStruct["size-eos"]) {
-            sizeInBits = 0 //data.size - currentOffset
-            sizeIsUntilEOS = true
-
         }
     }
 }
@@ -161,12 +173,15 @@ enums:
         var currentOffset = sourceOffset
 
         val kaitaiBytesList = mutableListOf<ByteWitchResult>()
-        val types = mutableSetOf<Type>()
+        //val types = mutableSetOf<Type>()
 
         while (seqProcessing) {
             val element = ethernetYaml.seq[seqID]
 
             val type = Type(ethernetYaml, element)
+            if (type.sizeIsUntilEOS) {
+                type.sizeInBits = (data.size - currentOffset) * 8
+            }
 
             console.log("size: ${type.sizeInBits/8}")
 
