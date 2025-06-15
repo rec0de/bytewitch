@@ -500,11 +500,38 @@ fun byteDistance(a: ByteArray, b: ByteArray): Double {
 }
 
 // return colour based on the difference
-fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
+/*fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
     val clampedDiff = diff.coerceIn(0.0, 1.0)
     val r = (clampedDiff * 255).toInt()
     val g = ((1 - clampedDiff) * 255).toInt()
     return Triple(r, g, 0)
+}*/
+
+fun hslToRgb(h: Float, s: Float, l: Float): Triple<Int, Int, Int> {
+    val c = (1 - kotlin.math.abs(2 * l - 1)) * s
+    val hPrime = h / 60
+    val x = c * (1 - kotlin.math.abs(hPrime % 2 - 1))
+    val (r1, g1, b1) = when {
+        hPrime < 1 -> Triple(c, x, 0f)
+        hPrime < 2 -> Triple(x, c, 0f)
+        hPrime < 3 -> Triple(0f, c, x)
+        hPrime < 4 -> Triple(0f, x, c)
+        hPrime < 5 -> Triple(x, 0f, c)
+        else       -> Triple(c, 0f, x)
+    }
+    val m = l - c / 2
+    return Triple(
+        ((r1 + m) * 255).toInt(),
+        ((g1 + m) * 255).toInt(),
+        ((b1 + m) * 255).toInt()
+    )
+}
+
+// return colour based on the difference - we use HSL because it looks more natural
+fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
+    val clampedDiff = diff.coerceIn(0.0, 1.0).toFloat()
+    val hue = 120f * (1 - clampedDiff) // green (120°) at 0.0 → red (0°) at 1.0
+    return hslToRgb(hue, 1f, 0.5f)
 }
 
 
@@ -625,7 +652,7 @@ fun attachNemesysSeparatorHandlers() {
         var offsetX = 0.0 // needed to move separator with the cursor
         var offsetY = 0.0 // needed to move separator with the cursor
         var currentSeparator: HTMLElement? = null // the separator that is currently pressed by the user
-        var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator
+        var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator. This determines the target position
 
         var clickStartTime = 0.0 // count click time to interpret is as deleted
 
@@ -671,16 +698,17 @@ fun attachNemesysSeparatorHandlers() {
                 currentSeparator?.style?.top = "${newY}px"
             }
 
-            // find new position
+            // find new target position
             val byteGroups = document.querySelectorAll(".bytegroup")
-            for (j in 0 until byteGroups.length) {
+            for (j in 0 until byteGroups.length) { // go through all byte groups
                 val bg = byteGroups[j] as HTMLElement
                 val rect = bg.getBoundingClientRect()
                 val withinX = event.clientX >= rect.left && event.clientX <= rect.right
                 val withinY = event.clientY >= rect.top && event.clientY <= rect.bottom
 
-                // update bytegroup to highlightbyte
+                // check if mouse is over current byte group
                 if (withinX && withinY) {
+                    // update bytegroup to highlightbyte and remove it from the last one
                     hoverTarget?.classList?.remove("highlightbyte")
                     hoverTarget = bg
                     bg.classList.add("highlightbyte")
@@ -737,6 +765,9 @@ fun attachNemesysSeparatorHandlers() {
 }
 
 // move separator to specific target element
+// separator is the separator that we wat to move
+// target is the byte group that was last hovered by the mouse. this determines the target byte
+// mouseX is needed to check if we want to move the separator on the left or right side of the target
 fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement, mouseX: Double) {
     val parent = separator.parentElement ?: return
     val targetParent = target.parentElement ?: return
