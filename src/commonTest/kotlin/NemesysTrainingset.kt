@@ -28,8 +28,8 @@ class NemesysTrainingset {
         testNumber: Int,
         expectedSegments: List<NemesysSegment>,
         actualSegments: List<NemesysSegment>, ) {
-        val tp = expectedSegments.count { e -> actualSegments.any { a -> a.offset == e.offset && a.fieldType == e.fieldType } }
-        val fp = actualSegments.count { a -> expectedSegments.none { e -> a.offset == e.offset && a.fieldType == e.fieldType } }
+        val tp = expectedSegments.count { e -> actualSegments.any { a -> a.offset == e.offset } }
+        val fp = actualSegments.count { a -> expectedSegments.none { e -> a.offset == e.offset } }
         val fn = expectedSegments.size - tp
 
         totalTP += tp

@@ -226,24 +226,26 @@ class NemesysParser {
     }
 
 
-    // every byte is one field. don't use postprocessing but pre processing
+    // every byte is one field. don't use postprocessing
     private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<NemesysSegment>{
-        val taken = BooleanArray(bytes.size) { false }
+        // val taken = BooleanArray(bytes.size) { false }
 
         // preProcessing to detect length fields
-        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+        // val fixedSegments = detectLengthPrefixedFields(bytes, taken)
 
         val dynamicSegments = mutableListOf<NemesysSegment>()
         for (i in bytes.indices) { // go through each byte
-            if (!taken[i]) {
+            /* if (!taken[i]) {
                 val slice = byteArrayOf(bytes[i])
                 // do some post processing to merge bytes together
                 val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.fieldType ?: NemesysField.UNKNOWN
                 dynamicSegments.add(NemesysSegment(i, type))
-            }
+            } */
+            dynamicSegments.add(NemesysSegment(i, NemesysField.UNKNOWN))
         }
 
-        return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
+        // return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
+        return (dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
     }
 
     // every byte is one field. only use pre- and postprocessing to merge bytes together
