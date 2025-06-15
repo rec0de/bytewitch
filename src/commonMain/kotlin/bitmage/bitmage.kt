@@ -63,9 +63,28 @@ fun ByteArray.indicesOfAllSubsequences(target: ByteArray): Set<Int> {
     return matches
 }
 
+fun ByteArray.toBooleanArray(): BooleanArray {
+    return BooleanArray(size * 8) { i -> (this[i / 8].toInt() shr (7 - (i % 8)) and 1) == 1 }
+}
+
 fun ByteArray.toBinaryString(): String {
     return this.joinToString("") { byte ->
         byte.toUByte().toString(2).padStart(8, '0')
+    }
+}
+
+// BooleanArray
+
+fun BooleanArray.toByteArray(): ByteArray {
+    return ByteArray((size + 7) / 8) { byteIndex ->
+        var byte = 0
+        for (bit in 0 until 8) {
+            val i = byteIndex * 8 + bit
+            if (i < size && this[i]) {
+                byte = byte or (1 shl (7 - bit))
+            }
+        }
+        byte.toByte()
     }
 }
 
