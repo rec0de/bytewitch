@@ -197,7 +197,7 @@ enums:
 
             var kaitaiElement : ByteWitchResult
             val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits -1)
-            val sourceByteRange = Pair(currentOffsetInBits + sourceOffsetInBits, currentOffsetInBits + type.sizeInBits + sourceOffsetInBits)
+            val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits).toFloat()/8)
 
             if (type.subTypes.isNotEmpty()) {
                 kaitaiElement = processSeq(elementId, yamlStruct, yamlStruct.types[element.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
@@ -225,7 +225,7 @@ enums:
             currentOffsetInBits += type.sizeInBits
         }
 
-        return KaitaiResult(id, kaitaiBytesList, Pair(sourceOffsetInBits, data.size + sourceOffsetInBits))
+        return KaitaiResult(id, kaitaiBytesList, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
     }
 
     override fun confidence(data: ByteArray): Double {
@@ -235,37 +235,37 @@ enums:
     override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.33, null)
 }
 
-class KaitaiResult(val id: String, val kaitaiBytesList: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiResult(val id: String, val kaitaiBytesList: List<ByteWitchResult>, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${kaitaiBytesList.joinToString("") { it.renderHTML() }})</div>"
     }
 }
 
-class KaitaiElement(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiElement(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().hex()})h</div>"
     }
 }
 
-class KaitaiBytes(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiBytes(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().hex()})h</div>"
     }
 }
 
-class KaitaiNumber(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiNumber(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>I am a Number</div>"
     }
 }
 
-class KaitaiBinary(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiBinary(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.joinToString("") { if (it) "1" else "0" }})b</div>"
     }
 }
 
-class KaitaiString(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class KaitaiString(val id: String, val endianness: Endianness, val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): ByteWitchResult {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>I am a String</div>"
     }

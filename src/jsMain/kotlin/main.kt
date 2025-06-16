@@ -111,16 +111,16 @@ fun decode(tryhard: Boolean) {
 
 fun attachRangeListeners(element: Element) {
     if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
-        val start = element.getAttribute("data-start")!!.toInt()
-        val end =  element.getAttribute("data-end")!!.toInt()
+        val start = element.getAttribute("data-start")!!.toFloat()
+        val end =  element.getAttribute("data-end")!!.toFloat()
         element.addEventListener("click", { evt ->
             console.log("$start to $end")
             val floatview = document.getElementById("floatview")!!
             floatview.innerHTML = floatview.textContent!! // re-set previous highlights
             val text = floatview.childNodes[0]!!
             val range = document.createRange()
-            range.setStart(text, start / 4);
-            range.setEnd(text, (end + 1) / 4);
+            range.setStart(text, (start * 2).toInt());
+            range.setEnd(text, (end * 2 + 0.5).toInt());
             range.surroundContents(document.createElement("span"))
 
             evt.stopPropagation()
