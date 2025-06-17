@@ -67,6 +67,20 @@ fun ByteArray.toBooleanArray(): BooleanArray {
     return BooleanArray(size * 8) { i -> (this[i / 8].toInt() shr (7 - (i % 8)) and 1) == 1 }
 }
 
+fun ByteArray.toInt(endianness: ByteOrder): Int {
+    if (this.size > 4) {
+        throw IllegalArgumentException("Int can not be larger than 4 Bytes")
+    }
+
+    var result = 0
+    var i = if (endianness == ByteOrder.LITTLE) this.size - 1 else 0
+    for (e in this) {
+        result = result or ((e.toInt() and 0xFF) shl 8 * i)
+        if (endianness == ByteOrder.LITTLE) i-- else i++
+    }
+    return result
+}
+
 fun ByteArray.toBinaryString(): String {
     return this.joinToString("") { byte ->
         byte.toUByte().toString(2).padStart(8, '0')
