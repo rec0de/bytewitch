@@ -117,6 +117,7 @@ fun removeTextArea(dataContainer: Element) {
 
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement
+
     output.removeChild(output.lastElementChild!!)
 
     // reset floatview
@@ -183,8 +184,6 @@ fun applyLiveDecodeListeners() {
         NemesysSegment(154, NemesysField.UNKNOWN)    // true
     )
 
-
-
     val messages = mutableMapOf(
         0 to NemesysParsedMessage(segments1, message1, 0),
         // 1 to NemesysParsedMessage(segments2, message2, 1)
@@ -192,11 +191,6 @@ fun applyLiveDecodeListeners() {
 
     return messages
 }
-
-
-
-val selectedGroups = mutableListOf<MutableSet<String>>()
-var currentGroup = mutableSetOf<String>()
 
 fun setupSelectableSegments() {
     val elements = document.querySelectorAll("[value-align-id]")
@@ -262,7 +256,10 @@ fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
     val floatview = document.getElementById("floatview") as HTMLDivElement
     val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
+    // Reset output
+    output.innerHTML = ""
     floatview.innerHTML = ""
+    bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
 
     // decode input
@@ -792,6 +789,43 @@ fun attachSeparatorPlaceholderClickHandlers() {
 }
 
 
+// set bytes in floatview and textview
+fun setByteFinderContent(msgIndex: Int) {
+    val bytes = parsedMessages[msgIndex]?.bytes ?: return
+
+    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+
+    floatview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    bytefinder.style.display = "flex"
+}
+
+// set bytes in floatview and textview and highlight segment
+fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
+    val floatview = document.getElementById("floatview")!!
+
+    // set byte sequence
+    setByteFinderContent(msgIndex)
+
+    // apply highlighting in floatview
+    val range = document.createRange()
+    val text = floatview.childNodes[0]!!
+    range.setStart(text, start*2 + start/8)
+    range.setEnd(text, end*2 + end/8)
+    range.surroundContents(document.createElement("span"))
+
+    // apply highlighting in textview
+    val textview = document.getElementById("textview")!!
+    textview.innerHTML = textview.textContent!! // re-set previous highlights
+    val txtText = textview.childNodes[0]!!
+    val txtRange = document.createRange()
+    txtRange.setStart(txtText, start);
+    txtRange.setEnd(txtText, end);
+    txtRange.surroundContents(document.createElement("span"))
+}
+
 
 // attach range listener for float view
 fun attachRangeListeners(element: Element, msgIndex: Int) {
@@ -800,18 +834,7 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
         val end = element.getAttribute("data-end")!!.toInt()
 
         element.addEventListener("click", { evt ->
-            val floatview = document.getElementById("floatview")!!
-
-            // set byte sequence
-            val message = parsedMessages[msgIndex]?.bytes ?: return@addEventListener
-            floatview.innerHTML = message.hex()
-
-            // apply highlighting
-            val range = document.createRange()
-            range.setStart(floatview.firstChild!!, start * 2)
-            range.setEnd(floatview.firstChild!!, end * 2)
-            range.surroundContents(document.createElement("span"))
-
+            setByteFinderHighlight(start, end, msgIndex)
             evt.stopPropagation()
         })
 
