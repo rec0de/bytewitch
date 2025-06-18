@@ -424,7 +424,7 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
     // for example: if AlignedSegment(0, 1, 3, 2, 0.05) is given
     // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
     val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
-    val alignmentColors = mutableMapOf<String, Triple<Int, Int, Int>>() // safe highlighting color
+    val alignmentColors = mutableMapOf<String, Triple<Float, Float, Float>>() // safe highlighting color
     val alignmentBytes = mutableMapOf<String, ByteArray>() // save byte segment of corresponding id
     for (segment in alignedSegments) {
         val idA = "${segment.protocolA}-${segment.segmentIndexA}"
@@ -449,7 +449,7 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
                 .mapNotNull { other -> alignmentBytes[other]?.let { byteDistance(thisBytes, it) } }
                 .minOrNull() ?: 1.0
 
-            alignmentColors[entry] = getRgbColorForDifference(minDiff)
+            alignmentColors[entry] = getHslColorForDifference(minDiff)
         }
     }
 
@@ -464,11 +464,10 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
                 val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
 
                 // set style
-                val (r, g, b) = alignmentColors[linkedId] ?: Triple(0, 0, 1)
+                val (h, s, l) = alignmentColors[linkedId] ?: Triple(0, 0, 1)
                 for (i in 0 until elements.length) {
                     (elements[i] as HTMLElement).classList.add("hovered-alignment")
-                    (elements[i] as HTMLElement).setAttribute("style", "background-color: rgba($r, $g, $b, 0.3);")
-                    // (elements[i] as HTMLElement).setAttribute("style", "background-color: rgba($r, $g, $b, 0.2); box-shadow: 0 0 0 3px rgba($r, $g, $b, 0.4);")
+                    (elements[i] as HTMLElement).setAttribute("style", "background-color: hsla($h, $s%, $l%, 0.3);")
                 }
             }
         }
@@ -507,31 +506,11 @@ fun byteDistance(a: ByteArray, b: ByteArray): Double {
     return Triple(r, g, 0)
 }*/
 
-fun hslToRgb(h: Float, s: Float, l: Float): Triple<Int, Int, Int> {
-    val c = (1 - kotlin.math.abs(2 * l - 1)) * s
-    val hPrime = h / 60
-    val x = c * (1 - kotlin.math.abs(hPrime % 2 - 1))
-    val (r1, g1, b1) = when {
-        hPrime < 1 -> Triple(c, x, 0f)
-        hPrime < 2 -> Triple(x, c, 0f)
-        hPrime < 3 -> Triple(0f, c, x)
-        hPrime < 4 -> Triple(0f, x, c)
-        hPrime < 5 -> Triple(x, 0f, c)
-        else       -> Triple(c, 0f, x)
-    }
-    val m = l - c / 2
-    return Triple(
-        ((r1 + m) * 255).toInt(),
-        ((g1 + m) * 255).toInt(),
-        ((b1 + m) * 255).toInt()
-    )
-}
-
 // return colour based on the difference - we use HSL because it looks more natural
-fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
+fun getHslColorForDifference(diff: Double): Triple<Float, Float, Float> {
     val clampedDiff = diff.coerceIn(0.0, 1.0).toFloat()
     val hue = 120f * (1 - clampedDiff) // green (120°) at 0.0 → red (0°) at 1.0
-    return hslToRgb(hue, 1f, 0.5f)
+    return Triple(hue, 100f, 50f)
 }
 
 
