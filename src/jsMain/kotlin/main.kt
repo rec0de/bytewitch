@@ -15,6 +15,7 @@ import org.w3c.dom.events.Event
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
+var tryhard = false
 
 // save parsed messages for float view and nemesys
 var parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
@@ -39,11 +40,13 @@ fun main() {
         applyLiveDecodeListeners()
 
         decodeBtn.onclick = {
+            tryhard = false
             decode(false)
         }
 
         tryhardBtn.onclick = {
-            decode(true)
+            tryhard = true
+            decode(false)
         }
 
         uploadBtn.onclick = {
@@ -83,7 +86,7 @@ fun main() {
             // for live decode
             if (liveDecodeEnabled) {
                 newTextarea.oninput = {
-                    decode(false)
+                    decode(true)
                 }
             }
         }
@@ -133,7 +136,7 @@ fun applyLiveDecodeListeners() {
         val ta = textareas[i] as HTMLTextAreaElement
         ta.oninput = {
             if (liveDecodeEnabled)
-                decode(false)
+                decode(true)
         }
     }
 }
@@ -250,7 +253,7 @@ fun exportAlignments(): String {
 
 
 // decode one specific byte sequence
-fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
+fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -321,7 +324,7 @@ fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
 }
 
 // decode all text areas
-fun decode(tryhard: Boolean) {
+fun decode(isLiveDecoding: Boolean) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -332,7 +335,7 @@ fun decode(tryhard: Boolean) {
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
-            decodeBytes(tryhard, bytes, i)
+            decodeBytes(bytes, i)
         }
     }
 
@@ -344,10 +347,10 @@ fun decode(tryhard: Boolean) {
     }
 
     // for sequence alignment
-    val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
-    attachSequenceAlignmentListeners(alignedSegment)
-
-
+    if (tryhard && !isLiveDecoding) {
+        val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
+        attachSequenceAlignmentListeners(alignedSegment)
+    }
 
     // TODO for testing purposes only
     // includeAlignmentForTesting()
@@ -589,8 +592,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             rerenderNemesys(msgIndex, newParsed)
 
             // rerun sequence alignment
-            val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
-            attachSequenceAlignmentListeners(alignedSegment)
+            if (tryhard) {
+                val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
+                attachSequenceAlignmentListeners(alignedSegment)
+            }
         })
     }
 }
@@ -922,7 +927,7 @@ fun appendTextareaWithContent(content: String) {
 
     if (liveDecodeEnabled) {
         textarea.oninput = {
-            decode(false)
+            decode(true)
         }
     }
 }
