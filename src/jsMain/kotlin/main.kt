@@ -141,116 +141,6 @@ fun applyLiveDecodeListeners() {
     }
 }
 
-/*fun getTestingData(): MutableMap<Int, NemesysParsedMessage> {
-    val message1 = "62706c6973743030d30102030405065173516651625c636f6d2e6b696b2e636861741105ffa107d208090a0b516851645f102036366137626435396665376639613763323265623436336436646233393730342341d95c3031cf51a2080f1113152225272c2e30530000000000000101000000000000000c0000000000000000000000000000005c".fromHex()
-    // val message2 = "A76269641870686E6163686E616D65674E65756D616E6E68757365726E616D656A6E65756D616E6E78587865656D61696C726E65756D616E6E406F75746C6F6F6B2E646566686F62627973A266686F62627931684675C39F62616C6C66686F626279326A4261736B657462616C6C6770726F66696C65A2636167651267636F756E7472796B446575747363686C616E646969735F616374697665F5".fromHex()
-
-    val segments1 = listOf(
-        NemesysSegment(0, NemesysField.UNKNOWN),     // Start der BPList
-        NemesysSegment(8, NemesysField.UNKNOWN),     // Start des Root-Objekts (Dictionary)
-        NemesysSegment(15, NemesysField.UNKNOWN),    // "s"
-        NemesysSegment(17, NemesysField.UNKNOWN),    // "f"
-        NemesysSegment(19, NemesysField.UNKNOWN),    // "b"
-        NemesysSegment(21, NemesysField.UNKNOWN),    // "com.kik.chat"
-        NemesysSegment(34, NemesysField.UNKNOWN),    // 1535
-        NemesysSegment(37, NemesysField.UNKNOWN),    // Start des Arrays
-        NemesysSegment(39, NemesysField.UNKNOWN),    // Start des Dictionary-Objekts im Array
-        NemesysSegment(44, NemesysField.UNKNOWN),    // "h"
-        NemesysSegment(46, NemesysField.UNKNOWN),    // "d"
-        NemesysSegment(48, NemesysField.UNKNOWN),    // "66a7bd59fe7f9a7c22eb463d6db39704"
-        NemesysSegment(83, NemesysField.UNKNOWN),
-    )
-
-    val segments2 = listOf(
-        NemesysSegment(0, NemesysField.UNKNOWN),     // Start des Objekts
-        NemesysSegment(1, NemesysField.UNKNOWN),     // "id"
-        NemesysSegment(4, NemesysField.UNKNOWN),     // 112
-        NemesysSegment(6, NemesysField.UNKNOWN),     // "nachname"
-        NemesysSegment(15, NemesysField.UNKNOWN),    // "Neumann"
-        NemesysSegment(23, NemesysField.UNKNOWN),    // "username"
-        NemesysSegment(32, NemesysField.UNKNOWN),    // "neumannxXx"
-        NemesysSegment(43, NemesysField.UNKNOWN),    // "email"
-        NemesysSegment(49, NemesysField.UNKNOWN),    // "neumann@outlook.de"
-        NemesysSegment(68, NemesysField.UNKNOWN),    // "hobbys"
-        NemesysSegment(75, NemesysField.UNKNOWN),    // verschachteltes "hobbys"-Objekt
-        NemesysSegment(76, NemesysField.UNKNOWN),    // "hobby1"
-        NemesysSegment(83, NemesysField.UNKNOWN),    // "Fußball"
-        NemesysSegment(92, NemesysField.UNKNOWN),    // "hobby2"
-        NemesysSegment(99, NemesysField.UNKNOWN),    // "Basketball"
-        NemesysSegment(110, NemesysField.UNKNOWN),   // "profile"
-        NemesysSegment(118, NemesysField.UNKNOWN),   // verschachteltes "profile"-Objekt
-        NemesysSegment(119, NemesysField.UNKNOWN),   // "age"
-        NemesysSegment(123, NemesysField.UNKNOWN),   // 18
-        NemesysSegment(124, NemesysField.UNKNOWN),   // "country"
-        NemesysSegment(132, NemesysField.UNKNOWN),   // "Deutschland"
-        NemesysSegment(144, NemesysField.UNKNOWN),   // "is_active"
-        NemesysSegment(154, NemesysField.UNKNOWN)    // true
-    )
-
-    val messages = mutableMapOf(
-        0 to NemesysParsedMessage(segments1, message1, 0),
-        // 1 to NemesysParsedMessage(segments2, message2, 1)
-    )
-
-    return messages
-}
-
-fun setupSelectableSegments() {
-    val elements = document.querySelectorAll("[value-align-id]")
-    for (i in 0 until elements.length) {
-        val el = elements[i] as HTMLElement
-        el.addEventListener("click", {
-            toggleSegment(el)
-        })
-    }
-
-    // start new group by pressing "n" on the keyboard
-    document.addEventListener("keydown", { e ->
-        if ((e as KeyboardEvent).key == "n") {
-            if (currentGroup.size > 1) {
-                selectedGroups.add(currentGroup.toMutableSet())
-            }
-            currentGroup.clear()
-        }
-    })
-}
-
-fun toggleSegment(el: HTMLElement) {
-    val id = el.getAttribute("value-align-id") ?: return
-    if (currentGroup.contains(id)) {
-        currentGroup.remove(id)
-        el.classList.remove("highlighted")
-    } else {
-        currentGroup.add(id)
-        el.classList.add("highlighted")
-    }
-}
-
-fun exportAlignments(): String {
-    val triplets = mutableSetOf<String>()
-
-    for (group in selectedGroups) {
-        Logger.log("Group:")
-        Logger.log(group)
-        val items = group.map {
-            val (msg, seg) = it.split("-").map { part -> part.toInt() }
-            msg to seg
-        }
-
-        for (i in items.indices) {
-            for (j in i + 1 until items.size) {
-                val (msgA, segA) = items[i]
-                val (msgB, segB) = items[j]
-                triplets.add("Triple($msgA, $msgB, Pair($segA, $segB))")
-            }
-        }
-    }
-
-    return """val expectedAlignments = setOf(
-        ${triplets.joinToString(",\n    ")}
-    )"""
-}*/
-
 
 // decode one specific byte sequence
 fun decodeBytes(bytes: ByteArray, taIndex: Int) {
@@ -351,43 +241,7 @@ fun decode(isLiveDecoding: Boolean) {
         val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
         attachSequenceAlignmentListeners(alignedSegment)
     }
-
-    // TODO for testing purposes only
-    // includeAlignmentForTesting()
 }
-
-/*fun includeAlignmentForTesting() {
-    val output = document.getElementById("output") as HTMLDivElement
-    val testingMessages = getTestingData()
-    val messageBox = document.createElement("DIV") as HTMLDivElement
-    messageBox.classList.add("message-output")
-    for ((index, message) in testingMessages) {
-        val nemesysResult = document.createElement("DIV") as HTMLDivElement
-        val nemesysName = document.createElement("H3") as HTMLHeadingElement
-        nemesysName.innerText = "nemesysparser $index"
-
-        val nemesysContent = document.createElement("DIV") as HTMLDivElement
-        nemesysContent.classList.add("parsecontent")
-
-        if (message != null) {
-            nemesysContent.innerHTML = NemesysRenderer.render(message)
-        } else {
-            nemesysContent.innerText = "Error: message $index is null"
-        }
-
-        nemesysResult.appendChild(nemesysName)
-        nemesysResult.appendChild(nemesysContent)
-        messageBox.appendChild(nemesysResult)
-        output.appendChild(messageBox)
-    }
-    setupSelectableSegments()
-    val btn = document.createElement("button") as HTMLElement
-    btn.innerText = "Export Alignments"
-    btn.onclick = {
-        console.log(exportAlignments())
-    }
-    document.body?.appendChild(btn)
-}*/
 
 // rerender nemesys html view
 fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
@@ -498,14 +352,6 @@ fun byteDistance(a: ByteArray, b: ByteArray): Double {
     if (a.size != b.size) return 1.0
     return a.indices.count { a[it] != b[it] }.toDouble() / a.size
 }
-
-// return colour based on the difference
-/*fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
-    val clampedDiff = diff.coerceIn(0.0, 1.0)
-    val r = (clampedDiff * 255).toInt()
-    val g = ((1 - clampedDiff) * 255).toInt()
-    return Triple(r, g, 0)
-}*/
 
 // return colour based on the difference - we use HSL because it looks more natural
 fun getHslColorForDifference(diff: Double): Triple<Float, Float, Float> {

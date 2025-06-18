@@ -123,9 +123,7 @@ object NemesysSequenceAlignment {
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].offset else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        // val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
-                        val dissim = canberraDissimilarityByteWise(segmentBytesA, segmentBytesB, typeA, typeB)
-                        // val dissim = canberraDissimilarityWithPooling(segmentBytesA, segmentBytesB)
+                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
                         val sim = 1.0 - dissim
 
                         if (sim >= similarityThreshold) {
@@ -186,103 +184,5 @@ object NemesysSequenceAlignment {
                 (1 - minD) * r * (shortSegment.size / (longSegment.size * longSegment.size) - pf)
 
         return dm
-    }
-
-    // using canberra dissimilarity byte wise
-    private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
-        // if both segments are a payload length field so set canberra distance to 0
-        if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
-            || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
-            return 0.0
-        }
-
-        return needlemanWunschCanberra(segmentA, segmentB)
-    }
-
-    // canberra score using sequence alignment on two segments
-    private fun needlemanWunschCanberra(segmentA: ByteArray, segmentB: ByteArray, gapPenalty: Double = 1.0): Double {
-        val m = segmentA.size
-        val n = segmentB.size
-        val dp = Array(m + 1) { DoubleArray(n + 1) }
-
-        // init
-        for (i in 0..m) dp[i][0] = i * gapPenalty
-        for (j in 0..n) dp[0][j] = j * gapPenalty
-
-        // fill up matrix
-        for (i in 1..m) {
-            for (j in 1..n) {
-                val match = dp[i - 1][j - 1] + byteCanberra(segmentA[i - 1], segmentB[j - 1])
-                val delete = dp[i - 1][j] + gapPenalty
-                val insert = dp[i][j - 1] + gapPenalty
-                dp[i][j] = minOf(match, delete, insert)
-            }
-        }
-
-        // dp[m][n] is the score on the bottom right of the matrix. It says the distance of the best alignment
-        return dp[m][n] / maxOf(m, n).toDouble()
-    }
-
-    // scoring function for bytes using canberra
-    private fun byteCanberra(a: Byte, b: Byte): Double {
-        val ai = a.toInt() and 0xFF
-        val bi = b.toInt() and 0xFF
-        val denominator = ai + bi
-        return if (denominator == 0) 0.0 else kotlin.math.abs(ai - bi).toDouble() / denominator
-    }
-
-
-    // Canberra Dissimilarity for segments of different sizes (using pooling)
-    private fun canberraDissimilarityWithPooling(segmentA: ByteArray, segmentB: ByteArray): Double {
-        val shortSegment = if (segmentA.size <= segmentB.size) segmentA else segmentB
-        val longSegment = if (segmentA.size > segmentB.size) segmentA else segmentB
-
-        // pool longer segment
-        val pooledSegment = averagePoolSegment(longSegment, shortSegment.size)
-
-        // now just use the regular canberraDistance with pooledSegment
-        return canberraDistance(shortSegment, pooledSegment) / shortSegment.size
-    }
-
-    // average pooling of a segment to transform it in a lower dimension
-    private fun averagePoolSegment(segment: ByteArray, targetSize: Int): ByteArray {
-        val pooled = ByteArray(targetSize)
-        val chunkSize = segment.size.toDouble() / targetSize
-
-        for (i in 0 until targetSize) {
-            // chunk that we need to pool
-            val start = (i * chunkSize).toInt()
-            val end = ((i + 1) * chunkSize).toInt().coerceAtMost(segment.size)
-            val chunk = segment.sliceArray(start until end)
-
-            val avgValue = if (chunk.isNotEmpty()) {
-                chunk.map { it.toInt() and 0xFF }.average().toInt() // calc average value
-            } else {
-                0
-            }
-
-            pooled[i] = avgValue.toByte()
-        }
-
-        return pooled
-    }
-
-
-    // position penalty for absolute and relative difference
-    private fun computePositionPenalty(startA: Int, startB: Int, lenA: Int, lenB: Int): Double {
-        val alpha = 0.02 // hyper parameter for absolute difference
-        val beta = 0.03  // hyper parameter for relative difference
-
-        // calc penalty for absolute difference
-        val maxLen = maxOf(lenA, lenB).toDouble()
-        val positionDiffAbs = kotlin.math.abs(startA - startB).toDouble()
-        val penaltyAbs = positionDiffAbs / maxLen
-
-        // calc penalty for relative difference
-        val relativePosA = startA.toDouble() / lenA
-        val relativePosB = startB.toDouble() / lenB
-        val penaltyRel = kotlin.math.abs(relativePosA - relativePosB)
-
-        return alpha * penaltyAbs + beta * penaltyRel
     }
 }

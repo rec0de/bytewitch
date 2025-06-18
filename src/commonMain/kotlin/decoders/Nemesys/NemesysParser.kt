@@ -654,53 +654,6 @@ class NemesysParser {
         return improved
     }
 
-
-    // merge char sequences together - this is the way how it's done by Stephan Kleber in his paper
-    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
-        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
-
-        // if no boundary detected set start boundary to 0
-        if (boundaries.isEmpty()) {
-            mergedBoundaries.add(0 to NemesysField.UNKNOWN)
-            return mergedBoundaries
-        }
-
-        boundaries.add(0, 0)
-        var i = 0
-
-        while (i < boundaries.size) {
-            // set start and end of segment
-            val start = boundaries[i]
-            var end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
-            var j = i + 1
-
-            while (j + 1 < boundaries.size) {
-                val nextStart = boundaries[j]
-                val nextEnd = boundaries[j + 1]
-                val nextSegment = bytes.sliceArray(nextStart until nextEnd)
-
-                if (nextSegment.all { it >= 0 && it < 0x7f }) {
-                    end = nextEnd
-                    j++
-                } else {
-                    break
-                }
-            }
-
-            val fullSegment = bytes.sliceArray(start until end)
-
-            if (isCharSegment(fullSegment)) {
-                mergedBoundaries.add(start to NemesysField.STRING)
-                i = j
-            } else {
-                mergedBoundaries.add(start to NemesysField.UNKNOWN)
-                i++
-            }
-        }
-
-        return mergedBoundaries
-    }
-
     // check if segment is a char sequence
     private fun isCharSegment(segment: ByteArray): Boolean {
         if (segment.size < 6) return false
