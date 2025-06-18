@@ -2,7 +2,6 @@ package decoders
 
 import bitmage.ByteOrder
 import bitmage.hex
-import bitmage.toBinaryString
 import bitmage.toBooleanArray
 import bitmage.toByteArray
 import bitmage.toInt
@@ -19,6 +18,23 @@ external object JsYaml {
 
 enum class displayStyle {
     HEX, BINARY, NUMBER, STRING
+}
+
+// acts just like a MutableList except it also has the added features
+class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()) : MutableList<T> by innerList {
+    var parent: MutableListTree<T>? = null
+        get() { return parent }
+        set(value) {field = value}
+
+    var root: MutableListTree<T>? = null
+        get() {
+            var rootCandidate: MutableListTree<T> = this
+            while (rootCandidate.parent != null) {
+                rootCandidate = rootCandidate.parent!!
+            }
+            return rootCandidate
+        }
+        private set
 }
 
 class Type(yamlStruct: dynamic, elementStruct: dynamic) {
@@ -84,10 +100,10 @@ object Kaitai : ByteWitchDecoder {
         val kaitaiInput = document.getElementById("kaitaiinput") as HTMLTextAreaElement
         val kaitaiYaml = JsYaml.load(kaitaiInput.value)
 
-        return processSeq(kaitaiYaml.meta.id, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
+        return processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
     }
 
-    fun processSeq(id: String, yamlStruct: dynamic, seqStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int) : KaitaiElement {
+    fun processSeq(id: String, parentKaitaiBytesList: MutableListTree<KaitaiElement>?, yamlStruct: dynamic, seqStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int) : KaitaiElement {
         var currentOffsetInBits = 0
         /*
         Entweder data als ByteArray und Bitshiften
@@ -97,7 +113,8 @@ object Kaitai : ByteWitchDecoder {
         test and 0b00111000 >> 3 = -> 001
         oder data als BooleanArray
         */
-        val kaitaiBytesList = mutableListOf<KaitaiElement>()
+        val kaitaiBytesList = MutableListTree<KaitaiElement>()
+        kaitaiBytesList.parent = parentKaitaiBytesList
         //val types = mutableSetOf<Type>()
 
         for (element in seqStruct) {
@@ -113,7 +130,7 @@ object Kaitai : ByteWitchDecoder {
             val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits).toFloat()/8)
 
             if (type.subTypes.isNotEmpty()) {
-                kaitaiElement = processSeq(elementId, yamlStruct, yamlStruct.types[element.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
+                kaitaiElement = processSeq(elementId, kaitaiBytesList, yamlStruct, yamlStruct.types[element.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
             } else {
                 val endianness = ByteOrder.LITTLE
                 kaitaiElement = if (type.usedDisplayStyle == displayStyle.BINARY) {
@@ -150,11 +167,11 @@ object Kaitai : ByteWitchDecoder {
 
 interface KaitaiElement : ByteWitchResult {
     val id: String
-    val kaitaiBytesList: List<ByteWitchResult>? get() = null
+    val kaitaiBytesList: MutableListTree<KaitaiElement>? get() = null
     val value: BooleanArray? get() = null
 }
 
-class KaitaiResult(override val id: String, override val kaitaiBytesList: List<ByteWitchResult>, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiResult(override val id: String, override val kaitaiBytesList: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${kaitaiBytesList.joinToString("") { it.renderHTML() }})</div>"
     }
