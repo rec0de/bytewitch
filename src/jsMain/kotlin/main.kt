@@ -254,11 +254,12 @@ fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
     val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
     // Reset output
-    output.innerHTML = ""
     floatview.innerHTML = ""
+    textview.innerHTML = ""
     bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
 
