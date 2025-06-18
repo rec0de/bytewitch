@@ -37,30 +37,37 @@ class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()
         private set
 }
 
-class Type(completeStruct: dynamic, currentElementStruct: dynamic) {
+class Type(val completeStruct: dynamic, val currentElementStruct: dynamic) {  // TODO: integrate Type Object and it's things into the seq parsing, as a lot of stuff from there is actually needed here
     var sizeInBits: Int = 0
     var sizeIsUntilEOS: Boolean = false
+    var sizeIsUntilTerminator: Boolean = false
+    var terminator: ByteArray? = null
     var type: String = currentElementStruct.type.toString()
     var endianness: ByteOrder
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var subTypes: MutableList<Type> = mutableListOf<Type>()
 
     fun parseBuiltinType() {
-        if (this.type == "strz") {  // TODO totally wrong, is actually a shortcut for type = str + terminator = 0. Other terminator bytes can exist
-            sizeIsUntilEOS = true
+        if (type == "strz") {
             usedDisplayStyle = DisplayStyle.STRING
+            sizeIsUntilTerminator = true
+            terminator = ByteArray(0x00)
+        } else if (type == "str") {
+            usedDisplayStyle = DisplayStyle.STRING
+            sizeIsUntilTerminator = true
+            terminator = currentElementStruct.terminator // TODO: Make proper method out of this. Could probably be a value defined somewhere else aswell :(
         } else {
-            if (this.type.startsWith("s")) {  // signed int
-                sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+            if (Regex("^s\\d+(le|be)?\$").matches(type)) {  // signed int
+                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
                 usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
-            } else if (this.type.startsWith("u")) {  // unsigned int
-                sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+            } else if (Regex("^u\\d+(le|be)?\$").matches(type)) {  // unsigned int
+                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
                 usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
-            } else if (this.type.startsWith("f")) {  // float
-                sizeInBits = this.type.filter { it.isDigit() }.toInt() * 8
+            } else if (Regex("^f\\d+(le|be)?\$").matches(type)) {  // float
+                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
                 usedDisplayStyle = DisplayStyle.FLOAT
-            } else if (this.type.startsWith("b")) {  // binary
-                sizeInBits = this.type.filter { it.isDigit() }.toInt()
+            } else if (Regex("^b\\d+(le|be)?\$").matches(type)) {  // binary
+                sizeInBits = type.filter { it.isDigit() }.toInt()
                 usedDisplayStyle = DisplayStyle.BINARY
             } else {
                 throw RuntimeException()
