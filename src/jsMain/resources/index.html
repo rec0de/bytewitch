@@ -352,13 +352,13 @@
             display: none;
         }
 
-        #floatview {
+        #floatview, #textview {
             margin-top: var(--rowgap);
             font-family: var(--mono);
             overflow-wrap: anywhere;
         }
 
-        #floatview > span {
+        #floatview > span, #textview > span {
             background: var(--accent);
         }
 
@@ -537,6 +537,7 @@
     <h3>Byte Finder</h3>
     <i>click parsed elements to highlight source bytes below</i>
     <div id="floatview"></div>
+    <div id="textview"></div>
 </div>
 
 
