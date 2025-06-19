@@ -123,8 +123,8 @@ object NemesysSequenceAlignment {
                         val endB = if (segmentBIndex + 1 < segmentsB.size) segmentsB[segmentBIndex + 1].offset else bytesB.size
                         val segmentBytesB = bytesB.sliceArray(startB until endB)
 
-                        // val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
-                        val dissim = canberraDissimilarityByteWise(segmentBytesA, segmentBytesB, typeA, typeB)
+                        val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
+                        // val dissim = canberraDissimilarityByteWise(segmentBytesA, segmentBytesB, typeA, typeB)
                         // val dissim = canberraDissimilarityWithPooling(segmentBytesA, segmentBytesB)
                         val sim = 1.0 - dissim
 

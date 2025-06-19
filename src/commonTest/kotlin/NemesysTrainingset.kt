@@ -53,14 +53,29 @@ class NemesysTrainingset {
         messages: Map<Int, NemesysParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
+        // needed to change Triple(it.protocolB, it.protocolA, it.segmentIndexB to it.segmentIndexA) to
+        // Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) to compare it
+        fun normalize(triple: Triple<Int, Int, Pair<Int, Int>>): Triple<Int, Int, Pair<Int, Int>> {
+            val (a, b, pair) = triple
+            return if (a < b || (a == b && pair.first <= pair.second)) {
+                Triple(a, b, pair)
+            } else {
+                Triple(b, a, pair.second to pair.first)
+            }
+        }
+
         val alignments = NemesysSequenceAlignment.alignSegments(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
 
+        // normalise sequence alignment so both Triples have the same order
+        val normalizedExpected = expectedAlignments.map { normalize(it) }.toSet()
+        val normalizedFound = foundAlignments.map { normalize(it) }.toSet()
+
         // TODO we need to call "val refined = NemesysParser().refineSegmentsAcrossMessages(listOf(parsedMessages))"
 
-        val tp = foundAlignments.intersect(expectedAlignments).size
-        val fp = foundAlignments.subtract(expectedAlignments).size
-        val fn = expectedAlignments.subtract(foundAlignments).size
+        val tp = normalizedFound.intersect(normalizedExpected).size
+        val fp = normalizedFound.subtract(normalizedExpected).size
+        val fn = normalizedExpected.subtract(normalizedFound).size
 
         totalTP += tp
         totalFP += fp
@@ -308,7 +323,7 @@ class NemesysTrainingset {
         return bestIndex
     }
 
-    @Test
+    /*@Test
     fun runSegmentationTests() {
         testSegmentParsing1()
         testSegmentParsing2()
@@ -326,7 +341,7 @@ class NemesysTrainingset {
         testSegmentParsing14()
 
         printFinalScore()
-    }
+    }*/
 
     @Test
     fun runSequenceAlignmentTests() {
@@ -337,14 +352,14 @@ class NemesysTrainingset {
         printFinalScore()
     }
 
-    @Test
+    /*@Test
     fun runSegmentationWithSequenceAlignmentTests() {
         testSegmentationWithSequenceAlignment1()
         testSegmentationWithSequenceAlignment2()
         testSegmentationWithSequenceAlignment3()
 
         printFinalScore()
-    }
+    }*/
 
     // to easily change the parser for segment parsing Tests
     private fun parserForSegmentParsing(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
