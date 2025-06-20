@@ -8,6 +8,8 @@ import bitmage.toInt
 import kotlinx.browser.document
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.js.iterator
+import kotlin.reflect.KType
+import kotlin.reflect.typeOf
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -112,6 +114,46 @@ object Kaitai : ByteWitchDecoder {
         return processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
     }
 
+
+    fun parseValue(value: dynamic) : ByteArray {
+
+        val flattenedArray = js("[value].flat(2)")  // handle both individual
+        var fullyFlatArray = byteArrayOf()
+        for (element in flattenedArray) {
+            if (element is Int) {
+                fullyFlatArray += element.toByte()
+            } else {
+                // TODO Check for identifier
+                for (i in 0..element.length-1) {
+                    fullyFlatArray += (element.charCodeAt(i) as Int).toByte()
+                }
+            }
+        }
+        return fullyFlatArray
+    }
+
+    fun checkContentsKey(content: dynamic, value: BooleanArray): Boolean {
+        return parseValue(content).contentEquals(value.toByteArray())
+    }
+
+    fun checkValidKey(valid: dynamic, value: BooleanArray): Boolean {
+        if (valid.min != undefined || valid.max != undefined) {
+            // TODO
+        } else if (valid["any-of"] != undefined) {
+            // TODO
+        } else if (valid.expr != undefined) {
+            // TODO
+        } else {
+            val valueToCheckAgainst = if (valid.eq != undefined) {
+                parseValue(valid.eq)
+            } else {
+                parseValue(valid)
+            }
+            return valueToCheckAgainst.contentEquals(value.toByteArray())
+        }
+        return true
+    }
+
     fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, completeStruct: dynamic, currentSeqStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int) : KaitaiElement {
         var currentOffsetInBits = 0
         /*
@@ -137,6 +179,10 @@ object Kaitai : ByteWitchDecoder {
             var kaitaiElement : KaitaiElement
             val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits -1)
             val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits).toFloat()/8)
+
+            if (!checkContentsKey(seqElement.contents, value)) {
+                throw Exception("Value of bytes does not align with expected contents value.")
+            }
 
             if (type.subTypes.isNotEmpty()) {
                 kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
