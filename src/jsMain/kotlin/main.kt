@@ -111,11 +111,12 @@ fun setByteFinderContent(bytes: ByteArray) {
 
 fun setByteFinderHighlight(start: Int, end: Int) {
     val floatview = document.getElementById("floatview")!!
-    floatview.innerHTML = floatview.textContent!! // re-set previous highlights
-    val text = floatview.childNodes[0]!!
+    
+    // apply highlighting in floatview
     val range = document.createRange()
-    range.setStart(text, start*2 + start/8);
-    range.setEnd(text, end*2 + end/8);
+    val text = floatview.childNodes[0]!! as Text
+    range.setStart(text, start*2 + start/8)
+    range.setEnd(text, minOf(end*2 + end/8, text.length))
     range.surroundContents(document.createElement("span"))
 
     val textview = document.getElementById("textview")!!
