@@ -10,6 +10,7 @@ import bitmage.hex
 import dateFromUTCString
 import htmlEscape
 import looksLikeUtf8String
+import kotlin.math.min
 
 class ASN1BER : ParseCompanion() {
 
@@ -40,6 +41,21 @@ class ASN1BER : ParseCompanion() {
             } catch (e: Exception) {
                 Logger.log(e.toString())
                 return null
+            }
+        }
+
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            try {
+                val decoder = ASN1BER()
+                val result = decoder.decode(data, sourceOffset)
+                check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
+
+                val nonTrivialLengthBonus = if(result.length > 1) 0.3 else 0.0
+                val confidence = min(data.size.toDouble() / 16 + nonTrivialLengthBonus, 1.0)
+
+                return Pair(confidence, result)
+            } catch (e: Exception) {
+                return Pair(0.0, null)
             }
         }
     }
