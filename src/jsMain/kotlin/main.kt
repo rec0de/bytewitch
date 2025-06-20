@@ -663,9 +663,10 @@ fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
 
     // apply highlighting in floatview
     val range = document.createRange()
-    val text = floatview.childNodes[0]!!
+    val text = floatview.childNodes[0]!! as Text
     range.setStart(text, start*2 + start/8)
-    range.setEnd(text, end*2 + end/8)
+    range.setEnd(text, minOf(end*2 + end/8, text.length))
+    // range.setEnd(text, end*2 + end/8)
     range.surroundContents(document.createElement("span"))
 
     // apply highlighting in textview
