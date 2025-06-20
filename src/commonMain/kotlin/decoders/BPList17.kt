@@ -12,7 +12,7 @@ class BPList17 {
         override val name = "bplist17"
 
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
-            if (data.size < 8) {
+            if (data.size < 9) {
                 return Pair(0.0, null)
             }
             val headerString = data.sliceArray(0 until 8).decodeToString()

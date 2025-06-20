@@ -76,7 +76,7 @@ class UbjsonParser : ParseCompanion() {
             bytes[parseOffset-1].toUByte().toInt().toChar()
         }
 
-        Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
+        //Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
 
         return when(typeByte) {
             'Z' -> OPNull(start)

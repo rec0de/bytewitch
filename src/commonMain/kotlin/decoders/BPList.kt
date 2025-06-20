@@ -23,7 +23,7 @@ class BPListParser() {
         override val name = "bplist"
 
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
-            val confidence = if(data.size > 8 && data.sliceArray(0 until 7).decodeToString() == "bplist0") 1.0 else 0.0
+            val confidence = if(data.size > 40 && data.sliceArray(0 until 7).decodeToString() == "bplist0") 1.0 else 0.0
             return Pair(confidence, null)
         }
 

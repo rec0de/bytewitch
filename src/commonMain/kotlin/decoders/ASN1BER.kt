@@ -50,8 +50,9 @@ class ASN1BER : ParseCompanion() {
                 val result = decoder.decode(data, sourceOffset)
                 check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
 
-                val nonTrivialLengthBonus = if(result.length > 1) 0.3 else 0.0
-                val confidence = min(data.size.toDouble() / 16 + nonTrivialLengthBonus, 1.0)
+                val trivialLengthPenalty = if(result.length <= 1) -0.3 else 0.0
+                val weirdTypePenalty = if(result is GenericASN1Result) -0.15 else 0.0
+                val confidence = min(data.size.toDouble() / 16 + trivialLengthPenalty + weirdTypePenalty, 1.0)
 
                 return Pair(confidence, result)
             } catch (e: Exception) {
