@@ -38,7 +38,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
 
     // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
     // let's sort the characters into some bins matching the largest character blocks on the BMP
-    val binCount = 22
+    val binCount = 24
     val bins = IntArray(binCount){ 0 }
 
     string.forEach {
@@ -64,11 +64,13 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
             in 0x1700..0x18af -> bins[18] += 1 // mics southeast asia + mongolian
             in 0x2800..0x28ff -> bins[19] += 1 // braille, rare
             in 0x1000..0x109F -> bins[20] += 1 // Myanmar
+            in 0x0F00.. 0x0FFF -> bins[21] += 1 // tibetan, rare
+            in 0x1C80..0x209F -> bins[22] += 1 // misc extensions and supplements, rare
             else -> bins[binCount-1] += 1 // others
         }
     }
 
-    val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], bins[19], weirdASCII.length)
+    val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], bins[19], bins[21], bins[22], weirdASCII.length)
     val multipleRares = rares.count { it > 0 } > 1
     val rareNonAsciiShare = rares.sum().toDouble() / (string.length - printableASCII.length)
     val hasRareCJK = bins[2] > 0
@@ -94,7 +96,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
 
     val score = max(0.0, 1.0 + surrogatesBonus*0.25 + biasedAsciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
-    //Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
+    Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
 
     return score
 }
@@ -110,7 +112,7 @@ fun looksLikeUtf8String(data: ByteArray, enableLengthBias: Boolean = true): Doub
         return 0.0
 
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
-    Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
+    //Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
 
     // if the string has no decoding errors and contains multi-byte UTF8 sequences
     // we can be pretty sure this is a valid string
