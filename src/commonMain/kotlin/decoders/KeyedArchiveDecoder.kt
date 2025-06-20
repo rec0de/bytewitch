@@ -8,12 +8,14 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
 
     override val name = "nskeyedarchive"
 
-    override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
-        return if (BPListParser.decodesAsValid(data).first) {
-            val parsed = BPListParser.decode(data, 0) as BPListObject
-            Pair(isKeyedArchive(parsed), parsed)
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        val bpConfidence = BPListParser.confidence(data, sourceOffset)
+        return if (bpConfidence.first > 0.5) {
+            val parsed = (bpConfidence.second ?: BPListParser.decode(data, sourceOffset)) as BPListObject
+            val nsConfidence = if(isKeyedArchive(parsed)) 1.0 else 0.0
+            Pair(nsConfidence, parsed)
         } else
-            Pair(false, null)
+            Pair(0.0, null)
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {

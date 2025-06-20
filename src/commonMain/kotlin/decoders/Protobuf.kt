@@ -104,32 +104,22 @@ class ProtobufParser {
             return 0
         }
 
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             try {
                 val parser = ProtobufParser()
-                val res = parser.parse(data, 0)
-                return Pair(parser.fullyParsed, res)
-            } catch (e: Exception) {
-                return Pair(false, null)
-            }
-        }
-
-        override fun confidence(data: ByteArray): Double {
-            try {
-                val parser = ProtobufParser()
-                val parsed = parser.parse(data, 0)
+                val parsed = parser.parse(data, sourceOffset)
 
                 if(!parser.fullyParsed)
-                    return 0.0
+                    return Pair(0.0, null)
 
                 val fieldNumberPenalty = if(parsed.objs.size < 3) -0.4 else 0.0
                 val highFieldPenalty = if(parsed.objs.keys.any { it > 200 }) -0.4 else 0.0
 
                 // short valid protobuf sequences may well be false positives, the longer the sequence the more sure we are
                 // (might factor in plausible field number ranges here in the future)
-                return min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty
+                return Pair(min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty, parsed)
             } catch (e: Exception) {
-                return 0.0
+                return Pair(0.0, null)
             }
         }
     }

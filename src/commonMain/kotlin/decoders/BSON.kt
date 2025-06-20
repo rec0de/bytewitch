@@ -37,15 +37,15 @@ class BsonParser : ParseCompanion() {
             }
         }
 
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if(data.size < 7 || data.readInt(ByteOrder.LITTLE) != data.size)
-                return Pair(false, null)
+                return Pair(0.0, null)
 
             try {
-                val parse = BsonParser().parse(data, 0)
-                return Pair(true, parse)
+                val parse = BsonParser().parse(data, sourceOffset)
+                return Pair(1.0, parse)
             } catch (e: Exception) {
-                return Pair(false, null)
+                return Pair(0.0, null)
             }
         }
     }
