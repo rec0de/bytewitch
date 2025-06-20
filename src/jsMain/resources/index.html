@@ -10,6 +10,8 @@
             --content-back: #fee5ed;
             --accent: #c9748f;
             --accent-highlight: #b9466b;
+            --nemesys: #a374c9;
+            --nemesys-highlight: #8546b9;
             --bplist: #7e74c9;
             --bplist-highlight: #5547b8;
             --nsarchive: #74c9c7;
@@ -109,13 +111,20 @@
             max-width: 100%;
         }
 
-        .container > textarea {
+        #data_container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem; /* gap between textareas */
+        }
+
+        #data_container > textarea {
             font-family: monospace;
             max-width: 100%;
             width: 800px;
             height: 250px;
             max-height: 20vh;
         }
+
 
         .container > span {
             padding-top:  0.5rem;
@@ -172,6 +181,80 @@
             padding: var(--rowgap);
             border-radius: 0.3rem;
             background: rgba(255, 255, 255, 0.5);
+        }
+
+
+        .nemesys {
+            box-sizing: border-box;
+            background: var(--nemesys);
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: var(--rowgap);
+        }
+
+        .nemesysfield {
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .nemesysfield > div {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: var(--rowgap);
+            align-items: start;
+        }
+
+        .nemesysvalue {
+            box-sizing: border-box;
+            padding: var(--rowgap);
+            border-radius: 0.3rem;
+            background: rgba(255, 255, 255, 0.5);
+
+            position: relative;
+        }
+
+        .bytegroup {
+            display: inline-block;
+            padding: 5px;
+            border: 1px solid #ccc;
+            background: white;
+            vertical-align: middle;
+        }
+
+        .highlightbyte {
+            background: #e9e9e9;
+        }
+
+        .field-separator {
+            display: inline-block;
+            margin: 0;
+            font-weight: bold;
+            color: black;
+            cursor: move;
+            user-select: none;
+            position: relative;
+            z-index: 10;
+            transition: transform 0.1s ease;
+        }
+
+        @keyframes fadeOutShrink {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+        }
+
+        .field-separator.dragging {
+            opacity: 0.8;
         }
 
         .bplist {
@@ -257,7 +340,12 @@
         }
 
         #output {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
             gap: 1rem;
+            justify-content: center;
+            align-items: flex-start;
         }
 
         #bytefinder {
@@ -276,6 +364,10 @@
 
         .protobuf.highlight {
             background: var(--accent-highlight);
+        }
+
+        .nemesys.highlight {
+            background: var(--nemesys-highlight);
         }
 
         .asn1.highlight {
@@ -297,11 +389,118 @@
         .generic.highlight {
             background: var(--generic-highlight);
         }
+
+        .icon-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .icon {
+            width: 28px;
+            height: 28px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .icon:hover {
+            transform: scale(1.1);
+        }
+
+        .icon-add {
+            background-image: url("icon_add_red.png");
+        }
+
+        .icon-add:hover {
+            background-image: url("icon_add_red_filled.png");
+        }
+
+        .icon-delete {
+            background-image: url("icon_delete_red.png");
+        }
+
+        .icon-delete:hover {
+            background-image: url("icon_delete_red_filled.png");
+        }
+
+        .icon-edit {
+            background-image: url("icon_edit_white.png");
+            margin-bottom: 4px;
+        }
+
+        .icon-edit:hover {
+            background-image: url("icon_edit_white_filled.png");
+        }
+
+        .icon-finish {
+            background-image: url("icon_finish_white.png");
+            margin-bottom: 4px;
+        }
+
+        .icon-finish:hover {
+            background-image: url("icon_finish_white_filled.png");
+        }
+
+        .message-output {
+            flex: 1 1 calc(33.333% - 1rem); /* put three messages next to each other with a little gap */
+            box-sizing: border-box;
+            border: 2px solid #999;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 100%;
+        }
+
+        .byteview-block {
+            font-family: var(--mono);
+            overflow-wrap: anywhere;
+            background: #fff;
+            padding: 0.5rem;
+            border-radius: 0.3rem;
+            border: 1px solid #ccc;
+        }
+
+
+        .separator-placeholder {
+            display: inline-block;
+            height: 22px;
+            background-color: transparent;
+            cursor: pointer;
+            vertical-align: middle;
+            position: relative;
+        }
+
+        .separator-placeholder::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -2px;
+            width: 5px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            transition: background 0.2s ease, border-radius 0.2s ease;
+            z-index: 1;
+            border-radius: 2px;
+        }
+
+        .separator-placeholder:hover::before {
+            background: #999999;
+        }
+
+        .hovered-alignment {
+            outline: 1px solid #6a6a6a;
+        }
     </style>
 </head>
 <body>
 <script src="bytewitch.js"></script>
-
 <div class="container" style="gap: 1rem; align-items: center;">
     <div class="header">
         <img src="icon.png">
@@ -310,7 +509,13 @@
     <div class="legend">
         <div class="bplist">bplist</div><div class="protobuf">protobuf</div><div class="opack">opack</div><div class="nsarchive">nsarchive</div><div class="asn1">asn.1</div><div class="generic">generic</div>
     </div>
-    <textarea id="data"></textarea>
+    <div id="data_container">
+        <textarea class="data input_area"></textarea>
+    </div>
+    <div class="icon-buttons">
+        <div class="icon icon-add" id="add_data"></div>
+        <div class="icon icon-delete" id="delete_data"></div>
+    </div>
     <div class="parsebuttons">
         <span>
             <input type="checkbox" id="livedecode" checked />
@@ -323,7 +528,7 @@
     </div>
 </div>
 
-<div class="container" id="output"><i>no valid decode yet</i></div>
+<div class="container" id="output"><i id="no_decode_yet">no valid decode yet</i></div>
 
 <div class="container" id="bytefinder">
     <h3>Byte Finder</h3>

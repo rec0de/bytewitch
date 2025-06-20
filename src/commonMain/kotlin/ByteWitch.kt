@@ -5,11 +5,10 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
-
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector, //Nemesys
+        EntropyDetector, HeuristicSignatureDetector
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
@@ -33,9 +32,11 @@ object ByteWitch {
     }
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
+        val allDecoders = decoders
+
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
-            return decoders.mapNotNull {
+            return allDecoders.mapNotNull {
                 val decode = it.tryhardDecode(data)
                 Logger.log("decode with ${it.name} yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
