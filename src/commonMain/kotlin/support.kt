@@ -21,7 +21,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
     if(veryWeird || string.isEmpty()) {
-        Logger.log("very weird string: $string")
+        //Logger.log("very weird string: $string")
         return 0.0
     }
 
@@ -32,7 +32,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val asciiPercentage = printableASCII.length.toDouble() / string.length
     val biasedAsciiPercentage = printableASCII.length.toDouble() / max(string.length, 7)
     if((biasedAsciiPercentage > 0.8 || asciiPercentage == 1.0) && weirdASCII.isEmpty()) {
-        Logger.log("mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias}")
+        //Logger.log("mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias}")
         return max(asciiPercentage - lengthBias, 0.0)
     }
 
@@ -94,7 +94,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
 
     val score = max(0.0, 1.0 + surrogatesBonus*0.25 + biasedAsciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
-    Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
+    //Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
 
     return score
 }

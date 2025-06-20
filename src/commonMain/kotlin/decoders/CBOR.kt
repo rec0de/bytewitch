@@ -4,6 +4,7 @@ import Logger
 import ParseCompanion
 import bitmage.*
 import looksLikeUtf8String
+import kotlin.math.min
 
 
 // CBOR is basically MsgPack is basically OPack, so we'll re-use classes
@@ -42,7 +43,23 @@ class CborParser : ParseCompanion() {
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if(data.size < 4)
                 return Pair(0.0, null)
-            return super.confidence(data, sourceOffset)
+
+            try {
+                val decoder = CborParser()
+                val result = decoder.parseTopLevel(data, sourceOffset)
+
+                var weirdTypePenalty = 0.0
+                if(result is OPTaggedParsedData && result.type > 32)
+                    weirdTypePenalty = -0.3
+                else if(result is OPTaggedData && result.type > 32)
+                    weirdTypePenalty = -0.3
+
+                val confidence = min(data.size.toDouble() / 16 + weirdTypePenalty, 1.0)
+
+                return Pair(confidence, result)
+            } catch (e: Exception) {
+                return Pair(0.0, null)
+            }
         }
     }
 
