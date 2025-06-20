@@ -13,6 +13,12 @@ class NemesysParser {
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
+    fun parseEntropy(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+        val boundaries = findEntropyBoundaries(messages)
+
+        return boundaries
+    }
+
     // parse bytewise and see every byte as one field without using Nemesys and without using Postprocessing
     fun parseBytewiseWithoutOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
         val segments = setBytewiseSegmentBoundaries(bytes)
@@ -496,6 +502,140 @@ class NemesysParser {
 
         return -1
     }
+
+    // calculate information entropy H(Di) for every position
+    private fun calcBytewiseEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val entropy = DoubleArray(minLength) { 0.0 }
+
+        // to through all bytes
+        for (i in 0 until minLength) {
+            val counts = mutableMapOf<Int, Int>()
+            for (msg in messages) {
+                val byte = msg.bytes[i].toInt() and 0xFF
+                counts[byte] = counts.getOrPut(byte) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+            entropy[i] = counts.entries.sumOf { (v, c) ->
+                val p = c / total
+                -p * ln(p)// TODO ln or log2?
+            }
+        }
+
+        return entropy
+    }
+
+    // calc Gain Ratio GR. GR(Di) means IGR from Di to Di+1. This says how much neighboring bytes belong together
+    private fun calcGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val gr = DoubleArray(minLength) { 0.0 }
+
+        for (i in 0 until minLength - 1) { // don't need to check the last byte
+            val pairCounts = mutableMapOf<Pair<Int, Int>, Int>() // how often byte combination [a,b] appear at pos i
+            val countsI = mutableMapOf<Int, Int>() // how often byte a appears at position i
+            val countsJ = mutableMapOf<Int, Int>() // how often byte b appears at position i
+
+            // go through all messages for counting byte a and byte b
+            for (msg in messages) {
+                val a = msg.bytes[i].toInt() and 0xFF
+                val b = msg.bytes[i + 1].toInt() and 0xFF
+                pairCounts[a to b] = pairCounts.getOrPut(a to b) { 0 } + 1
+                countsI[a] = countsI.getOrPut(a) { 0 } + 1
+                countsJ[b] = countsJ.getOrPut(b) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            // Entropy of (i, i+1)
+            val hXY = pairCounts.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i
+            val hX = countsI.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i+1
+            val hY = countsJ.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // calculate igr
+            val igr = hY - (hXY - hX)
+            gr[i] = if (entropy[i] > 0) igr / entropy[i] else 0.0
+        }
+
+        return gr
+    }
+
+    // set boundaries using Entropy and Gain Ratio
+    private fun getBoundariesUsingEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+        val minLength = messages.minOf { it.bytes.size }
+        val boundaries = mutableSetOf<Int>()
+
+        for (i in 1 until minLength - 1) {
+            // Rule 1: local maximum in entropy
+            if (entropy[i] >= entropy[i - 1] && entropy[i] > entropy[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 3: local minimum in GR
+            if (entropy[i] > 0 && gr[i] < gr[i - 1] && gr[i] < gr[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 4: GR < threshold
+            if (entropy[i] > 0 && gr[i] < threshold) {
+                boundaries.add(i)
+            }
+        }
+
+        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 00 00 00 | A5
+        for (i in 1 until minLength) {
+            if (entropy[i - 1] == 0.0 && entropy[i] > 0.0) { // past entropy was 0 and now it changed to something higher
+                val o = (i - 1 downTo 0).takeWhile { entropy[it] == 0.0 }.count() // check how many previous bytes with entropy 0 exist
+                val delta = (i - o) % 4 // TODO not sure if that's correct
+                boundaries.add(delta)
+            }
+        }
+
+        return boundaries
+    }
+
+
+    // entropy decoder for multiple messages
+    fun findEntropyBoundaries(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+        if (messages.isEmpty()) return emptyList()
+
+        // TODO calculation of entropy and igr could be made in one step. This saves performance but is harder to read.
+        // get information entropy H(Di) for every byte position
+        val entropy = calcBytewiseEntropy(messages)
+
+        // get Gain Ratio (gr)
+        val gr = calcGainRatio(messages, entropy)
+
+        // get boundaries based on rules
+        val boundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
+
+        // return in right format // TODO not sure if that's correct
+        return messages.mapIndexed { _, message ->
+            val localOffsets = boundaries.filter { it < message.bytes.size }
+
+            val segments = localOffsets.map { offset ->
+                NemesysSegment(offset, NemesysField.UNKNOWN)
+            }
+
+            NemesysParsedMessage(segments, message.bytes, message.msgIndex)
+        }
+    }
+
+
+
 
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<NemesysSegment> {
