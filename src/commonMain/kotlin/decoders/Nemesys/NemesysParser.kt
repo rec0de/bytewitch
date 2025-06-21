@@ -11,15 +11,83 @@ class NemesysParser {
         return NemesysParsedMessage(segments, bytes, msgIndex)
     }
 
+    // parse bytewise and see every byte as one field without using Nemesys and without using Postprocessing
+    fun parseBytewiseWithoutOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+        val segments = setBytewiseSegmentBoundaries(bytes)
+
+        return NemesysParsedMessage(segments, bytes, msgIndex)
+    }
+
+    // parse bytewise and see every byte as one field without using Nemesys
+    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+        val segments = setBytewiseSegmentBoundariesWithOptimization(bytes)
+
+        return NemesysParsedMessage(segments, bytes, msgIndex)
+    }
+
+    // every byte is one field. don't use postprocessing
+    private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<NemesysSegment>{
+        val taken = BooleanArray(bytes.size) { false }
+
+        // preProcessing to detect length fields
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        val dynamicSegments = mutableListOf<NemesysSegment>()
+        for (i in bytes.indices) { // go through each byte
+            if (!taken[i]) {
+                val slice = byteArrayOf(bytes[i])
+                // do some post processing to merge bytes together
+                val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.fieldType ?: NemesysField.UNKNOWN
+                dynamicSegments.add(NemesysSegment(i, type))
+            }
+        }
+
+        return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
+    }
+
+    // every byte is one field. only use pre- and postprocessing to merge bytes together
+    private fun setBytewiseSegmentBoundariesWithOptimization(bytes: ByteArray): List<NemesysSegment>{
+        val taken = BooleanArray(bytes.size) { false }
+
+        // preProcessing to detect length fields
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        // find free ranges
+        val freeRanges = mutableListOf<Pair<Int, Int>>()
+        var currentStart: Int? = null
+        for (i in bytes.indices) {
+            if (!taken[i]) {
+                if (currentStart == null) currentStart = i
+            } else {
+                if (currentStart != null) {
+                    freeRanges.add(currentStart to i)
+                    currentStart = null
+                }
+            }
+        }
+        if (currentStart != null) {
+            freeRanges.add(currentStart to bytes.size)
+        }
+
+        // set field boundaries after every byte
+        val dynamicSegments = mutableListOf<NemesysSegment>()
+        for ((start, end) in freeRanges) {
+            val boundaries = (start..end).toMutableList()
+            val segments = postProcessing(boundaries, bytes)
+            dynamicSegments.addAll(segments)
+        }
+
+        return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
+    }
+
+
     // count how often every segment exists
     fun countSegmentValues(messages: List<NemesysParsedMessage>, minSegmentLength: Int = 2): Map<ByteArray, Int> {
         val segmentValueCounts = mutableMapOf<ByteArray, Int>()
 
         for (msg in messages) {
             for ((index, segment) in msg.segments.withIndex()) {
-                val start = segment.offset
-                val end = msg.segments.getOrNull(index + 1)?.offset ?: msg.bytes.size
-                val segmentBytes = msg.bytes.sliceArray(start until end)
+                val segmentBytes = msg.bytes.sliceArray(NemesysUtil.getByteRange(msg, index))
 
                 // filter some segments
                 if (segmentBytes.size < minSegmentLength) continue
@@ -66,9 +134,7 @@ class NemesysParser {
                     continue
                 }
 
-                val start = curr.offset
-                val end = msg.segments.getOrNull(i + 1)?.offset ?: msg.bytes.size
-                val segmentBytes = msg.bytes.sliceArray(start until end)
+                val segmentBytes = msg.bytes.sliceArray(NemesysUtil.getByteRange(msg, i))
 
                 var splitOffsets = mutableSetOf<Int>()
                 splitOffsets.add(0) // segment start
@@ -99,7 +165,7 @@ class NemesysParser {
                 val sortedOffsets = splitOffsets.toList().sorted().distinct()
                 for (j in 0 until sortedOffsets.size - 1) {
                     val relativeOffset = sortedOffsets[j]
-                    newSegments.add(NemesysSegment(start + relativeOffset, curr.fieldType))
+                    newSegments.add(NemesysSegment(curr.offset + relativeOffset, curr.fieldType))
                 }
 
                 i++
@@ -807,7 +873,7 @@ class NemesysParser {
     }
 }
 
-// this object is used as a tool for nemesys parser and renderer
+// this object is used as a tool for nemesys classes
 object NemesysUtil {
     // get actual length given the bytes and endian
     fun tryParseLength(
@@ -838,5 +904,12 @@ object NemesysUtil {
         } catch (e: IndexOutOfBoundsException) {
             null
         }
+    }
+
+    // to detect the range of a segment
+    fun getByteRange(message: NemesysParsedMessage, index: Int): IntRange {
+        val start = message.segments[index].offset
+        val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
+        return start until end
     }
 }
