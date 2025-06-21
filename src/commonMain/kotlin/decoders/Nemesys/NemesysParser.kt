@@ -595,7 +595,7 @@ class NemesysParser {
             }
         }
 
-        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 00 00 00 | A5
+        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 34 AC | 00 00 00 A5
         for (i in 1 until minLength) {
             if (entropy[i - 1] == 0.0 && entropy[i] > 0.0) { // past entropy was 0 and now it changed to something higher
                 val o = (i - 1 downTo 0).takeWhile { entropy[it] == 0.0 }.count() // check how many previous bytes with entropy 0 exist
@@ -604,7 +604,7 @@ class NemesysParser {
             }
         }
 
-        return boundaries
+        return boundaries.sorted().toSet()
     }
 
 
@@ -620,15 +620,13 @@ class NemesysParser {
         val gr = calcGainRatio(messages, entropy)
 
         // get boundaries based on rules
-        val boundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
+        val globalBoundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
 
-        // return in right format // TODO not sure if that's correct
-        return messages.mapIndexed { _, message ->
-            val localOffsets = boundaries.filter { it < message.bytes.size }
-
-            val segments = localOffsets.map { offset ->
-                NemesysSegment(offset, NemesysField.UNKNOWN)
-            }
+        // postprocessing and return in right format
+        return messages.map { message ->
+            // Post Processing to improve local segmentation
+            val localOffsets = globalBoundaries.filter { it < message.bytes.size }.toMutableList()
+            val segments = postProcessing(localOffsets, message.bytes)
 
             NemesysParsedMessage(segments, message.bytes, message.msgIndex)
         }

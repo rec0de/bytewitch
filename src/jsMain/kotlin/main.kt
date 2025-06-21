@@ -1,4 +1,5 @@
 import bitmage.hex
+import decoders.ByteWitchResult
 import decoders.Nemesys.*
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -251,9 +252,47 @@ fun exportAlignments(): String {
     )"""
 }*/
 
+// use entropy decoder and attach output to messageBox
+fun decodeWithEntropy() {
+    val  nemesysParsedMessages = NemesysParser().parseEntropy(parsedMessages.values.toList())
+
+    nemesysParsedMessages.forEach {
+        val messageId = "message-output-${it.msgIndex}"
+        var messageBox = document.getElementById(messageId) as HTMLDivElement
+
+        // remove old nemesys content
+        val existingParsers = messageBox.querySelectorAll("h3")
+        for (i in 0 until existingParsers.length) {
+            val heading = existingParsers.item(i) as? HTMLHeadingElement ?: continue
+            if (heading.innerText.lowercase() == "nemesysparser") {
+                heading.parentElement?.remove()
+                break
+            }
+        }
+        // TODO change nemesys word to entropy
+
+        // add new nemesys content
+        val nemesysResult = document.createElement("DIV") as HTMLDivElement
+        val nemesysName = document.createElement("H3") as HTMLHeadingElement
+        nemesysName.innerText = "nemesysparser"
+
+        val nemesysContent = document.createElement("DIV") as HTMLDivElement
+        nemesysContent.classList.add("parsecontent")
+        nemesysContent.innerHTML = NemesysRenderer.render(it)
+
+        attachRangeListeners(nemesysContent, it.msgIndex)
+        attachNemesysButtons(nemesysContent, it.bytes, it.msgIndex)
+
+        nemesysResult.appendChild(nemesysName)
+        nemesysResult.appendChild(nemesysContent)
+
+        messageBox.appendChild(nemesysResult)
+    }
+}
+
 
 // decode one specific byte sequence
-fun decodeBytes(bytes: ByteArray, taIndex: Int) {
+fun decodeBytes(bytes: ByteArray, taIndex: Int, showNemesysContent: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -286,45 +325,61 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
         }
 
         result.forEach {
-            val parseResult = document.createElement("DIV") as HTMLDivElement
-
-            val parseName = document.createElement("H3") as HTMLHeadingElement
-            parseName.innerText = it.first
-
-            val parseContent = document.createElement("DIV") as HTMLDivElement
-            parseContent.classList.add("parsecontent")
-            parseContent.innerHTML = it.second.renderHTML()
-
-            attachRangeListeners(parseContent, taIndex)
-
-            parseResult.appendChild(parseName)
-            parseResult.appendChild(parseContent)
-            messageBox.appendChild(parseResult)
+            messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
 
-        // for nemesys (and float view)
-        val nemesysParsed = NemesysParser().parse(bytes, taIndex)
-        parsedMessages[taIndex] = nemesysParsed // besides nemesys this is also needed for the float view
-
-        val nemesysResult = document.createElement("DIV") as HTMLDivElement
-        val nemesysName = document.createElement("H3") as HTMLHeadingElement
-        nemesysName.innerText = "nemesysparser"
-
-        val nemesysContent = document.createElement("DIV") as HTMLDivElement
-        nemesysContent.classList.add("parsecontent")
-        nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
-
-        attachRangeListeners(nemesysContent, taIndex)
-        attachNemesysButtons(nemesysContent, bytes, taIndex)
-
-        nemesysResult.appendChild(nemesysName)
-        nemesysResult.appendChild(nemesysContent)
-        messageBox.appendChild(nemesysResult)
+        // for nemesys content
+        if (showNemesysContent) {
+            messageBox.appendChild(decodeWithNemesys(bytes, taIndex))
+        }
     }
+}
+
+// render result of byte witch decoder
+private fun renderByteWitchResult(it: Pair<String, ByteWitchResult>, taIndex: Int): HTMLDivElement {
+    val parseResult = document.createElement("DIV") as HTMLDivElement
+
+    val parseName = document.createElement("H3") as HTMLHeadingElement
+    parseName.innerText = it.first
+
+    val parseContent = document.createElement("DIV") as HTMLDivElement
+    parseContent.classList.add("parsecontent")
+    parseContent.innerHTML = it.second.renderHTML()
+
+    attachRangeListeners(parseContent, taIndex)
+
+    parseResult.appendChild(parseName)
+    parseResult.appendChild(parseContent)
+
+    return parseResult
+}
+
+// decode bytes with nemesys and return HTML content
+private fun decodeWithNemesys(bytes: ByteArray, taIndex: Int): HTMLDivElement {
+    val nemesysParsed = NemesysParser().parse(bytes, taIndex)
+    parsedMessages[taIndex] = nemesysParsed
+
+    val nemesysResult = document.createElement("DIV") as HTMLDivElement
+    val nemesysName = document.createElement("H3") as HTMLHeadingElement
+    nemesysName.innerText = "nemesysparser"
+
+    val nemesysContent = document.createElement("DIV") as HTMLDivElement
+    nemesysContent.classList.add("parsecontent")
+    nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
+
+    attachRangeListeners(nemesysContent, taIndex)
+    attachNemesysButtons(nemesysContent, bytes, taIndex)
+
+    nemesysResult.appendChild(nemesysName)
+    nemesysResult.appendChild(nemesysContent)
+
+    return nemesysResult
 }
 
 // decode all text areas
 fun decode(isLiveDecoding: Boolean) {
+    val showNemesysContent = true
+
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -335,19 +390,24 @@ fun decode(isLiveDecoding: Boolean) {
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
-            decodeBytes(bytes, i)
+            parsedMessages[i] = NemesysParsedMessage(listOf(), bytes, i) // for float view if showNemesysContent is set to false
+            decodeBytes(bytes, i, showNemesysContent)
         }
     }
 
-    // refine nemesys fields and rerender html content
-    val refined = NemesysParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
-    refined.forEach { msg ->
-        parsedMessages[msg.msgIndex] = msg
-        rerenderNemesys(msg.msgIndex, msg)
+
+    if (showNemesysContent) { // refine nemesys fields and rerender html content
+        val refined = NemesysParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+        refined.forEach { msg ->
+            parsedMessages[msg.msgIndex] = msg
+            rerenderNemesys(msg.msgIndex, msg)
+        }
+    } else { // show output of entropy decoder
+        decodeWithEntropy()
     }
 
     // for sequence alignment
-    if (tryhard && !isLiveDecoding) {
+    if (tryhard && !isLiveDecoding && showNemesysContent) {
         val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
         attachSequenceAlignmentListeners(alignedSegment)
     }

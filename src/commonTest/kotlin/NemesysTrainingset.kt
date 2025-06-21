@@ -29,7 +29,7 @@ class NemesysTrainingset {
         assertTrue(false, "F1 score should be at least 80%")
     }
 
-    /*private fun printSegmentParsingResult(
+    private fun printSegmentParsingResult(
         testNumber: Int,
         expectedSegments: List<NemesysSegment>,
         actualSegments: List<NemesysSegment>) {
@@ -51,8 +51,8 @@ class NemesysTrainingset {
         println("Precision: ${(precision * 100).toInt()}%")
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
-    }*/
-    private fun printSegmentParsingResult(
+    }
+    /*private fun printSegmentParsingResult(
         testNumber: Int,
         expectedBoundaries: List<ExpectedBoundary>,
         actualSegments: List<NemesysSegment>
@@ -82,7 +82,7 @@ class NemesysTrainingset {
         println("Precision: ${(precision * 100).toInt()}%")
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
-    }
+    }*/
 
 
     private fun printSequenceAlignmentResult(
@@ -362,11 +362,11 @@ class NemesysTrainingset {
 
     @Test
     fun runSegmentationTests() {
-        testSegmentParsing1()
-        testSegmentParsing2()
+        // testSegmentParsing1()
+        // testSegmentParsing2()
         testSegmentParsing3()
-        /*testSegmentParsing4()
-        testSegmentParsing5()
+        testSegmentParsing4()
+        /*testSegmentParsing5()
         testSegmentParsing6()
         testSegmentParsing7()
         testSegmentParsing8()
@@ -376,6 +376,13 @@ class NemesysTrainingset {
         testSegmentParsing12()
         testSegmentParsing13()
         testSegmentParsing14()*/
+
+        printFinalScore()
+    }
+
+    @Test
+    fun runSegmentationOnMultipleMessagesTests() {
+        testMultipleMessagesSegmentParsing1()
 
         printFinalScore()
     }
@@ -406,7 +413,7 @@ class NemesysTrainingset {
     private fun testSegmentParsing1() {
         val bytes = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
 
-        /*val expectedSegments = listOf(
+        val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.STRING),
             NemesysSegment(6, NemesysField.STRING),
             NemesysSegment(8, NemesysField.UNKNOWN),
@@ -420,8 +427,8 @@ class NemesysTrainingset {
             NemesysSegment(35, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN),
             NemesysSegment(36, NemesysField.STRING),
             NemesysSegment(72, NemesysField.UNKNOWN)
-        )*/
-        val expectedBoundaries = listOf(
+        )
+        /*val expectedBoundaries = listOf(
             ExpectedBoundary(0, true),
             ExpectedBoundary(6, false),
             ExpectedBoundary(8, true),
@@ -435,19 +442,20 @@ class NemesysTrainingset {
             ExpectedBoundary(35, true),
             ExpectedBoundary(36, false),
             ExpectedBoundary(72, true)
-        )
+        )*/
 
 
         val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
-        printSegmentParsingResult(1, expectedBoundaries, actualSegments)
+        printSegmentParsingResult(1, expectedSegments, actualSegments)
+        // printSegmentParsingResult(1, expectedBoundaries, actualSegments)
     }
 
     private fun testSegmentParsing2() {
         val bytes = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102446394532423231352d393431372d344141372d413439302d384446364539443445364639080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
 
-        /*val expectedSegments = listOf(
+        val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.STRING),
             NemesysSegment(6, NemesysField.STRING),
             NemesysSegment(8, NemesysField.UNKNOWN),
@@ -461,8 +469,8 @@ class NemesysTrainingset {
             NemesysSegment(35, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN),
             NemesysSegment(36, NemesysField.STRING),
             NemesysSegment(72, NemesysField.UNKNOWN)
-        )*/
-        val expectedBoundaries = listOf(
+        )
+        /*val expectedBoundaries = listOf(
             ExpectedBoundary(0, true),   // required
             ExpectedBoundary(6, false),  // optional
             ExpectedBoundary(8, true),   // required
@@ -476,19 +484,20 @@ class NemesysTrainingset {
             ExpectedBoundary(35, true),  // required
             ExpectedBoundary(36, true), // optional
             ExpectedBoundary(72, true)   // required
-        )
+        )*/
 
 
         val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
-        printSegmentParsingResult(2, expectedBoundaries, actualSegments)
+        printSegmentParsingResult(2, expectedSegments, actualSegments)
+        // printSegmentParsingResult(2, expectedBoundaries, actualSegments)
     }
 
     private fun testSegmentParsing3() {
         val bytes = "A5626964187B68757365726E616D6565616C69636565656D61696C71616C696365406578616D706C652E636F6D6770726F66696C65A263616765181E67636F756E747279674765726D616E796969735F616374697665F5".fromHex()
 
-        /*val expectedSegments = listOf(
+        val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),   // Start des gesamten Objekts
             NemesysSegment(1, NemesysField.UNKNOWN),   // "id" type
             NemesysSegment(2, NemesysField.STRING),   // "id"
@@ -514,8 +523,8 @@ class NemesysTrainingset {
             NemesysSegment(76, NemesysField.UNKNOWN),  // "is_active" type
             NemesysSegment(77, NemesysField.STRING),  // "is_active"
             NemesysSegment(86, NemesysField.UNKNOWN)   // true
-        )*/
-        val expectedBoundaries = listOf(
+        )
+        /*val expectedBoundaries = listOf(
             ExpectedBoundary(0, true),    // Start des gesamten Objekts
             ExpectedBoundary(1, true),    // "id" type
             ExpectedBoundary(2, true),   // "id" (optional)
@@ -541,16 +550,17 @@ class NemesysTrainingset {
             ExpectedBoundary(76, true),   // "is_active" type
             ExpectedBoundary(77, true),  // "is_active" (optional)
             ExpectedBoundary(86, true)    // true
-        )
+        )*/
 
 
         val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
 
-        printSegmentParsingResult(3, expectedBoundaries, actualSegments)
+        printSegmentParsingResult(3, expectedSegments, actualSegments)
+        // printSegmentParsingResult(3, expectedBoundaries, actualSegments)
     }
 
-    /*private fun testSegmentParsing4() {
+    private fun testSegmentParsing4() {
         val bytes = "A56269640368757365726E616D6563626F6265656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E747279635553416969735F616374697665F4".fromHex()
 
         val expectedSegments = listOf(
@@ -914,7 +924,227 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(14, expectedSegments, actualSegments)
-    }*/
+    }
+
+    private fun testMultipleMessagesSegmentParsing1() {
+        val message1 = "A5626964187B68757365726E616D6565616C69636565656D61696C71616C696365406578616D706C652E636F6D6770726F66696C65A263616765181E67636F756E747279674765726D616E796969735F616374697665F5".fromHex()
+        val message2 = "A56269640368757365726E616D6563626F6265656D61696C6A626F6240676D782E64656770726F66696C65A263616765184C67636F756E747279635553416969735F616374697665F4".fromHex()
+        val message3 = "b90005626964181a68757365726e616d65656672616e7a65656d61696c746672616e7a2e6261756d616e6e40676d782e64656770726f66696c65b9000263616765183667636f756e7472796a4e65746865726c616e646969735f616374697665f4".fromHex()
+        val message4 = "b90005626964183568757365726e616d65666e696b65333265656d61696c6e6e696b6540676d61696c2e636f6d6770726f66696c65b90002636167651567636f756e7472796a4e65746865726c616e646969735f616374697665f5".fromHex()
+        val message5 = "b9000562696419035568757365726e616d656c73696d6f6e6c65686d616e6e65656d61696c736c65686d616e6e393840676d61696c2e636f6d6770726f66696c65b9000263616765181a67636f756e7472796742656c6769756d6969735f616374697665f5".fromHex()
+        val message6 = "b9000562696419017d68757365726e616d656d776f6c6667616e674b61666b6165656d61696c6e4b61666b613132407765622e64656770726f66696c65b9000263616765182e67636f756e74727965496e6469616969735f616374697665f5".fromHex()
+        val message7 = "b900056269640268757365726e616d656872616c664f74746f65656d61696c6f4f74746f3231407961686f6f2e64656770726f66696c65b90002636167651567636f756e7472796553797269616969735f616374697665f4".fromHex()
+
+        val expectedSegments1 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),   // Start des gesamten Objekts
+            NemesysSegment(1, NemesysField.UNKNOWN),   // "id" type
+            NemesysSegment(2, NemesysField.STRING),   // "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),   // 123
+            NemesysSegment(6, NemesysField.UNKNOWN),   // "username" type
+            NemesysSegment(7, NemesysField.STRING),   // "username"
+            NemesysSegment(15, NemesysField.UNKNOWN),  // "alice" type
+            NemesysSegment(16, NemesysField.STRING),  // "alice"
+            NemesysSegment(21, NemesysField.UNKNOWN),  // "email" type
+            NemesysSegment(22, NemesysField.STRING),  // "email"
+            NemesysSegment(27, NemesysField.UNKNOWN),  // "alice@example.com" type
+            NemesysSegment(28, NemesysField.STRING),  // "alice@example.com"
+            NemesysSegment(45, NemesysField.UNKNOWN),  // "profile" type
+            NemesysSegment(46, NemesysField.STRING),  // "profile"
+            NemesysSegment(53, NemesysField.UNKNOWN),  // verschachteltes Objekt beginnt
+            NemesysSegment(54, NemesysField.UNKNOWN),  // "age" type
+            NemesysSegment(55, NemesysField.STRING),  // "age"
+            NemesysSegment(58, NemesysField.UNKNOWN),  // 30
+            NemesysSegment(60, NemesysField.UNKNOWN),  // "country" type
+            NemesysSegment(61, NemesysField.STRING),  // "country"
+            NemesysSegment(68, NemesysField.UNKNOWN),  // "Germany" type
+            NemesysSegment(69, NemesysField.STRING),  // "Germany"
+            NemesysSegment(76, NemesysField.UNKNOWN),  // "is_active" type
+            NemesysSegment(77, NemesysField.STRING),  // "is_active"
+            NemesysSegment(86, NemesysField.UNKNOWN)   // true
+        )
+        val expectedSegments2 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),   // Start des gesamten Objekts
+            NemesysSegment(1, NemesysField.UNKNOWN),   // "id" type
+            NemesysSegment(2, NemesysField.STRING),   // "id"
+            NemesysSegment(4, NemesysField.UNKNOWN),   // 3
+            NemesysSegment(5, NemesysField.UNKNOWN),   // "username" type
+            NemesysSegment(6, NemesysField.STRING),   // "username"
+            NemesysSegment(14, NemesysField.UNKNOWN),  // "bob" type
+            NemesysSegment(15, NemesysField.STRING),  // "bob"
+            NemesysSegment(18, NemesysField.UNKNOWN),  // "email" type
+            NemesysSegment(19, NemesysField.STRING),  // "email"
+            NemesysSegment(24, NemesysField.UNKNOWN),  // "bob@gmx.de" type
+            NemesysSegment(25, NemesysField.STRING),  // "bob@gmx.de"
+            NemesysSegment(35, NemesysField.UNKNOWN),  // "profile" type
+            NemesysSegment(36, NemesysField.STRING),  // "profile"
+            NemesysSegment(43, NemesysField.UNKNOWN),  // verschachteltes Objekt beginnt
+            NemesysSegment(44, NemesysField.UNKNOWN),  // "age" type
+            NemesysSegment(45, NemesysField.STRING),  // "age"
+            NemesysSegment(48, NemesysField.UNKNOWN),  // 76
+            NemesysSegment(50, NemesysField.UNKNOWN),  // "country" type
+            NemesysSegment(51, NemesysField.STRING),  // "country"
+            NemesysSegment(58, NemesysField.UNKNOWN),  // "USA" type
+            NemesysSegment(59, NemesysField.STRING),  // "USA"
+            NemesysSegment(62, NemesysField.UNKNOWN),  // "is_active" type
+            NemesysSegment(63, NemesysField.STRING),  // "is_active"
+            NemesysSegment(72, NemesysField.UNKNOWN)   // false
+        )
+        val expectedSegments3 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),   // Start des gesamten Objekts
+            NemesysSegment(3, NemesysField.UNKNOWN),   // "id" type
+            NemesysSegment(4, NemesysField.STRING),    // "id"
+            NemesysSegment(6, NemesysField.UNKNOWN),   // 26
+            NemesysSegment(8, NemesysField.UNKNOWN),   // "username" type
+            NemesysSegment(9, NemesysField.STRING),    // "username"
+            NemesysSegment(17, NemesysField.UNKNOWN),  // "franz" type
+            NemesysSegment(18, NemesysField.STRING),   // "franz"
+            NemesysSegment(23, NemesysField.UNKNOWN),  // "email" type
+            NemesysSegment(24, NemesysField.STRING),   // "email"
+            NemesysSegment(29, NemesysField.UNKNOWN),  // "franz.baumann@gmx.de" type
+            NemesysSegment(30, NemesysField.STRING),   // "franz.baumann@gmx.de"
+            NemesysSegment(50, NemesysField.UNKNOWN),  // "profile" type
+            NemesysSegment(51, NemesysField.STRING),   // "profile"
+            NemesysSegment(58, NemesysField.UNKNOWN),  // verschachteltes Objekt beginnt
+            NemesysSegment(61, NemesysField.UNKNOWN),  // "age" type
+            NemesysSegment(62, NemesysField.STRING),   // "age"
+            NemesysSegment(65, NemesysField.UNKNOWN),  // 54
+            NemesysSegment(67, NemesysField.UNKNOWN),  // "country" type
+            NemesysSegment(68, NemesysField.STRING),   // "country"
+            NemesysSegment(75, NemesysField.UNKNOWN),  // "Netherland" type
+            NemesysSegment(76, NemesysField.STRING),   // "Netherland"
+            NemesysSegment(86, NemesysField.UNKNOWN),  // "is_active" type
+            NemesysSegment(87, NemesysField.STRING),   // "is_active"
+            NemesysSegment(96, NemesysField.UNKNOWN)   // false
+        )
+        val expectedSegments4 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),   // Start des gesamten Objekts
+            NemesysSegment(3, NemesysField.UNKNOWN),   // "id" type
+            NemesysSegment(4, NemesysField.STRING),    // "id"
+            NemesysSegment(6, NemesysField.UNKNOWN),   // 53
+            NemesysSegment(8, NemesysField.UNKNOWN),   // "username" type
+            NemesysSegment(9, NemesysField.STRING),    // "username"
+            NemesysSegment(17, NemesysField.UNKNOWN),  // "nike32" type
+            NemesysSegment(18, NemesysField.STRING),   // "nike32"
+            NemesysSegment(24, NemesysField.UNKNOWN),  // "email" type
+            NemesysSegment(25, NemesysField.STRING),   // "email"
+            NemesysSegment(30, NemesysField.UNKNOWN),  // "nike@gmail.com" type
+            NemesysSegment(31, NemesysField.STRING),   // "nike@gmail.com"
+            NemesysSegment(45, NemesysField.UNKNOWN),  // "profile" type
+            NemesysSegment(46, NemesysField.STRING),   // "profile"
+            NemesysSegment(53, NemesysField.UNKNOWN),  // verschachteltes Objekt beginnt
+            NemesysSegment(56, NemesysField.UNKNOWN),  // "age" type
+            NemesysSegment(57, NemesysField.STRING),   // "age"
+            NemesysSegment(60, NemesysField.UNKNOWN),  // 21
+            NemesysSegment(61, NemesysField.UNKNOWN),  // "country" type
+            NemesysSegment(62, NemesysField.STRING),   // "country"
+            NemesysSegment(69, NemesysField.UNKNOWN),  // "Netherland" type
+            NemesysSegment(70, NemesysField.STRING),   // "Netherland"
+            NemesysSegment(80, NemesysField.UNKNOWN),  // "is_active" type
+            NemesysSegment(81, NemesysField.STRING),   // "is_active"
+            NemesysSegment(90, NemesysField.UNKNOWN)   // true
+        )
+        val expectedSegments5 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),    // Start des Objekts
+            NemesysSegment(3, NemesysField.UNKNOWN),    // "id" type
+            NemesysSegment(4, NemesysField.STRING),     // "id"
+            NemesysSegment(6, NemesysField.UNKNOWN),    // 853
+            NemesysSegment(9, NemesysField.UNKNOWN),    // "username" type
+            NemesysSegment(10, NemesysField.STRING),    // "username"
+            NemesysSegment(18, NemesysField.UNKNOWN),   // "simonlehmann" type
+            NemesysSegment(19, NemesysField.STRING),    // "simonlehmann"
+            NemesysSegment(31, NemesysField.UNKNOWN),   // "email" type
+            NemesysSegment(32, NemesysField.STRING),    // "email"
+            NemesysSegment(37, NemesysField.UNKNOWN),   // "lehmann98@gmail.com" type
+            NemesysSegment(38, NemesysField.STRING),    // "lehmann98@gmail.com"
+            NemesysSegment(57, NemesysField.UNKNOWN),   // "profile" type
+            NemesysSegment(58, NemesysField.STRING),    // "profile"
+            NemesysSegment(65, NemesysField.UNKNOWN),   // verschachteltes Objekt beginnt
+            NemesysSegment(68, NemesysField.UNKNOWN),   // "age" type
+            NemesysSegment(69, NemesysField.STRING),    // "age"
+            NemesysSegment(72, NemesysField.UNKNOWN),   // 26
+            NemesysSegment(74, NemesysField.UNKNOWN),   // "country" type
+            NemesysSegment(75, NemesysField.STRING),    // "country"
+            NemesysSegment(82, NemesysField.UNKNOWN),   // "Belgium" type
+            NemesysSegment(83, NemesysField.STRING),    // "Belgium"
+            NemesysSegment(90, NemesysField.UNKNOWN),   // "is_active" type
+            NemesysSegment(91, NemesysField.STRING),    // "is_active"
+            NemesysSegment(100, NemesysField.UNKNOWN)   // true
+        )
+        val expectedSegments6 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),    // Start des Objekts
+            NemesysSegment(3, NemesysField.UNKNOWN),    // "id" type
+            NemesysSegment(4, NemesysField.STRING),     // "id"
+            NemesysSegment(6, NemesysField.UNKNOWN),    // 381
+            NemesysSegment(9, NemesysField.UNKNOWN),    // "username" type
+            NemesysSegment(10, NemesysField.STRING),    // "username"
+            NemesysSegment(18, NemesysField.UNKNOWN),   // "wolfgangKafka" type
+            NemesysSegment(19, NemesysField.STRING),    // "wolfgangKafka"
+            NemesysSegment(32, NemesysField.UNKNOWN),   // "email" type
+            NemesysSegment(33, NemesysField.STRING),    // "email"
+            NemesysSegment(38, NemesysField.UNKNOWN),   // "Kafka12@web.de" type
+            NemesysSegment(39, NemesysField.STRING),    // "Kafka12@web.de"
+            NemesysSegment(53, NemesysField.UNKNOWN),   // "profile" type
+            NemesysSegment(54, NemesysField.STRING),    // "profile"
+            NemesysSegment(61, NemesysField.UNKNOWN),   // verschachteltes Objekt beginnt
+            NemesysSegment(64, NemesysField.UNKNOWN),   // "age" type
+            NemesysSegment(65, NemesysField.STRING),    // "age"
+            NemesysSegment(68, NemesysField.UNKNOWN),   // 46
+            NemesysSegment(70, NemesysField.UNKNOWN),   // "country" type
+            NemesysSegment(71, NemesysField.STRING),    // "country"
+            NemesysSegment(78, NemesysField.UNKNOWN),   // "India" type
+            NemesysSegment(79, NemesysField.STRING),    // "India"
+            NemesysSegment(84, NemesysField.UNKNOWN),   // "is_active" type
+            NemesysSegment(85, NemesysField.STRING),    // "is_active"
+            NemesysSegment(94, NemesysField.UNKNOWN)    // true
+        )
+        val expectedSegments7 = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),    // Start des Objekts
+            NemesysSegment(3, NemesysField.UNKNOWN),    // "id" type
+            NemesysSegment(4, NemesysField.STRING),     // "id"
+            NemesysSegment(6, NemesysField.UNKNOWN),    // 2
+            NemesysSegment(7, NemesysField.UNKNOWN),    // "username" type
+            NemesysSegment(8, NemesysField.STRING),     // "username"
+            NemesysSegment(16, NemesysField.UNKNOWN),   // "ralfOtto" type
+            NemesysSegment(17, NemesysField.STRING),    // "ralfOtto"
+            NemesysSegment(25, NemesysField.UNKNOWN),   // "email" type
+            NemesysSegment(26, NemesysField.STRING),    // "email"
+            NemesysSegment(31, NemesysField.UNKNOWN),   // "Otto21@yahoo.de" type
+            NemesysSegment(32, NemesysField.STRING),    // "Otto21@yahoo.de"
+            NemesysSegment(47, NemesysField.UNKNOWN),   // "profile" type
+            NemesysSegment(48, NemesysField.STRING),    // "profile"
+            NemesysSegment(55, NemesysField.UNKNOWN),   // verschachteltes Objekt
+            NemesysSegment(58, NemesysField.UNKNOWN),   // "age" type
+            NemesysSegment(59, NemesysField.STRING),    // "age"
+            NemesysSegment(62, NemesysField.UNKNOWN),   // 21
+            NemesysSegment(63, NemesysField.UNKNOWN),   // "country" type
+            NemesysSegment(64, NemesysField.STRING),    // "country"
+            NemesysSegment(71, NemesysField.UNKNOWN),   // "Syria" type
+            NemesysSegment(72, NemesysField.STRING),    // "Syria"
+            NemesysSegment(77, NemesysField.UNKNOWN),   // "is_active" type
+            NemesysSegment(78, NemesysField.STRING),    // "is_active"
+            NemesysSegment(87, NemesysField.UNKNOWN)    // false
+        )
+
+        val listOfMessages = listOf(
+            NemesysParsedMessage(listOf(), message1, 1),
+            NemesysParsedMessage(listOf(), message2, 2),
+            NemesysParsedMessage(listOf(), message3, 3),
+            NemesysParsedMessage(listOf(), message4, 4),
+            NemesysParsedMessage(listOf(), message5, 5),
+            NemesysParsedMessage(listOf(), message6, 6),
+            NemesysParsedMessage(listOf(), message7, 7),
+        )
+
+        val nemesysParsedMessages = NemesysParser().parseEntropy(listOfMessages)
+        val allSegments = nemesysParsedMessages.flatMap { it.segments }
+        printSegmentParsingResult(1, expectedSegments1, allSegments)
+        printSegmentParsingResult(2, expectedSegments2, allSegments)
+        printSegmentParsingResult(3, expectedSegments3, allSegments)
+        printSegmentParsingResult(4, expectedSegments4, allSegments)
+        printSegmentParsingResult(5, expectedSegments5, allSegments)
+        printSegmentParsingResult(6, expectedSegments6, allSegments)
+        printSegmentParsingResult(7, expectedSegments7, allSegments)
+    }
 
     private fun testSequenceAlignment1() {
         val message1 = "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex()
