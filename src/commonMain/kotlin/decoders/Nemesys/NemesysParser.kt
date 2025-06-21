@@ -504,7 +504,7 @@ class NemesysParser {
     }
 
     // calculate information entropy H(Di) for every position
-    private fun calcBytewiseEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
+    fun calcBytewiseEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
         val minLength = messages.minOf { it.bytes.size }
         val entropy = DoubleArray(minLength) { 0.0 }
 
@@ -527,7 +527,7 @@ class NemesysParser {
     }
 
     // calc Gain Ratio GR. GR(Di) means IGR from Di to Di+1. This says how much neighboring bytes belong together
-    private fun calcGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
+    fun calcGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
         val minLength = messages.minOf { it.bytes.size }
         val gr = DoubleArray(minLength) { 0.0 }
 
@@ -574,7 +574,7 @@ class NemesysParser {
     }
 
     // set boundaries using Entropy and Gain Ratio
-    private fun getBoundariesUsingEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+    fun getBoundariesUsingEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
         val minLength = messages.minOf { it.bytes.size }
         val boundaries = mutableSetOf<Int>()
 
@@ -633,8 +633,6 @@ class NemesysParser {
             NemesysParsedMessage(segments, message.bytes, message.msgIndex)
         }
     }
-
-
 
 
     // find segmentation boundaries
