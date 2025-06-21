@@ -2,6 +2,7 @@ import decoders.Nemesys.NemesysField
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import decoders.Nemesys.NemesysSequenceAlignment
+import kotlin.test.assertContentEquals
 import kotlin.test.assertNotEquals
 
 class NemesysSequenceAlignmentTests {
@@ -104,5 +105,37 @@ class NemesysSequenceAlignmentTests {
                 assertEquals(expected[i][j], matrix[i][j], absoluteTolerance = 0.0001)
             }
         }
+    }
+
+    @Test
+    fun testAveragePoolSegmentExactSplit() {
+        val input = ByteWitch.getBytesFromInputEncoding("10203040")
+        val result = NemesysSequenceAlignment.averagePoolSegment(input, 2)
+        val expected = ByteWitch.getBytesFromInputEncoding("1838") // [10,20] → 18; [30,40] → 38
+        assertContentEquals(expected, result)
+    }
+
+    @Test
+    fun testAveragePoolSegmentUnevenSplit1() {
+        val input = ByteWitch.getBytesFromInputEncoding("10203040506070")
+        val result = NemesysSequenceAlignment.averagePoolSegment(input, 3)
+        val expected = ByteWitch.getBytesFromInputEncoding("183860") // [10,20]→18; [30,40]→38; [50,60,70]→60
+        assertContentEquals(expected, result)
+    }
+
+    @Test
+    fun testAveragePoolSegmentUnevenSplit2() {
+        val input = ByteWitch.getBytesFromInputEncoding("AB9DE2C34A")
+        val result = NemesysSequenceAlignment.averagePoolSegment(input, 3)
+        val expected = ByteWitch.getBytesFromInputEncoding("ABBF86") // [AB]→AB; [9D,E2]→BF; [C3,4A]→86
+        assertContentEquals(expected, result)
+    }
+
+    @Test
+    fun testAveragePoolSegmentEmptyInput() {
+        val input = byteArrayOf()
+        val result = NemesysSequenceAlignment.averagePoolSegment(input, 3)
+        val expected = ByteWitch.getBytesFromInputEncoding("000000") // no input → erverything should be 0
+        assertContentEquals(expected, result)
     }
 }

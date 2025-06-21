@@ -15,6 +15,7 @@ import org.w3c.dom.events.Event
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
+var tryhard = false
 
 // save parsed messages for float view and nemesys
 var parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
@@ -39,11 +40,13 @@ fun main() {
         applyLiveDecodeListeners()
 
         decodeBtn.onclick = {
+            tryhard = false
             decode(false)
         }
 
         tryhardBtn.onclick = {
-            decode(true)
+            tryhard = true
+            decode(false)
         }
 
         uploadBtn.onclick = {
@@ -83,7 +86,7 @@ fun main() {
             // for live decode
             if (liveDecodeEnabled) {
                 newTextarea.oninput = {
-                    decode(false)
+                    decode(true)
                 }
             }
         }
@@ -117,6 +120,7 @@ fun removeTextArea(dataContainer: Element) {
 
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement
+
     output.removeChild(output.lastElementChild!!)
 
     // reset floatview
@@ -132,7 +136,7 @@ fun applyLiveDecodeListeners() {
         val ta = textareas[i] as HTMLTextAreaElement
         ta.oninput = {
             if (liveDecodeEnabled)
-                decode(false)
+                decode(true)
         }
     }
 }
@@ -183,8 +187,6 @@ fun applyLiveDecodeListeners() {
         NemesysSegment(154, NemesysField.UNKNOWN)    // true
     )
 
-
-
     val messages = mutableMapOf(
         0 to NemesysParsedMessage(segments1, message1, 0),
         // 1 to NemesysParsedMessage(segments2, message2, 1)
@@ -192,11 +194,6 @@ fun applyLiveDecodeListeners() {
 
     return messages
 }
-
-
-
-val selectedGroups = mutableListOf<MutableSet<String>>()
-var currentGroup = mutableSetOf<String>()
 
 fun setupSelectableSegments() {
     val elements = document.querySelectorAll("[value-align-id]")
@@ -256,13 +253,17 @@ fun exportAlignments(): String {
 
 
 // decode one specific byte sequence
-fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
+fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
     val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
+    // Reset output
     floatview.innerHTML = ""
+    textview.innerHTML = ""
+    bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
 
     // decode input
@@ -323,7 +324,7 @@ fun decodeBytes(tryhard: Boolean, bytes: ByteArray, taIndex: Int) {
 }
 
 // decode all text areas
-fun decode(tryhard: Boolean) {
+fun decode(isLiveDecoding: Boolean) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -334,7 +335,7 @@ fun decode(tryhard: Boolean) {
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
-            decodeBytes(tryhard, bytes, i)
+            decodeBytes(bytes, i)
         }
     }
 
@@ -346,10 +347,10 @@ fun decode(tryhard: Boolean) {
     }
 
     // for sequence alignment
-    val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
-    attachSequenceAlignmentListeners(alignedSegment)
-
-
+    if (tryhard && !isLiveDecoding) {
+        val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
+        attachSequenceAlignmentListeners(alignedSegment)
+    }
 
     // TODO for testing purposes only
     // includeAlignmentForTesting()
@@ -407,8 +408,8 @@ fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
     attachFinishButtonHandler(newWrapper, parsed.bytes, msgIndex)
 }
 
-// extract segment give the protocol id and segment id
-fun extractBytes(protocol: Int, index: Int): ByteArray? {
+// extract segment given the protocol id and segment id
+fun extractBytes(protocol: Int, index: Int): ByteArray? { // TODO use function in NemesysUtil instead of this one
     val msg = parsedMessages[protocol] ?: return null
     val start = msg.segments.getOrNull(index)?.offset ?: return null
     val end = msg.segments.getOrNull(index + 1)?.offset ?: msg.bytes.size
@@ -424,7 +425,7 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
     // for example: if AlignedSegment(0, 1, 3, 2, 0.05) is given
     // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
     val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
-    val alignmentColors = mutableMapOf<String, String>() // safe highlighting color
+    val alignmentColors = mutableMapOf<String, Triple<Float, Float, Float>>() // safe highlighting color
     val alignmentBytes = mutableMapOf<String, ByteArray>() // save byte segment of corresponding id
     for (segment in alignedSegments) {
         val idA = "${segment.protocolA}-${segment.segmentIndexA}"
@@ -449,7 +450,7 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
                 .mapNotNull { other -> alignmentBytes[other]?.let { byteDistance(thisBytes, it) } }
                 .minOrNull() ?: 1.0
 
-            alignmentColors[entry] = getColorClassForDifference(minDiff)
+            alignmentColors[entry] = getHslColorForDifference(minDiff)
         }
     }
 
@@ -458,24 +459,27 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
     for (id in alignmentGroups.keys) {
         val el = document.querySelector("[value-align-id='${id}']") as? HTMLElement ?: continue
 
+        // set style for all aligned elements
         val mouseEnterHandler: (Event) -> Unit = {
             alignmentGroups[id]?.forEach { linkedId ->
                 val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
-                val className = alignmentColors[linkedId] ?: "align-blue"
+
+                // set style
+                val (h, s, l) = alignmentColors[linkedId] ?: Triple(0, 0, 1)
                 for (i in 0 until elements.length) {
-                    // (elements[i] as HTMLElement).classList.add("hovered-alignment")
-                    (elements[i] as HTMLElement).classList.add("hovered-alignment", className)
+                    (elements[i] as HTMLElement).classList.add("hovered-alignment")
+                    (elements[i] as HTMLElement).setAttribute("style", "background-color: hsla($h, $s%, $l%, 0.3);")
                 }
             }
         }
 
+        // remove styles after hovering
         val mouseLeaveHandler: (Event) -> Unit = {
             alignmentGroups[id]?.forEach { linkedId ->
                 val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
                 for (i in 0 until elements.length) {
-                    // (elements[i] as HTMLElement).classList.remove("hovered-alignment")
-                    val el = elements[i] as HTMLElement
-                    el.classList.remove("hovered-alignment", "align-green", "align-yellow", "align-red", "align-blue")
+                    (elements[i] as HTMLElement).classList.remove("hovered-alignment")
+                    (elements[i] as HTMLElement).removeAttribute("style")
                 }
             }
         }
@@ -496,13 +500,19 @@ fun byteDistance(a: ByteArray, b: ByteArray): Double {
 }
 
 // return colour based on the difference
-fun getColorClassForDifference(diff: Double): String = when {
-    diff == 0.0 -> "align-green"
-    diff < 0.5 -> "align-yellow"
-    diff < 0.9 -> "align-red"
-    else -> "align-blue"
-}
+/*fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
+    val clampedDiff = diff.coerceIn(0.0, 1.0)
+    val r = (clampedDiff * 255).toInt()
+    val g = ((1 - clampedDiff) * 255).toInt()
+    return Triple(r, g, 0)
+}*/
 
+// return colour based on the difference - we use HSL because it looks more natural
+fun getHslColorForDifference(diff: Double): Triple<Float, Float, Float> {
+    val clampedDiff = diff.coerceIn(0.0, 1.0).toFloat()
+    val hue = 120f * (1 - clampedDiff) // green (120°) at 0.0 → red (0°) at 1.0
+    return Triple(hue, 100f, 50f)
+}
 
 
 // remove old sequence alignment listeners
@@ -582,8 +592,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             rerenderNemesys(msgIndex, newParsed)
 
             // rerun sequence alignment
-            val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
-            attachSequenceAlignmentListeners(alignedSegment)
+            if (tryhard) {
+                val alignedSegment = NemesysSequenceAlignment.alignSegments(parsedMessages)
+                attachSequenceAlignmentListeners(alignedSegment)
+            }
         })
     }
 }
@@ -622,7 +634,7 @@ fun attachNemesysSeparatorHandlers() {
         var offsetX = 0.0 // needed to move separator with the cursor
         var offsetY = 0.0 // needed to move separator with the cursor
         var currentSeparator: HTMLElement? = null // the separator that is currently pressed by the user
-        var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator
+        var hoverTarget: HTMLElement? = null // the actual bytegroup that is hovered by the mouse with the separator. This determines the target position
 
         var clickStartTime = 0.0 // count click time to interpret is as deleted
 
@@ -668,16 +680,17 @@ fun attachNemesysSeparatorHandlers() {
                 currentSeparator?.style?.top = "${newY}px"
             }
 
-            // find new position
+            // find new target position
             val byteGroups = document.querySelectorAll(".bytegroup")
-            for (j in 0 until byteGroups.length) {
+            for (j in 0 until byteGroups.length) { // go through all byte groups
                 val bg = byteGroups[j] as HTMLElement
                 val rect = bg.getBoundingClientRect()
                 val withinX = event.clientX >= rect.left && event.clientX <= rect.right
                 val withinY = event.clientY >= rect.top && event.clientY <= rect.bottom
 
-                // update bytegroup to highlightbyte
+                // check if mouse is over current byte group
                 if (withinX && withinY) {
+                    // update bytegroup to highlightbyte and remove it from the last one
                     hoverTarget?.classList?.remove("highlightbyte")
                     hoverTarget = bg
                     bg.classList.add("highlightbyte")
@@ -734,6 +747,9 @@ fun attachNemesysSeparatorHandlers() {
 }
 
 // move separator to specific target element
+// separator is the separator that we wat to move
+// target is the byte group that was last hovered by the mouse. this determines the target byte
+// mouseX is needed to check if we want to move the separator on the left or right side of the target
 fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement, mouseX: Double) {
     val parent = separator.parentElement ?: return
     val targetParent = target.parentElement ?: return
@@ -779,6 +795,43 @@ fun attachSeparatorPlaceholderClickHandlers() {
 }
 
 
+// set bytes in floatview and textview
+fun setByteFinderContent(msgIndex: Int) {
+    val bytes = parsedMessages[msgIndex]?.bytes ?: return
+
+    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+
+    floatview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    bytefinder.style.display = "flex"
+}
+
+// set bytes in floatview and textview and highlight segment
+fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
+    val floatview = document.getElementById("floatview")!!
+
+    // set byte sequence
+    setByteFinderContent(msgIndex)
+
+    // apply highlighting in floatview
+    val range = document.createRange()
+    val text = floatview.childNodes[0]!!
+    range.setStart(text, start*2 + start/8)
+    range.setEnd(text, end*2 + end/8)
+    range.surroundContents(document.createElement("span"))
+
+    // apply highlighting in textview
+    val textview = document.getElementById("textview")!!
+    textview.innerHTML = textview.textContent!! // re-set previous highlights
+    val txtText = textview.childNodes[0]!!
+    val txtRange = document.createRange()
+    txtRange.setStart(txtText, start);
+    txtRange.setEnd(txtText, end);
+    txtRange.surroundContents(document.createElement("span"))
+}
+
 
 // attach range listener for float view
 fun attachRangeListeners(element: Element, msgIndex: Int) {
@@ -787,18 +840,7 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
         val end = element.getAttribute("data-end")!!.toInt()
 
         element.addEventListener("click", { evt ->
-            val floatview = document.getElementById("floatview")!!
-
-            // set byte sequence
-            val message = parsedMessages[msgIndex]?.bytes ?: return@addEventListener
-            floatview.innerHTML = message.hex()
-
-            // apply highlighting
-            val range = document.createRange()
-            range.setStart(floatview.firstChild!!, start * 2)
-            range.setEnd(floatview.firstChild!!, end * 2)
-            range.surroundContents(document.createElement("span"))
-
+            setByteFinderHighlight(start, end, msgIndex)
             evt.stopPropagation()
         })
 
@@ -885,7 +927,7 @@ fun appendTextareaWithContent(content: String) {
 
     if (liveDecodeEnabled) {
         textarea.oninput = {
-            decode(false)
+            decode(true)
         }
     }
 }

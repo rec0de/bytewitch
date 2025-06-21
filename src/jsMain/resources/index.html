@@ -352,13 +352,13 @@
             display: none;
         }
 
-        #floatview {
+        #floatview, #textview {
             margin-top: var(--rowgap);
             font-family: var(--mono);
             overflow-wrap: anywhere;
         }
 
-        #floatview > span {
+        #floatview > span, #textview > span {
             background: var(--accent);
         }
 
@@ -495,14 +495,8 @@
         }
 
         .hovered-alignment {
-            background-color: rgba(0, 123, 255, 0.15);
-            outline: 1px solid #007bff;
+            outline: 1px solid #6a6a6a;
         }
-
-        .align-green  { background-color: rgba(40, 167, 69, 0.25); outline: 1px solid #28a745; }
-        .align-yellow { background-color: rgba(255, 193, 7, 0.25); outline: 1px solid #ffc107; }
-        .align-red    { background-color: rgba(220, 53, 69, 0.25); outline: 1px solid #dc3545; }
-        .align-blue   { background-color: rgba(0, 123, 255, 0.25); outline: 1px solid #007bff; }
 
         .highlighted {
             background-color: rgba(255, 200, 0, 0.6);
@@ -545,6 +539,7 @@
     <h3>Byte Finder</h3>
     <i>click parsed elements to highlight source bytes below</i>
     <div id="floatview"></div>
+    <div id="textview"></div>
 </div>
 
 

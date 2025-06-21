@@ -245,7 +245,7 @@ object NemesysSequenceAlignment {
     }
 
     // average pooling of a segment to transform it in a lower dimension
-    private fun averagePoolSegment(segment: ByteArray, targetSize: Int): ByteArray {
+    fun averagePoolSegment(segment: ByteArray, targetSize: Int): ByteArray {
         val pooled = ByteArray(targetSize)
         val chunkSize = segment.size.toDouble() / targetSize
 
