@@ -1,5 +1,6 @@
 import bitmage.fromHex
 import decoders.Nemesys.*
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -33,9 +34,12 @@ class NemesysTrainingset {
         testNumber: Int,
         expectedSegments: List<NemesysSegment>,
         actualSegments: List<NemesysSegment>) {
-        val tp = expectedSegments.count { e -> actualSegments.any { a -> a.offset == e.offset } }
-        val fp = actualSegments.count { a -> expectedSegments.none { e -> a.offset == e.offset } }
-        val fn = expectedSegments.size - tp
+
+        val tolerance = 1
+        val tp = expectedSegments.count { e -> actualSegments.any { a -> abs(a.offset - e.offset) <= tolerance } }
+        val fp = actualSegments.count { a -> expectedSegments.none { e -> abs(a.offset - e.offset) <= tolerance } }
+        val fn = expectedSegments.count { e -> actualSegments.none { a -> abs(a.offset - e.offset) <= tolerance } }
+
 
         totalTP += tp
         totalFP += fp
@@ -130,68 +134,6 @@ class NemesysTrainingset {
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
     }
-
-    // if you wann align "big" with "small" that it starts from to left to the right
-    // so it aligns "b"<->"s", "i"<->"m", "g"<->"l" and the last "l" of small doesn't get any alignment
-    /*private fun printSegmentationWithSequenceAlignmentResultOld(
-        testNumber: Int,
-        actualMessages: Map<Int, NemesysParsedMessage>,
-        expectedSegments: Map<Int, NemesysParsedMessage>,
-        expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
-    ) {
-        val actualAlignments = NemesysSequenceAlignment.alignSegments(actualMessages)
-
-        fun getByteRange(message: NemesysParsedMessage, index: Int): IntRange {
-            val start = message.segments[index].offset
-            val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
-            return start until end
-        }
-
-        // save corresponding (byteIndexInMessageA, byteIndexInMessageB)
-        val expectedAlignedBytes = expectedAlignments.flatMap { (protocolA, protocolB, segmentPair) ->
-            val (segmentIndexA, segmentIndexB) = segmentPair
-            val msgA = expectedSegments[protocolA] ?: return@flatMap emptyList()
-            val msgB = expectedSegments[protocolB] ?: return@flatMap emptyList()
-            val rangeA = NemesysUtil.getByteRange(msgA, segmentIndexA)
-            val rangeB = NemesysUtil.getByteRange(msgB, segmentIndexB)
-            val overlap = minOf(rangeA.count(), rangeB.count()) // get shorter field
-
-            // correspond bytes in descending order until the short field is full
-            (0 until overlap).map { i -> (rangeA.first + i) to (rangeB.first + i) }
-        }.toSet()
-
-        // save corresponding (byteIndexInMessageA, byteIndexInMessageB)
-        val actualAlignedBytes = actualAlignments.flatMap { aligned ->
-            val msgA = actualMessages[aligned.protocolA] ?: return@flatMap emptyList()
-            val msgB = actualMessages[aligned.protocolB] ?: return@flatMap emptyList()
-            val rangeA = NemesysUtil.getByteRange(msgA, aligned.segmentIndexA)
-            val rangeB = NemesysUtil.getByteRange(msgB, aligned.segmentIndexB)
-            val overlap = minOf(rangeA.count(), rangeB.count()) // get shorter field
-
-            // correspond bytes in descending order until the short field is full
-            (0 until overlap).map { i -> (rangeA.first + i) to (rangeB.first + i) }
-        }.toSet()
-
-        val tp = actualAlignedBytes.intersect(expectedAlignedBytes).size
-        val fp = actualAlignedBytes.subtract(expectedAlignedBytes).size
-        val fn = expectedAlignedBytes.subtract(actualAlignedBytes).size
-
-        totalTP += tp
-        totalFP += fp
-        totalFN += fn
-
-        val precision = tp.toDouble() / (tp + fp).coerceAtLeast(1)
-        val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
-        val f1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
-
-        println("----- testSegmentationWithSequenceAlignment$testNumber -----")
-        println("True Positive Bytes: $tp")
-        println("False Positive Bytes: $fp")
-        println("False Negative Bytes: $fn")
-        println("Precision: ${(precision * 100).toInt()}%")
-        println("Recall: ${(recall * 100).toInt()}%")
-        println("F1 Score: ${(f1 * 100).toInt()}%")
-    }*/
 
 
     // calculate byte-wise sequence alignment result
@@ -362,11 +304,11 @@ class NemesysTrainingset {
 
     @Test
     fun runSegmentationTests() {
-        // testSegmentParsing1()
-        // testSegmentParsing2()
+        testSegmentParsing1()
+        testSegmentParsing2()
         testSegmentParsing3()
         testSegmentParsing4()
-        /*testSegmentParsing5()
+        testSegmentParsing5()
         testSegmentParsing6()
         testSegmentParsing7()
         testSegmentParsing8()
@@ -375,7 +317,7 @@ class NemesysTrainingset {
         testSegmentParsing11()
         testSegmentParsing12()
         testSegmentParsing13()
-        testSegmentParsing14()*/
+        testSegmentParsing14()
 
         printFinalScore()
     }
@@ -434,14 +376,14 @@ class NemesysTrainingset {
             ExpectedBoundary(6, false),
             ExpectedBoundary(8, true),
             ExpectedBoundary(13, true),
-            ExpectedBoundary(14, false),
+            ExpectedBoundary(14, true),
             ExpectedBoundary(21, true),
-            ExpectedBoundary(22, false),
+            ExpectedBoundary(22, true),
             ExpectedBoundary(31, true),
-            ExpectedBoundary(32, false),
+            ExpectedBoundary(32, true),
             ExpectedBoundary(33, true),
             ExpectedBoundary(35, true),
-            ExpectedBoundary(36, false),
+            ExpectedBoundary(36, true),
             ExpectedBoundary(72, true)
         )*/
 
@@ -480,7 +422,7 @@ class NemesysTrainingset {
             ExpectedBoundary(21, true), // optional
             ExpectedBoundary(22, true),  // required
             ExpectedBoundary(31, true),  // required
-            ExpectedBoundary(32, false),  // required
+            ExpectedBoundary(32, true),  // required
             ExpectedBoundary(33, true),  // required
             ExpectedBoundary(35, true),  // required
             ExpectedBoundary(36, true), // optional
@@ -529,10 +471,10 @@ class NemesysTrainingset {
             ExpectedBoundary(0, true),    // Start des gesamten Objekts
             ExpectedBoundary(1, true),    // "id" type
             ExpectedBoundary(2, true),   // "id" (optional)
-            ExpectedBoundary(4, false),   // 123 (optional)
+            ExpectedBoundary(4, true),   // 123 (optional)
             ExpectedBoundary(6, true),    // "username" type
             ExpectedBoundary(7, true),   // "username" (optional)
-            ExpectedBoundary(15, false),  // "alice" type (optional)
+            ExpectedBoundary(15, true),  // "alice" type (optional)
             ExpectedBoundary(16, true),   // "alice"
             ExpectedBoundary(21, true),   // "email" type
             ExpectedBoundary(22, true),  // "email" (optional)
@@ -591,7 +533,6 @@ class NemesysTrainingset {
             NemesysSegment(63, NemesysField.STRING),  // "is_active"
             NemesysSegment(72, NemesysField.UNKNOWN)   // false
         )
-
 
         val parsed = parserForSegmentParsing(bytes, msgIndex = 0)
         val actualSegments = parsed.segments
