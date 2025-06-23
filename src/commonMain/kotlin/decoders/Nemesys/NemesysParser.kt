@@ -573,6 +573,60 @@ class NemesysParser {
         return gr
     }
 
+    private fun getHalfByte(bytes: ByteArray, halfByteIndex: Int): Int {
+        val byteIndex = halfByteIndex / 2
+        val isHigh = halfByteIndex % 2 == 0
+        val byte = bytes[byteIndex].toInt() and 0xFF
+        return if (isHigh) (byte shr 4) and 0x0F else byte and 0x0F
+    }
+
+    private fun calcHalfByteGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
+        val minHalfBytes = messages.minOf { it.bytes.size } * 2
+        val gr = DoubleArray(minHalfBytes) { 0.0 }
+
+        for (i in 0 until minHalfBytes - 1) {
+            val pairCounts = mutableMapOf<Pair<Int, Int>, Int>()
+            val countsI = mutableMapOf<Int, Int>()
+            val countsJ = mutableMapOf<Int, Int>()
+
+            for (msg in messages) {
+                val byteArray = msg.bytes
+                val nibbleA = getHalfByte(byteArray, i)
+                val nibbleB = getHalfByte(byteArray, i + 1)
+
+                pairCounts[nibbleA to nibbleB] = pairCounts.getOrPut(nibbleA to nibbleB) { 0 } + 1
+                countsI[nibbleA] = countsI.getOrPut(nibbleA) { 0 } + 1
+                countsJ[nibbleB] = countsJ.getOrPut(nibbleB) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            // H(Di, Di+1)
+            val hXY = pairCounts.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // H(Di)
+            val hX = countsI.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // H(Di+1)
+            val hY = countsJ.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            val igr = hY - (hXY - hX)
+            gr[i] = if (entropy[i] > 0) igr / entropy[i] else 0.0
+        }
+
+        return gr
+    }
+
+
     // set boundaries using Entropy and Gain Ratio
     fun getBoundariesUsingEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
         val minLength = messages.minOf { it.bytes.size }
@@ -608,25 +662,136 @@ class NemesysParser {
     }
 
 
+    // set boundaries using Entropy and Gain Ratio
+    private fun getBoundariesUsingHalbByteEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+        val minHalfBytes = messages.minOf { it.bytes.size } * 2
+
+        val boundaries = mutableSetOf<Int>()
+
+        for (i in 1 until minHalfBytes - 1) {
+            // Rule 1: local maximum in entropy
+            if (entropy[i] >= entropy[i - 1] && entropy[i] > entropy[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 3: local minimum in GR
+            if (entropy[i] > 0 && gr[i] < gr[i - 1] && gr[i] < gr[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 4: GR < threshold
+            if (entropy[i] > 0 && gr[i] < threshold) {
+                boundaries.add(i)
+            }
+        }
+
+
+        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 34 AC | 00 00 00 A5
+        for (i in 1 until minHalfBytes) {
+            if (entropy[i - 1] == 0.0 && entropy[i] > 0.0) {
+                val o = (i - 1 downTo 0).takeWhile { entropy[it] == 0.0 }.count()
+                val delta = (i - o) % 4
+                boundaries.add(i - delta)
+            }
+        }
+
+        return boundaries.sorted().toSet()
+    }
+
+    fun calcHalfByteEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val entropy = DoubleArray(minLength * 2) { 0.0 } // 2 half-bytes per byte
+
+        for (i in 0 until minLength) {
+            val countsHigh = mutableMapOf<Int, Int>()
+            val countsLow = mutableMapOf<Int, Int>()
+
+            for (msg in messages) {
+                val byte = msg.bytes[i].toInt() and 0xFF
+                val highNibble = (byte shr 4) and 0x0F
+                val lowNibble = byte and 0x0F
+
+                countsHigh[highNibble] = countsHigh.getOrPut(highNibble) { 0 } + 1
+                countsLow[lowNibble] = countsLow.getOrPut(lowNibble) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            entropy[i * 2] = countsHigh.entries.sumOf { (_, c) ->
+                val p = c / total
+                -p * ln(p)
+            }
+
+            entropy[i * 2 + 1] = countsLow.entries.sumOf { (_, c) ->
+                val p = c / total
+                -p * ln(p)
+            }
+        }
+
+        return entropy
+    }
+
+
+
     // entropy decoder for multiple messages
     fun findEntropyBoundaries(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
         if (messages.isEmpty()) return emptyList()
 
-        // TODO calculation of entropy and igr could be made in one step. This saves performance but is harder to read.
+        // TODO calculation of entropy and gr could be made in one step. This saves performance but is harder to read.
         // get information entropy H(Di) for every byte position
-        val entropy = calcBytewiseEntropy(messages)
+        // val entropy = calcBytewiseEntropy(messages)
+        val entropy = calcHalfByteEntropy(messages)
 
         // get Gain Ratio (gr)
-        val gr = calcGainRatio(messages, entropy)
+        // val gr = calcGainRatio(messages, entropy)
+        val gr = calcHalfByteGainRatio(messages, entropy)
 
         // get boundaries based on rules
-        val globalBoundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
+        // val globalBoundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
+        val globalBoundaries = getBoundariesUsingHalbByteEntropy(messages, entropy, gr, 0.01)
 
         // postprocessing and return in right format
         return messages.map { message ->
             // Post Processing to improve local segmentation
             val localOffsets = globalBoundaries.filter { it < message.bytes.size }.toMutableList()
-            val segments = postProcessing(localOffsets, message.bytes)
+
+            val segments = postProcessing(localOffsets, message.bytes).toMutableList()
+            // if want to be used without postProcessing (performs worse)
+            /*val segments = localOffsets.map { offset ->
+                NemesysSegment(offset = offset, fieldType = NemesysField.UNKNOWN)
+            }*/
+
+
+            /*val deltaBC = computeDeltaBC(message.bytes)
+
+            // sigma should depend on the field length: Nemesys paper on page 5
+            val smoothed = applyGaussianFilter(deltaBC, 0.6)
+
+            // Safety check (it mostly enters if the bytes are too short)
+            /*if (smoothed.isEmpty()) { // TODO ???
+                segments.add(NemesysSegment(0, NemesysField.UNKNOWN))
+                continue
+            }*/
+
+            // find extrema of smoothedDeltaBC
+            val extrema = findExtremaInList(smoothed)
+
+            // find all rising points from minimum to maximum in extrema list
+            val rising = findRisingDeltas(extrema)
+
+            // find inflection point in risingDeltas -> those are considered as boundaries
+            val inflection = findInflectionPoints(rising, deltaBC)
+
+            // merge consecutive text segments together
+            // val boundaries = mergeCharSequences(preBoundaries, bytes)
+            val improved = postProcessing(inflection.toMutableList(), message.bytes)
+
+            // add relativeStart to the boundaries
+            for ((relativeStart, type) in improved) {
+                segments.add(NemesysSegment(relativeStart, type))
+            }*/
+
+
 
             NemesysParsedMessage(segments, message.bytes, message.msgIndex)
         }

@@ -383,6 +383,7 @@ class NemesysTrainingset {
     @Test
     fun runSegmentationOnMultipleMessagesTests() {
         testMultipleMessagesSegmentParsing1()
+        testMultipleMessagesSegmentParsing2()
 
         printFinalScore()
     }
@@ -1136,14 +1137,194 @@ class NemesysTrainingset {
         )
 
         val nemesysParsedMessages = NemesysParser().parseEntropy(listOfMessages)
-        val allSegments = nemesysParsedMessages.flatMap { it.segments }
-        printSegmentParsingResult(1, expectedSegments1, allSegments)
-        printSegmentParsingResult(2, expectedSegments2, allSegments)
-        printSegmentParsingResult(3, expectedSegments3, allSegments)
-        printSegmentParsingResult(4, expectedSegments4, allSegments)
-        printSegmentParsingResult(5, expectedSegments5, allSegments)
-        printSegmentParsingResult(6, expectedSegments6, allSegments)
-        printSegmentParsingResult(7, expectedSegments7, allSegments)
+        printSegmentParsingResult(1, expectedSegments1, nemesysParsedMessages[0].segments)
+        printSegmentParsingResult(2, expectedSegments2, nemesysParsedMessages[1].segments)
+        printSegmentParsingResult(3, expectedSegments3, nemesysParsedMessages[2].segments)
+        printSegmentParsingResult(4, expectedSegments4, nemesysParsedMessages[3].segments)
+        printSegmentParsingResult(5, expectedSegments5, nemesysParsedMessages[4].segments)
+        printSegmentParsingResult(6, expectedSegments6, nemesysParsedMessages[5].segments)
+        printSegmentParsingResult(7, expectedSegments7, nemesysParsedMessages[6].segments)
+
+
+        // the following checks the result with nemesys
+        /*printSegmentParsingResult(1, expectedSegments1, NemesysParser().parse(message1, 1).segments)
+        printSegmentParsingResult(2, expectedSegments2, NemesysParser().parse(message2, 2).segments)
+        printSegmentParsingResult(3, expectedSegments3, NemesysParser().parse(message3, 3).segments)
+        printSegmentParsingResult(4, expectedSegments4, NemesysParser().parse(message4, 4).segments)
+        printSegmentParsingResult(5, expectedSegments5, NemesysParser().parse(message5, 5).segments)
+        printSegmentParsingResult(6, expectedSegments6, NemesysParser().parse(message6, 6).segments)
+        printSegmentParsingResult(7, expectedSegments7, NemesysParser().parse(message7, 7).segments)*/
+    }
+
+    private fun testMultipleMessagesSegmentParsing2() {
+        val message1 = "62706c6973743030d4010203040506070851635165526c53527047100e5a70726f64756374696f6e11eff65f102438464532413931422d393341332d314333332d464544332d45413435393344373942454108111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message2 = "62706c6973743030d4010203040506070851635165526c53527047101c5a70726f64756374696f6e11b6925f102441334245333743412d464133322d383436332d414633432d45333337434145453339463308111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message3 = "62706c6973743030d4010203040506070851635165526c53527047101c5a70726f64756374696f6e11b6925f102441334333394634432d463734332d414344332d383337322d42324136413346373833444508111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message4 = "62706c6973743030d4010203040506070851635165526c5352704710635a70726f64756374696f6e11d4315f102441424344454631322d333435362d373839302d414243442d45463132333435363738393008111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message5 = "62706c6973743030d4010203040506070851635165526c5352704710255a70726f64756374696f6e11a8ca5f102442414444434146452d313131312d323232322d333333332d34343434353535353636363608111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message6 = "62706c6973743030d4010203040506070851635165526c5352704710125a70726f64756374696f6e119a9e5f102443414645424142452d343332312d444342412d383736352d35363738353637383536373808111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message7 = "62706c6973743030d4010203040506070851635165526c5352704710415a70726f64756374696f6e1180005f102430313233343536372d383941422d434445462d303132332d34353637383941424344454608111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message8 = "62706c6973743030d4010203040506070851635165526c5352704710355a70726f64756374696f6e1130395f102446314532443343342d423541362d373839302d434445462d31333537394244463234363808111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message9 = "62706c6973743030d4010203040506070851635165526c5352704710205a70726f64756374696f6e11eadb5f102431323334414243442d353637382d454639302d414243442d30303131323233333434353508111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+        val message10 = "62706c6973743030d4010203040506070851635165526c5352704710245a70726f64756374696f6e11b26e5f102442454546424545462d313031302d323032302d333033302d34303430353035303630373008111315181b1d282b0000000000000101000000000000000900000000000000000000000000000052".fromHex()
+
+        val expectedSegments1 = listOf(
+            NemesysSegment(0, NemesysField.STRING),     // "bplist00"
+            NemesysSegment(8, NemesysField.UNKNOWN),    // Beginn Dictionary
+            NemesysSegment(17, NemesysField.STRING),    // "c"
+            NemesysSegment(19, NemesysField.STRING),    // "e"
+            NemesysSegment(21, NemesysField.STRING),    // "lS"
+            NemesysSegment(24, NemesysField.STRING),    // "pG"
+            NemesysSegment(27, NemesysField.UNKNOWN),   // 14 (für "c")
+            NemesysSegment(29, NemesysField.STRING),    // "production" (für "e")
+            NemesysSegment(40, NemesysField.STRING),    // 61430 (für "lS")
+            NemesysSegment(43, NemesysField.STRING)     // UUID für "pG"
+        )
+        val expectedSegments2 = listOf(
+            NemesysSegment(0, NemesysField.STRING),     // "bplist00"
+            NemesysSegment(8, NemesysField.UNKNOWN),    // Beginn Dictionary
+            NemesysSegment(17, NemesysField.STRING),    // "c"
+            NemesysSegment(19, NemesysField.STRING),    // "e"
+            NemesysSegment(21, NemesysField.STRING),    // "lS"
+            NemesysSegment(24, NemesysField.STRING),    // "pG"
+            NemesysSegment(27, NemesysField.UNKNOWN),   // 28 (für "c")
+            NemesysSegment(29, NemesysField.STRING),    // "production" (für "e")
+            NemesysSegment(40, NemesysField.STRING),    // 46738 (für "lS")
+            NemesysSegment(43, NemesysField.STRING)     // UUID für "pG"
+        )
+        val expectedSegments3 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments4 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments5 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments6 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments7 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments8 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments9 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+        val expectedSegments10 = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(8, NemesysField.UNKNOWN),
+            NemesysSegment(17, NemesysField.STRING),
+            NemesysSegment(19, NemesysField.STRING),
+            NemesysSegment(21, NemesysField.STRING),
+            NemesysSegment(24, NemesysField.STRING),
+            NemesysSegment(27, NemesysField.UNKNOWN),
+            NemesysSegment(29, NemesysField.STRING),
+            NemesysSegment(40, NemesysField.STRING),
+            NemesysSegment(43, NemesysField.STRING)
+        )
+
+        val listOfMessages = listOf(
+            NemesysParsedMessage(listOf(), message1, 1),
+            NemesysParsedMessage(listOf(), message2, 2),
+            NemesysParsedMessage(listOf(), message3, 3),
+            NemesysParsedMessage(listOf(), message4, 4),
+            NemesysParsedMessage(listOf(), message5, 5),
+            NemesysParsedMessage(listOf(), message6, 6),
+            NemesysParsedMessage(listOf(), message7, 7),
+            NemesysParsedMessage(listOf(), message8, 8),
+            NemesysParsedMessage(listOf(), message9, 9),
+            NemesysParsedMessage(listOf(), message10, 10)
+        )
+
+        val nemesysParsedMessages = NemesysParser().parseEntropy(listOfMessages)
+        printSegmentParsingResult(1, expectedSegments1, nemesysParsedMessages[0].segments)
+        printSegmentParsingResult(2, expectedSegments2, nemesysParsedMessages[1].segments)
+        printSegmentParsingResult(3, expectedSegments3, nemesysParsedMessages[2].segments)
+        printSegmentParsingResult(4, expectedSegments4, nemesysParsedMessages[3].segments)
+        printSegmentParsingResult(5, expectedSegments5, nemesysParsedMessages[4].segments)
+        printSegmentParsingResult(6, expectedSegments6, nemesysParsedMessages[5].segments)
+        printSegmentParsingResult(7, expectedSegments7, nemesysParsedMessages[6].segments)
+        printSegmentParsingResult(8, expectedSegments8, nemesysParsedMessages[7].segments)
+        printSegmentParsingResult(9, expectedSegments9, nemesysParsedMessages[8].segments)
+        printSegmentParsingResult(10, expectedSegments10, nemesysParsedMessages[9].segments)
+
+        // the following checks the result with nemesys
+        /*printSegmentParsingResult(1, expectedSegments1, NemesysParser().parse(message1, 1).segments)
+        printSegmentParsingResult(2, expectedSegments2, NemesysParser().parse(message2, 2).segments)
+        printSegmentParsingResult(3, expectedSegments3, NemesysParser().parse(message3, 3).segments)
+        printSegmentParsingResult(4, expectedSegments4, NemesysParser().parse(message4, 4).segments)
+        printSegmentParsingResult(5, expectedSegments5, NemesysParser().parse(message5, 5).segments)
+        printSegmentParsingResult(6, expectedSegments6, NemesysParser().parse(message6, 6).segments)
+        printSegmentParsingResult(7, expectedSegments7, NemesysParser().parse(message7, 7).segments)
+        printSegmentParsingResult(8, expectedSegments8, NemesysParser().parse(message8, 8).segments)
+        printSegmentParsingResult(9, expectedSegments9, NemesysParser().parse(message9, 9).segments)
+        printSegmentParsingResult(10, expectedSegments10, NemesysParser().parse(message10, 10).segments)*/
     }
 
     private fun testSequenceAlignment1() {
