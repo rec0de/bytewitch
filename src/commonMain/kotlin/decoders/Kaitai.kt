@@ -5,11 +5,10 @@ import bitmage.hex
 import bitmage.toBooleanArray
 import bitmage.toByteArray
 import bitmage.toInt
+import bitmage.toUInt
 import kotlinx.browser.document
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.js.iterator
-import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -25,7 +24,7 @@ enum class DisplayStyle {
 // acts just like a MutableList except it also has the added features
 class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()) : MutableList<T> by innerList {
     var parent: MutableListTree<T>? = null
-        get() { return parent }
+        get() { return field }
         set(value) {field = value}
 
     var root: MutableListTree<T>? = null
@@ -39,7 +38,7 @@ class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()
         private set
 }
 
-class Type(val completeStruct: dynamic, val currentElementStruct: dynamic) {  // TODO: integrate Type Object and it's things into the seq parsing, as a lot of stuff from there is actually needed here
+class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val bytesListTree: MutableListTree<KaitaiElement>) {  // TODO: integrate Type Object and it's things into the seq parsing, as a lot of stuff from there is actually needed here
     var sizeInBits: Int = 0
     var sizeIsUntilEOS: Boolean = false
     var sizeIsUntilTerminator: Boolean = false
@@ -74,20 +73,25 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic) {  //
             } else {
                 throw RuntimeException()
             }
+            if (type.endsWith("be")) { // We sometimes need to overwrite the byteorder even after parsing the endianness
+                this.endianness = ByteOrder.BIG
+            } else if (type.endsWith("le")) {
+                this.endianness = ByteOrder.LITTLE
+            }
         }
     }
 
     init {
-        if (completeStruct.meta.endianness != undefined) {
-            endianness = completeStruct.meta.endianness
-        } else {
-            endianness = ByteOrder.LITTLE
-        }
+        endianness = Kaitai.parseEndian(currentElementStruct, completeStruct)
 
         if (currentElementStruct.size != undefined) {
             sizeInBits = currentElementStruct.size * 8
         } else {
-            if (currentElementStruct["size-eos"]) {
+            if (currentElementStruct.contents != undefined) {
+                val tmp = Kaitai.parseValue(currentElementStruct.contents, bytesListTree)
+                sizeInBits = tmp.size
+                console.log(sizeInBits)
+            } else if (currentElementStruct["size-eos"]) {
                 sizeIsUntilEOS = true
             } else if (completeStruct.types[this.type] == undefined) {  // TODO should be its own if not else if, as size-eos can be made of subtypes
                 // TODO could also be an imported type instead...
@@ -95,7 +99,7 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic) {  //
             } else {
                 sizeInBits = 0
                 for (subElementStruct in completeStruct.types[this.type].seq) {
-                    var subType = Type(completeStruct, subElementStruct)
+                    var subType = Type(completeStruct, subElementStruct, bytesListTree)
                     subTypes.add(subType)
                     sizeInBits += subType.sizeInBits
                 }
@@ -106,50 +110,107 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic) {  //
 
 object Kaitai : ByteWitchDecoder {
     override val name = "Kaitai"
+    lateinit var completeStruct: JsYaml
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val kaitaiInput = document.getElementById("kaitaiinput") as HTMLTextAreaElement
         val kaitaiYaml = JsYaml.load(kaitaiInput.value)
+        completeStruct = kaitaiYaml
 
         return processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
     }
 
+    fun parseEndian(currentElementStruct: dynamic, completeStruct: dynamic) : ByteOrder {
+        // TODO: endian is significantly more complicated with switch-on and the fact that its in a different location than what I assume here
+        val actualStruct = if (currentElementStruct.endian != undefined) {
+            currentElementStruct
+        } else if (completeStruct.endian != undefined) {
+            completeStruct
+        } else {
+            return ByteOrder.BIG
+        }
 
-    fun parseValue(value: dynamic) : ByteArray {
+        if (actualStruct.endian == "be") {
+            return ByteOrder.BIG
+        } else {
+            return ByteOrder.LITTLE
+        }
+    }
 
-        val flattenedArray = js("[value].flat(2)")  // handle both individual
-        var fullyFlatArray = byteArrayOf()
+    fun parseReference(reference: String, bytesListTree: MutableListTree<KaitaiElement>): BooleanArray {
+        // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
+        if (reference.startsWith("_root.")) //_root.magic
+            return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
+        else if (reference.startsWith("_parent.")) 
+            return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
+        else (
+            if (reference.contains("."))
+                return parseReference(reference.substringAfter("."), bytesListTree.find { it.id == reference.substringBefore(".") }!!.bytesListTree!!)
+            else
+                return bytesListTree.find { it.id == reference }!!.value
+        )
+    }
+
+    fun parseValue(value: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : BooleanArray {
+        val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]
+        var fullyFlatArray = booleanArrayOf()
         for (element in flattenedArray) {
             if (element is Int) {
-                fullyFlatArray += element.toByte()
+                fullyFlatArray += (element as Int).toByte().toBooleanArray()
             } else {
-                // TODO Check for identifier
-                for (i in 0..element.length-1) {
-                    fullyFlatArray += (element.charCodeAt(i) as Int).toByte()
+                try {
+                    fullyFlatArray += parseReference(value, bytesListTree)
+                } catch (e: Exception) {
+                    for (i in 0..element.length - 1) {
+                        fullyFlatArray += (element.charCodeAt(i) as Int).toByte().toBooleanArray()
+                    }
                 }
             }
         }
         return fullyFlatArray
     }
 
-    fun checkContentsKey(content: dynamic, value: BooleanArray): Boolean {
-        return parseValue(content).contentEquals(value.toByteArray())
+    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+        return parseValue(seqElement.contents, bytesListTree).contentEquals(dataBytes)
     }
 
-    fun checkValidKey(valid: dynamic, value: BooleanArray): Boolean {
-        if (valid.min != undefined || valid.max != undefined) {
-            // TODO
-        } else if (valid["any-of"] != undefined) {
-            // TODO
-        } else if (valid.expr != undefined) {
-            // TODO
-        } else {
-            val valueToCheckAgainst = if (valid.eq != undefined) {
-                parseValue(valid.eq)
-            } else {
-                parseValue(valid)
+    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+        if (seqElement.valid.min != undefined || seqElement.valid.max != undefined) {
+            val parsedValue = dataBytes.toByteArray().toUInt(kaitaiElement.endianness)
+            val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(kaitaiElement.endianness)
+            if ((seqElement.valid.min != undefined) && (parsedValue < parsedValidMin)) {
+                return false
             }
-            return valueToCheckAgainst.contentEquals(value.toByteArray())
+            val parsedValidMax = parseValue(seqElement.valid.max, bytesListTree).toByteArray().toUInt(kaitaiElement.endianness)
+            if ((seqElement.valid.max != undefined) && (parsedValue > parsedValidMax)) {
+                return false
+            }
+            return true
+//            for (i in 0..value.toByteArray().size-1) {
+//                if ((valid.min != undefined) && (value.toByteArray()[i].toUByte() < parseValue(valid.min, bytesListTree).toByteArray()[i].toUByte())) {
+//                    return false
+//                }
+//                //if ((valid.max != undefined) && (value.toByteArray()[i].toUByte() > parseValue(valid.max, bytesListTree).toByteArray().padToSize(value.toByteArray().size, endianness)[i].toUByte())) {
+//                if ((valid.max != undefined) && (value.toByteArray()[i].toUByte() > parseValue(valid.max, bytesListTree).toByteArray()[i].toUByte())) {
+//                    return false
+//                }
+//            }
+        } else if (seqElement.valid["any-of"] != undefined) {
+            for (i in 0..seqElement.valid["any-of"].length-1) {
+                if (parseValue(seqElement.valid["any-of"][i], bytesListTree).contentEquals(dataBytes)) {
+                    return true
+                }
+            }
+            return false
+        } else if (seqElement.valid.expr != undefined) {
+            // TODO parse arbitrary expression
+        } else {
+            val valueToCheckAgainst = if (seqElement.valid.eq != undefined) {
+                parseValue(seqElement.valid.eq, bytesListTree)
+            } else {
+                parseValue(seqElement.valid, bytesListTree)
+            }
+            return valueToCheckAgainst.contentEquals(dataBytes)
         }
         return true
     }
@@ -168,21 +229,18 @@ object Kaitai : ByteWitchDecoder {
         bytesListTree.parent = parentBytesListTree
         //val types = mutableSetOf<Type>()
 
+        val endianness = parseEndian(completeStruct, completeStruct)
+
         for (seqElement in currentSeqStruct) {
-            val type = Type(completeStruct, seqElement)
+            val type = Type(completeStruct, seqElement, bytesListTree)
             if (type.sizeIsUntilEOS) {
                 type.sizeInBits = (data.size - currentOffsetInBits)
             }
-
             val elementId = seqElement.id
 
             var kaitaiElement : KaitaiElement
             val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits -1)
             val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits).toFloat()/8)
-
-            if (!checkContentsKey(seqElement.contents, value)) {
-                throw Exception("Value of bytes does not align with expected contents value.")
-            }
 
             if (type.subTypes.isNotEmpty()) {
                 kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
@@ -204,12 +262,19 @@ object Kaitai : ByteWitchDecoder {
                 }
             }
 
+            if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                throw Exception("Value of bytes does not align with expected contents value.")
+            }
+            if ((seqElement.valid != undefined) && !checkValidKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                throw Exception("Value of bytes does not align with expected valid value.")
+            }
+
             bytesListTree.add(kaitaiElement)
 
             currentOffsetInBits += type.sizeInBits
         }
 
-        return KaitaiResult(id, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
+        return KaitaiResult(id, endianness, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
     }
 
     override fun confidence(data: ByteArray): Double {
@@ -222,34 +287,46 @@ object Kaitai : ByteWitchDecoder {
 interface KaitaiElement : ByteWitchResult {
     val id: String
     val bytesListTree: MutableListTree<KaitaiElement>? get() = null
-    val value: BooleanArray? get() = null
+    val value: BooleanArray
+    var endianness: ByteOrder
 }
 
-class KaitaiResult(override val id: String, override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiResult(override val id: String, override var endianness: ByteOrder,
+                   override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${bytesListTree.joinToString("") { it.renderHTML() }})</div>"
     }
+
+    // KaitaiResult result does not really have a value itself, but if it's called we want to deliver a reasonable result
+    override val value: BooleanArray
+        get() {
+            var result = booleanArrayOf()
+            for (element in bytesListTree) {
+                result += element.value
+            }
+            return result
+        }
 }
 
-class KaitaiBytes(override val id: String, val endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().hex()})h</div>"
     }
 }
 
-class KaitaiInteger(override val id: String, val endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(endianness)})h</div>"
     }
 }
 
-class KaitaiBinary(override val id: String, val endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.joinToString("") { if (it) "1" else "0" }})b</div>"
     }
 }
 
-class KaitaiString(override val id: String, val endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>I am a String</div>"
     }

@@ -81,6 +81,22 @@ fun ByteArray.toInt(endianness: ByteOrder): Int {
     return result
 }
 
+fun ByteArray.toUInt(endianness: ByteOrder): UInt {
+    require(this.size <= 4) { "Byte array too long to convert to UInt" }
+
+    val actualArray = if (endianness == ByteOrder.LITTLE) {
+        this.reversedArray()
+    } else {
+        this
+    }
+
+    var result = 0u
+    for (byte in actualArray) {
+        result = (result shl 8) or (byte.toInt() and 0xFF).toUInt()
+    }
+    return result
+}
+
 fun ByteArray.toBinaryString(): String {
     return this.joinToString("") { byte ->
         byte.toUByte().toString(2).padStart(8, '0')
@@ -99,6 +115,14 @@ fun BooleanArray.toByteArray(): ByteArray {
             }
         }
         byte.toByte()
+    }
+}
+
+// Bytes
+
+fun Byte.toBooleanArray(): BooleanArray {
+    return BooleanArray(8) { i ->
+        (this.toInt() shr (7 - i) and 1) == 1
     }
 }
 
@@ -142,6 +166,12 @@ fun Long.toBytes(byteOrder: ByteOrder): ByteArray {
     return if(byteOrder == ByteOrder.BIG) bytesBE else bytesBE.reversed().toByteArray()
 }
 fun ULong.toBytes(byteOrder: ByteOrder) = this.toLong().toBytes(byteOrder)
+
+fun Int.toMinimalAmountOfBytes(byteOrder: ByteOrder): ByteArray {
+    var bytes: ByteArray = this.toBytes(byteOrder)
+    var indexOfFirstZeroByte = bytes.indexOfFirst { it != 0.toByte() }
+    return if (indexOfFirstZeroByte == -1) byteArrayOf(0) else bytes.copyOfRange(indexOfFirstZeroByte, bytes.size)
+}
 
 fun Int.toBytes(byteOrder: ByteOrder): ByteArray {
     val bytesBE = byteArrayOf((this shr 24).toByte(), (this shr 16).toByte(), (this shr 8).toByte(), (this shr 0).toByte())
