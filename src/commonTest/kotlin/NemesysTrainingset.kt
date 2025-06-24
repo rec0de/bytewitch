@@ -1,6 +1,8 @@
 import bitmage.fromHex
 import decoders.Nemesys.*
 import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -13,6 +15,8 @@ class NemesysTrainingset {
     private var totalTP = 0
     private var totalFP = 0
     private var totalFN = 0
+
+    private val fmsScores = mutableListOf<Double>()
 
     private fun printFinalScore() {
         val precision = totalTP.toDouble() / (totalTP + totalFP).coerceAtLeast(1)
@@ -28,6 +32,81 @@ class NemesysTrainingset {
         println("Final F1 Score: ${(finalF1 * 100).toInt()}%")
 
         assertTrue(false, "F1 score should be at least 80%")
+    }
+
+    private fun printFinalFMSScore() {
+        if (fmsScores.isEmpty()) {
+            println("No FMS scores to evaluate.")
+            return
+        }
+
+        val averageFMS = fmsScores.average()
+        val minFMS = fmsScores.minOrNull() ?: 0.0
+        val maxFMS = fmsScores.maxOrNull() ?: 0.0
+
+        println("===== Final FMS Evaluation =====")
+        println("Total Tests: ${fmsScores.size}")
+        println("Lowest FMS Score: ${(minFMS * 100).toInt()}%")
+        println("Highest FMS Score: ${(maxFMS * 100).toInt()}%")
+        println("Average FMS Score: ${(averageFMS * 100).toInt()}%")
+
+        assertTrue(false, "Average FMS score should be at least 80%")
+    }
+
+    // use Nemesys FMS-Score
+    private fun printFMSScore(
+        testNumber: Int,
+        expectedSegments: List<NemesysSegment>,
+        actualSegments: List<NemesysSegment>,
+        gamma: Double = 2.0
+    ) {
+        val real = expectedSegments.map { it.offset }.sorted()
+        val inferred = actualSegments.map { it.offset }.sorted().toSet()
+
+        // compute sigmaR for each real field boundary. Exclude r0 and r|R|
+        val deltas = mutableListOf<Double>()
+        for (k in 1 until real.size - 1) {
+            val rkMinus1 = real[k - 1]
+            val rk = real[k]
+            val rkPlus1 = real[k + 1]
+
+            val lowerBound = rkMinus1 + (rk - rkMinus1) / 2
+            val upperBound = rk + (rkPlus1 - rk) / 2
+
+            // find closest inferred boundary in the given scope
+            val candidates = inferred.filter { it in lowerBound until upperBound }
+            val delta = if (candidates.isEmpty()) { // no candidate found
+                Double.NEGATIVE_INFINITY
+            } else { // exact match => 0, else <0 or >0
+                candidates.minOf { abs(it - rk).toDouble() }.let { d ->
+                    if (candidates.any { it == rk }) 0.0 else d
+                }
+            }
+
+            deltas.add(delta)
+        }
+
+        // Specificity Penalty
+        val specificityPenalty = exp(-((real.size - inferred.size).toDouble().pow(2)) / real.size.toDouble().pow(2))
+
+        // Match Gain
+        val matchGain = deltas.sumOf { deltaR ->
+            when (deltaR) {
+                Double.NEGATIVE_INFINITY -> 0.0
+                0.0 -> 1.0
+                else -> exp(-(deltaR / gamma).pow(2))
+            }
+        } / deltas.size.coerceAtLeast(1)
+
+        // FMS Score
+        val fms = specificityPenalty * matchGain
+        fmsScores.add(fms)
+
+        println("----- testFMSScore$testNumber -----")
+        println("Real Boundaries: ${real.size}, Inferred: ${inferred.size}")
+        println("Match Gain: $matchGain")
+        println("Specificity Penalty: $specificityPenalty")
+        println("FMS Score: ${(fms * 100).toInt()}%")
     }
 
     private fun printSegmentParsingResult(
@@ -317,8 +396,9 @@ class NemesysTrainingset {
         testSegmentParsing11()
         testSegmentParsing12()
         testSegmentParsing13()
-        testSegmentParsing14()
+        // testSegmentParsing14()
 
+        // printFinalFMSScore()
         printFinalScore()
     }
 
@@ -848,9 +928,10 @@ class NemesysTrainingset {
         printSegmentParsingResult(13, expectedSegments, actualSegments)
     }
 
-    private fun testSegmentParsing14() {
+    /*private fun testSegmentParsing14() {
         val bytes = "e1435f7064917c05551af2daa06d876143cdb07a6e567ccbcbfcdbdce3428ed3b8574c7f1206d2160b3defe511de723182e53d03b6df59ab59eeaffd1d3ee64604cdb8e587410b4d40798dcecbfa90d03abab825995f57563840c74bd7cd0601020320cb38831888b37dc3760ebb155d13d7b6ee85e96f1eed096efed34a2c80190c64".fromHex()
 
+        // NOT SURE IF THIS SEGMENTATION IS RIGHT
         val expectedSegments = listOf(
             NemesysSegment(0, NemesysField.UNKNOWN),
             NemesysSegment(1, NemesysField.UNKNOWN), // _pd type
@@ -866,7 +947,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(14, expectedSegments, actualSegments)
-    }
+    }*/
 
     private fun testMultipleMessagesSegmentParsing1() {
         val message1 = "A5626964187B68757365726E616D6565616C69636565656D61696C71616C696365406578616D706C652E636F6D6770726F66696C65A263616765181E67636F756E747279674765726D616E796969735F616374697665F5".fromHex()

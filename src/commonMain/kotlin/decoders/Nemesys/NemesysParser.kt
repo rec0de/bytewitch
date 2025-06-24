@@ -986,6 +986,7 @@ class NemesysParser {
     // it adds +2 on the result to because the segment highlighting counts differently
     fun findInflectionPoints(risingDeltas: List<Pair<Int, Int>>, deltaBC: DoubleArray): MutableList<Int> {
         val boundaries = mutableListOf<Int>()
+        // val minDistance = 2
 
         for ((minIndex, maxIndex) in risingDeltas) {
             var maxDeltaIndex = minIndex + 2
@@ -998,6 +999,11 @@ class NemesysParser {
                     maxDeltaIndex = i + 2
                 }
             }
+
+            // boundaries are not allowed to be right next to each other
+            /*if (boundaries.isEmpty() || (maxDeltaIndex - boundaries.last()) >= minDistance) {
+                boundaries.add(maxDeltaIndex)
+            }*/
 
             boundaries.add(maxDeltaIndex)
         }
