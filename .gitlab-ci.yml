@@ -1,0 +1,14 @@
+# The Docker image that will be used to build your app
+image: gradle:8.14.2-jdk24
+create-pages:
+  pages:
+    # The folder that contains the files to be exposed at the Page URL
+    publish: build/dist/js/productionExecutable
+  # Publish each branch as separate environment
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    url: "https://$CI_PROJECT_NAMESPACE.pages.rwth-aachen.de/-/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/build/dist/js/productionExecutable/index.html"
+  # Functions that should be executed before the build script is run
+  before_script: []
+  script:
+    - gradle jsBrowserDistribution
