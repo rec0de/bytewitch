@@ -174,8 +174,13 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         //completeStruct = kaitaiYaml
          */
         val kaitaiYaml = JsYaml.load(kaitaiStruct)
+        val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
+            processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
+        } catch (e: dynamic) {
+            throw Exception("Unexpected JS Exception has been thrown:\n$e")
+        }
 
-        return processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
+        return result
     }
 
     fun parseEndian(currentElementStruct: dynamic, completeStruct: dynamic) : ByteOrder {
