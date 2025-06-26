@@ -71,7 +71,7 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
                 sizeInBits = type.filter { it.isDigit() }.toInt()
                 usedDisplayStyle = DisplayStyle.BINARY
             } else {
-                throw RuntimeException()
+                throw RuntimeException("Attempted to parse as builtin type $type but that doesn't seem to be a valid type")
             }
             if (type.endsWith("be")) { // We sometimes need to overwrite the byteorder even after parsing the endianness
                 this.endianness = ByteOrder.BIG
@@ -93,16 +93,16 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
                 console.log(sizeInBits)
             } else if (currentElementStruct["size-eos"]) {
                 sizeIsUntilEOS = true
-            } else if (completeStruct.types[this.type] == undefined) {  // TODO should be its own if not else if, as size-eos can be made of subtypes
-                // TODO could also be an imported type instead...
-                parseBuiltinType()
-            } else {
+            } else if ((completeStruct.types != undefined) && completeStruct.types[this.type] != undefined) {  // parse subtypes
                 sizeInBits = 0
                 for (subElementStruct in completeStruct.types[this.type].seq) {
                     var subType = Type(completeStruct, subElementStruct, bytesListTree)
                     subTypes.add(subType)
                     sizeInBits += subType.sizeInBits
                 }
+            } else {  // TODO should be its own if not else if, as size-eos can be made of subtypes
+                // TODO could also be an imported type instead...
+                parseBuiltinType()
             }
         }
     }
