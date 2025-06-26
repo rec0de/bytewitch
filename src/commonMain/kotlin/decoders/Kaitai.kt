@@ -39,7 +39,7 @@ class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()
 }
 
 class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val bytesListTree: MutableListTree<KaitaiElement>) {  // TODO: integrate Type Object and it's things into the seq parsing, as a lot of stuff from there is actually needed here
-    var sizeInBits: Int = 0
+    var sizeInBits: UInt = 0u
     var sizeIsUntilEOS: Boolean = false
     var sizeIsUntilTerminator: Boolean = false
     var terminator: ByteArray? = null
@@ -59,16 +59,16 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
             terminator = currentElementStruct.terminator // TODO: Make proper method out of this. Could probably be a value defined somewhere else aswell :(
         } else {
             if (Regex("^s\\d+(le|be)?\$").matches(type)) {  // signed int
-                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
+                sizeInBits = type.filter { it.isDigit() }.toUInt() * 8u
                 usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
             } else if (Regex("^u\\d+(le|be)?\$").matches(type)) {  // unsigned int
-                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
+                sizeInBits = type.filter { it.isDigit() }.toUInt() * 8u
                 usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
             } else if (Regex("^f\\d+(le|be)?\$").matches(type)) {  // float
-                sizeInBits = type.filter { it.isDigit() }.toInt() * 8
+                sizeInBits = type.filter { it.isDigit() }.toUInt() * 8u
                 usedDisplayStyle = DisplayStyle.FLOAT
             } else if (Regex("^b\\d+(le|be)?\$").matches(type)) {  // binary
-                sizeInBits = type.filter { it.isDigit() }.toInt()
+                sizeInBits = type.filter { it.isDigit() }.toUInt()
                 usedDisplayStyle = DisplayStyle.BINARY
             } else {
                 throw RuntimeException("Attempted to parse as builtin type $type but that doesn't seem to be a valid type")
@@ -85,16 +85,17 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
         endianness = Kaitai.parseEndian(currentElementStruct, completeStruct)
 
         if (currentElementStruct.size != undefined) {
-            sizeInBits = currentElementStruct.size * 8
+            val parsedValue = Kaitai.parseValue(currentElementStruct.size, bytesListTree)
+            sizeInBits = parsedValue.toByteArray().toUInt(endianness) * 8u
         } else {
             if (currentElementStruct.contents != undefined) {
                 val tmp = Kaitai.parseValue(currentElementStruct.contents, bytesListTree)
-                sizeInBits = tmp.size
+                sizeInBits = tmp.size.toUInt()
                 console.log(sizeInBits)
             } else if (currentElementStruct["size-eos"]) {
                 sizeIsUntilEOS = true
             } else if ((completeStruct.types != undefined) && completeStruct.types[this.type] != undefined) {  // parse subtypes
-                sizeInBits = 0
+                sizeInBits = 0u
                 for (subElementStruct in completeStruct.types[this.type].seq) {
                     var subType = Type(completeStruct, subElementStruct, bytesListTree)
                     subTypes.add(subType)
@@ -234,13 +235,13 @@ object Kaitai : ByteWitchDecoder {
         for (seqElement in currentSeqStruct) {
             val type = Type(completeStruct, seqElement, bytesListTree)
             if (type.sizeIsUntilEOS) {
-                type.sizeInBits = (data.size - currentOffsetInBits)
+                type.sizeInBits = (data.size - currentOffsetInBits).toUInt()
             }
             val elementId = seqElement.id
 
             var kaitaiElement : KaitaiElement
-            val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits -1)
-            val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits).toFloat()/8)
+            val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits.toInt() -1)
+            val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits.toInt()).toFloat()/8)
 
             if (type.subTypes.isNotEmpty()) {
                 kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
@@ -271,7 +272,7 @@ object Kaitai : ByteWitchDecoder {
 
             bytesListTree.add(kaitaiElement)
 
-            currentOffsetInBits += type.sizeInBits
+            currentOffsetInBits += type.sizeInBits.toInt()
         }
 
         return KaitaiResult(id, endianness, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
