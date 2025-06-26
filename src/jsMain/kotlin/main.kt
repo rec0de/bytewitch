@@ -13,6 +13,7 @@ import org.khronos.webgl.Uint8Array
 
 
 var liveDecodeEnabled = true
+var liveKaitaiEnabled = true
 var currentHighlight: Element? = null
 
 /* List of bundled Kaitai Structs that are pre-registered.
@@ -39,6 +40,8 @@ fun main() {
 
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
+        val kaitaiLiveDecode = document.getElementById("kaitai-live") as HTMLInputElement
+        liveKaitaiEnabled = kaitaiLiveDecode.checked
 
         addKaitaiBtn.onclick = {
             val kaitaiNameValue = kaitaiName.value.trim()
@@ -68,6 +71,14 @@ fun main() {
         input.oninput = {
             if (liveDecodeEnabled)
                 decode(false)
+        }
+
+        kaitaiInput.oninput = {
+            if (liveKaitaiEnabled) {
+                ByteWitch.setKaitaiLiveDecoder(kaitaiInput.value)
+                if (liveDecodeEnabled)
+                    decode(false)
+            }
         }
 
         decodeBtn.onclick = {
@@ -102,6 +113,21 @@ fun main() {
 
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
+            if (liveKaitaiEnabled) {
+                ByteWitch.setKaitaiLiveDecoder(kaitaiInput.value)
+                if (liveDecodeEnabled)
+                    decode(false)
+            }
+            0.0
+        }
+
+        kaitaiLiveDecode.onchange = {
+            liveKaitaiEnabled = kaitaiLiveDecode.checked
+            if (liveKaitaiEnabled) {
+                ByteWitch.setKaitaiLiveDecoder(kaitaiInput.value)
+            } else {
+                ByteWitch.setKaitaiLiveDecoder(null)
+            }
             0.0
         }
     })

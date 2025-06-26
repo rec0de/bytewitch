@@ -11,6 +11,7 @@ object ByteWitch {
 
     private var bundledKaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
     private var kaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
+    private var kaitaiLiveDecoder: ByteWitchDecoder? = null
 
     fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         val decoder = Kaitai(name, kaitaiStruct)
@@ -43,8 +44,20 @@ object ByteWitch {
         }
     }
 
+    fun setKaitaiLiveDecoder(kaitaiStruct: String?): Boolean {
+        if (kaitaiStruct == null || kaitaiStruct.isBlank()) {
+            Logger.log("Kaitai live decoder set to null")
+            kaitaiLiveDecoder = null
+        } else {
+            kaitaiLiveDecoder = Kaitai("Live", kaitaiStruct)
+            Logger.log("Set Kaitai live decoder")
+        }
+        return true
+    }
+
     fun getAllDecoders(): List<ByteWitchDecoder> {
-        return kaitaiDecoders.values + bundledKaitaiDecoders.values + decoders
+        val allDecoders = kaitaiDecoders.values + bundledKaitaiDecoders.values + decoders
+        return listOfNotNull(kaitaiLiveDecoder) + allDecoders
     }
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
