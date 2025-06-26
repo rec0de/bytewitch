@@ -1221,7 +1221,7 @@ class NemesysParser {
                     newEnd++
                 }
 
-                improved.add(NemesysSegment(0, NemesysField.STRING))
+                improved.add(NemesysSegment(newStart, NemesysField.STRING))
             } else {
                 improved.add(NemesysSegment(start, type))
             }
