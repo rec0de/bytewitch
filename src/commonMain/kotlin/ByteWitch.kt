@@ -1,15 +1,51 @@
 import bitmage.fromHex
-import bitmage.hex
 import decoders.*
 
 object ByteWitch {
 
     private val decoders = listOf<ByteWitchDecoder>(
-        Kaitai,
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
         EntropyDetector, HeuristicSignatureDetector, //Nemesys
     )
+
+    private var bundledKaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
+    private var kaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
+
+    fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
+        val decoder = Kaitai(name, kaitaiStruct)
+        bundledKaitaiDecoders[name] = decoder
+        Logger.log("Registered bundled Kaitai decoder: $name")
+        return true
+    }
+
+    fun registerKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
+        // TODO: Do we want to allow overwriting existing decoders?
+        if (kaitaiDecoders.containsKey(name)) {
+            Logger.log("Kaitai decoder for $name already registered, skipping.")
+            return false
+        }
+
+        val decoder = Kaitai(name, kaitaiStruct)
+        kaitaiDecoders[name] = decoder
+        Logger.log("Registered Kaitai decoder: $name")
+        return true
+    }
+
+    fun deregisterKaitaiDecoder(name: String): Boolean {
+        if (kaitaiDecoders.containsKey(name)) {
+            kaitaiDecoders.remove(name)
+            Logger.log("Deregistered Kaitai decoder: $name")
+            return true
+        } else {
+            Logger.log("No Kaitai decoder found for $name")
+            return false
+        }
+    }
+
+    fun getAllDecoders(): List<ByteWitchDecoder> {
+        return kaitaiDecoders.values + bundledKaitaiDecoders.values + decoders
+    }
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
@@ -28,13 +64,12 @@ object ByteWitch {
                     filtered.fromHex()
             }
         }
-
     }
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
-            return decoders.mapNotNull {
+            return getAllDecoders().mapNotNull {
                 val decode = it.tryhardDecode(data)
                 Logger.log("decode with ${it.name} yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
@@ -43,7 +78,7 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = decoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+            val possibleDecoders = getAllDecoders().map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
 
             return possibleDecoders.mapNotNull {
                 try {
@@ -58,7 +93,7 @@ object ByteWitch {
 
     fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
         try {
-            return decoders.firstOrNull {
+            return getAllDecoders().firstOrNull {
                 val confidence = it.confidence(data)
                 confidence > 0.75
             }?.decode(data, sourceOffset, inlineDisplay = true)

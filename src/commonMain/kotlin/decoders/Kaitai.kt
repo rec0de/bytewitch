@@ -6,8 +6,7 @@ import bitmage.toBooleanArray
 import bitmage.toByteArray
 import bitmage.toInt
 import bitmage.toUInt
-import kotlinx.browser.document
-import org.w3c.dom.HTMLTextAreaElement
+import kotlin.collections.plus
 import kotlin.js.iterator
 
 @JsModule("js-yaml")
@@ -81,14 +80,67 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
         }
     }
 
+    // TODO: This is a duplicate of the one in Kaitai.kt, should be replaced as soon as the parse methods are moved to a companion object
+    fun parseEndian(currentElementStruct: dynamic, completeStruct: dynamic) : ByteOrder {
+        // TODO: endian is significantly more complicated with switch-on and the fact that its in a different location than what I assume here
+        val actualStruct = if (currentElementStruct.endian != undefined) {
+            currentElementStruct
+        } else if (completeStruct.endian != undefined) {
+            completeStruct
+        } else {
+            return ByteOrder.BIG
+        }
+
+        if (actualStruct.endian == "be") {
+            return ByteOrder.BIG
+        } else {
+            return ByteOrder.LITTLE
+        }
+    }
+
+    // TODO: See the comment above, this is a duplicate of the one in Kaitai.kt
+    fun parseValue(value: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : BooleanArray {
+        val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]
+        var fullyFlatArray = booleanArrayOf()
+        for (element in flattenedArray) {
+            if (element is Int) {
+                fullyFlatArray += (element as Int).toByte().toBooleanArray()
+            } else {
+                try {
+                    fullyFlatArray += parseReference(value, bytesListTree)
+                } catch (e: Exception) {
+                    for (i in 0..element.length - 1) {
+                        fullyFlatArray += (element.charCodeAt(i) as Int).toByte().toBooleanArray()
+                    }
+                }
+            }
+        }
+        return fullyFlatArray
+    }
+
+    // TODO: See the comment above, this is a duplicate of the one in Kaitai.kt
+    fun parseReference(reference: String, bytesListTree: MutableListTree<KaitaiElement>): BooleanArray {
+        // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
+        if (reference.startsWith("_root.")) //_root.magic
+            return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
+        else if (reference.startsWith("_parent."))
+            return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
+        else (
+                if (reference.contains("."))
+                    return parseReference(reference.substringAfter("."), bytesListTree.find { it.id == reference.substringBefore(".") }!!.bytesListTree!!)
+                else
+                    return bytesListTree.find { it.id == reference }!!.value
+                )
+    }
+
     init {
-        endianness = Kaitai.parseEndian(currentElementStruct, completeStruct)
+        endianness = parseEndian(currentElementStruct, completeStruct)
 
         if (currentElementStruct.size != undefined) {
             sizeInBits = currentElementStruct.size * 8
         } else {
             if (currentElementStruct.contents != undefined) {
-                val tmp = Kaitai.parseValue(currentElementStruct.contents, bytesListTree)
+                val tmp = parseValue(currentElementStruct.contents, bytesListTree)
                 sizeInBits = tmp.size
                 console.log(sizeInBits)
             } else if (currentElementStruct["size-eos"]) {
@@ -108,14 +160,18 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
     }
 }
 
-object Kaitai : ByteWitchDecoder {
-    override val name = "Kaitai"
-    lateinit var completeStruct: JsYaml
+// TODO[IMPORTANT]: Move the ByteWitchDecoder into a companion object as the parse methods are static and do not need an instance. See the other decoders for examples
+class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecoder {
+    override val name = "Kaitai-$kaitaiName"
+    //lateinit var completeStruct: JsYaml
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        /*
         val kaitaiInput = document.getElementById("kaitaiinput") as HTMLTextAreaElement
         val kaitaiYaml = JsYaml.load(kaitaiInput.value)
-        completeStruct = kaitaiYaml
+        //completeStruct = kaitaiYaml
+         */
+        val kaitaiYaml = JsYaml.load(kaitaiStruct)
 
         return processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
     }
