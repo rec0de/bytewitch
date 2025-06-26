@@ -4,11 +4,6 @@ import kotlinx.browser.window
 import kotlinx.dom.clear
 import kotlinx.dom.createElement
 import org.w3c.dom.*
-import kotlinx.browser.document
-import kotlinx.browser.window
-import kotlinx.dom.clear
-import kotlinx.dom.createElement
-import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
@@ -231,8 +226,8 @@ fun arrayBufferToHex(buffer: ArrayBuffer): String {
 }
 
 fun loadKaitaiStructs() {
-    val kaitaiLegend = document.getElementById("kaitai-legend") as HTMLDivElement
-    bundledKaitaiStructs.forEach { kaitaiName ->
+    val kaitaiLegend = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
+    for ( kaitaiName in bundledKaitaiStructs ) {
         // Load file
         window.fetch("kaitai/$kaitaiName.ksy")
             .then { response ->
