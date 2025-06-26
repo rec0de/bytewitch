@@ -108,7 +108,7 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
                 fullyFlatArray += (element as Int).toByte().toBooleanArray()
             } else {
                 try {
-                    fullyFlatArray += parseReference(value, bytesListTree)
+                    fullyFlatArray += parseReference(element, bytesListTree)
                 } catch (e: Exception) {
                     for (i in 0..element.length - 1) {
                         fullyFlatArray += (element.charCodeAt(i) as Int).toByte().toBooleanArray()
@@ -217,7 +217,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 fullyFlatArray += (element as Int).toByte().toBooleanArray()
             } else {
                 try {
-                    fullyFlatArray += parseReference(value, bytesListTree)
+                    fullyFlatArray += parseReference(element, bytesListTree)
                 } catch (e: Exception) {
                     for (i in 0..element.length - 1) {
                         fullyFlatArray += (element.charCodeAt(i) as Int).toByte().toBooleanArray()
