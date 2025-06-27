@@ -38,11 +38,10 @@ class NemesysParser {
         val segments = mutableListOf<NemesysSegment>()
         var index = 0
 
-        // TODO try out different decoders
-        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, ProtobufParser, GenericTLV) // try these decoders
+        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV) // try these decoders
         val minWindow = 4
         val maxWindow = 32
-        val threshold = 0.9 // set confidence score // TODO try different scores and take the better one
+        val threshold = 0.8 // set confidence score
 
         while (index < bytes.size) {
             var bestConfidence = 0.0
@@ -50,7 +49,7 @@ class NemesysParser {
             var bestWindowSize = -1
 
             // sliding window approach
-            for (windowSize in minWindow..maxWindow) {
+            for (windowSize in maxWindow downTo minWindow) {
                 val end = index + windowSize
                 if (end > bytes.size) break
                 val window = bytes.sliceArray(index until end)
@@ -85,18 +84,17 @@ class NemesysParser {
         val segments = mutableListOf<NemesysSegment>()
         var index = 0
 
-        // TODO try out different decoders
-        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, ProtobufParser, GenericTLV) // try these decoders
+        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV) // try these decoders
         val minWindow = 4
         val maxWindow = 32
-        val threshold = 0.9 // set confidence score // TODO try different scores and take the better one
+        val threshold = 0.8 // set confidence score
 
         while (index < bytes.size) {
             var bestConfidence = 0.0
             var bestDecoder: ByteWitchDecoder? = null
             var bestWindowSize = -1
 
-            for (windowSize in minWindow..maxWindow) {
+            for (windowSize in maxWindow downTo minWindow) {
                 val end = index + windowSize
                 if (end > bytes.size) break
                 val window = bytes.sliceArray(index until end)
@@ -131,10 +129,10 @@ class NemesysParser {
     }
 
     fun parseSmartWithFullOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, ProtobufParser, GenericTLV)
+        val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV)
         val minWindow = 4
         val maxWindow = 32
-        val threshold = 0.9
+        val threshold = 0.8
 
         val taken = BooleanArray(bytes.size) { false }
 
@@ -168,7 +166,7 @@ class NemesysParser {
                 var bestWindowSize = -1
 
                 // use sliding windows appraoch
-                for (windowSize in minWindow..maxWindow) {
+                for (windowSize in maxWindow downTo minWindow) {
                     val actualEnd = index + windowSize
                     if (actualEnd > end) break
                     val window = bytes.sliceArray(index until actualEnd)
@@ -1023,7 +1021,7 @@ class NemesysParser {
 
     // check if byte is a printable char
     fun isPrintableChar(byte: Byte): Boolean {
-        return (byte == 0x09.toByte() || byte == 0x0A.toByte() || byte == 0x0D.toByte() || (byte in 0x20..0x7E))
+        return (byte == 0x0A.toByte() || byte == 0x0B.toByte() || byte == 0x0D.toByte() || (byte in 0x20..0x7E))
     }
 
     // merge consecutive fields together if both are printable char values
@@ -1067,6 +1065,52 @@ class NemesysParser {
         }
 
         return mergedSegments
+    }
+
+    // merge char sequences together - this is the way how it's done by Stephan Kleber in his paper (explained in 10.4.4.2)
+    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<NemesysSegment> {
+        val mergedBoundaries = mutableListOf<NemesysSegment>()
+
+        // if no boundary detected set start boundary to 0
+        if (boundaries.isEmpty()) {
+            mergedBoundaries.add(NemesysSegment(0, NemesysField.UNKNOWN))
+            return mergedBoundaries
+        }
+
+        boundaries.add(0, 0)
+        var i = 0
+
+        while (i < boundaries.size) {
+            // set start and end of segment
+            val start = boundaries[i]
+            var end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
+            var j = i + 1
+
+            while (j + 1 < boundaries.size) {
+                val nextStart = boundaries[j]
+                val nextEnd = boundaries[j + 1]
+                val nextSegment = bytes.sliceArray(nextStart until nextEnd)
+
+                if (nextSegment.all { it >= 0 && it < 0x7f }) {
+                    end = nextEnd
+                    j++
+                } else {
+                    break
+                }
+            }
+
+            val fullSegment = bytes.sliceArray(start until end)
+
+            if (isCharSegment(fullSegment)) {
+                mergedBoundaries.add(NemesysSegment(start, NemesysField.STRING))
+                i = j
+            } else {
+                mergedBoundaries.add(NemesysSegment(start, NemesysField.UNKNOWN))
+                i++
+            }
+        }
+
+        return mergedBoundaries
     }
 
     // try to improve boundaries by shifting them a bit
@@ -1230,52 +1274,6 @@ class NemesysParser {
         return improved
     }
 
-
-    // merge char sequences together - this is the way how it's done by Stephan Kleber in his paper
-    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): List<Pair<Int, NemesysField>> {
-        val mergedBoundaries = mutableListOf<Pair<Int, NemesysField>>()
-
-        // if no boundary detected set start boundary to 0
-        if (boundaries.isEmpty()) {
-            mergedBoundaries.add(0 to NemesysField.UNKNOWN)
-            return mergedBoundaries
-        }
-
-        boundaries.add(0, 0)
-        var i = 0
-
-        while (i < boundaries.size) {
-            // set start and end of segment
-            val start = boundaries[i]
-            var end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
-            var j = i + 1
-
-            while (j + 1 < boundaries.size) {
-                val nextStart = boundaries[j]
-                val nextEnd = boundaries[j + 1]
-                val nextSegment = bytes.sliceArray(nextStart until nextEnd)
-
-                if (nextSegment.all { it >= 0 && it < 0x7f }) {
-                    end = nextEnd
-                    j++
-                } else {
-                    break
-                }
-            }
-
-            val fullSegment = bytes.sliceArray(start until end)
-
-            if (isCharSegment(fullSegment)) {
-                mergedBoundaries.add(start to NemesysField.STRING)
-                i = j
-            } else {
-                mergedBoundaries.add(start to NemesysField.UNKNOWN)
-                i++
-            }
-        }
-
-        return mergedBoundaries
-    }
 
     // check if segment is a char sequence
     private fun isCharSegment(segment: ByteArray): Boolean {
