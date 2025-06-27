@@ -192,6 +192,10 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
             messageBox.appendChild(parseResult)
         }
 
+        // nemesys analysis bogs down UI for very large payloads, disable for now
+        if(bytes.size > 4096)
+            return
+
         // for nemesys (and float view)
         val nemesysParsed = NemesysParser().parse(bytes, taIndex)
         parsedMessages[taIndex] = nemesysParsed // besides nemesys this is also needed for the float view
