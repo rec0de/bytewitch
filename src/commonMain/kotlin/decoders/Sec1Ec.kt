@@ -260,7 +260,10 @@ object EdDSA : ByteWitchDecoder {
     private val expectedSizes = setOf(57)
     private val tryhardSizes = setOf(32)
 
-    override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> = Pair(data.size in expectedSizes, null)
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        val confidence = if(data.size in expectedSizes) 1.0 else 0.0
+        return Pair(confidence, null)
+    }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return when(data.size) {

@@ -11,11 +11,9 @@ class BPList15 {
     companion object : ByteWitchDecoder {
         override val name = "bplist15"
 
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
-            if (data.size < 8) {
-                return Pair(false, null)
-            }
-            return Pair(data.sliceArray(0 until 8).decodeToString() == "bplist15", null)
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+            val confidence = if(data.size > 22 && data.sliceArray(0 until 8).decodeToString() == "bplist15") 1.0 else 0.0
+            return Pair(confidence, null)
         }
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
