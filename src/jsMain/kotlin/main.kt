@@ -2,13 +2,11 @@ import bitmage.hex
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
-import kotlinx.dom.createElement
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
 
 
@@ -24,8 +22,9 @@ val bundledKaitaiStructs = listOf<String>("bmp", "magic1", "magic2")
 
 fun main() {
     window.addEventListener("load", {
-        // Load bundled Kaitai Structs
-        loadKaitaiStructs()
+        // Load Kaitai structs
+        loadBundledKaitaiStructs()
+        loadKaitaiStructsFromStorage()
 
         val input = document.getElementById("data") as HTMLTextAreaElement
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
@@ -49,6 +48,11 @@ fun main() {
             if (kaitaiNameValue.isNotEmpty() && kaitaiInputValue.isNotEmpty()) {
                 val success = ByteWitch.registerKaitaiDecoder(kaitaiNameValue, kaitaiInputValue)
                 if (success) {
+                    // Save the new Kaitai decoder to local storage
+                    val saved = KaitaiStorage.saveStruct(kaitaiNameValue, kaitaiInputValue)
+                    if (!saved) {
+                        console.error("Failed to save Kaitai Struct: $kaitaiNameValue")
+                    }
                     // Add the new Kaitai decoder to the UI
                     val parserDiv = document.createElement("DIV") as HTMLDivElement
                     parserDiv.classList.add("kaitai")
@@ -251,7 +255,33 @@ fun arrayBufferToHex(buffer: ArrayBuffer): String {
     }
 }
 
-fun loadKaitaiStructs() {
+fun loadKaitaiStructsFromStorage() {
+    val kaitaiLegend = document.getElementById("kaitai-legend") as HTMLDivElement
+
+    val names = KaitaiStorage.listStructNames()
+    for (kaitaiName in names) {
+        // Load file from storage
+        val ksyContent = KaitaiStorage.loadStruct(kaitaiName)
+        if (ksyContent != null) {
+            // Register the Kaitai Struct decoder
+            val success = ByteWitch.registerKaitaiDecoder(kaitaiName, ksyContent)
+            if (!success) {
+                console.error("Failed to register Kaitai Struct: $kaitaiName")
+                continue
+            }
+
+            // Add the Kaitai Struct to the UI
+            val parserDiv = document.createElement("DIV") as HTMLDivElement
+            parserDiv.classList.add("kaitai")
+            parserDiv.innerHTML = kaitaiName
+            kaitaiLegend.appendChild(parserDiv)
+        } else {
+            console.warn("Kaitai Struct $kaitaiName not found in storage")
+        }
+    }
+}
+
+fun loadBundledKaitaiStructs() {
     val kaitaiLegend = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     for ( kaitaiName in bundledKaitaiStructs ) {
         // Load file
@@ -274,7 +304,6 @@ fun loadKaitaiStructs() {
                 val parserDiv = document.createElement("DIV") as HTMLDivElement
                 parserDiv.classList.add("kaitai")
                 parserDiv.innerHTML = kaitaiName
-                // TODO: Differentiate between bundled and user-defined Kaitai parsers
                 kaitaiLegend.appendChild(parserDiv)
             }
             .catch { error ->
