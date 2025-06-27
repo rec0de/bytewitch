@@ -9,7 +9,7 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
         ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector, //Nemesys
+        EntropyDetector, HeuristicSignatureDetector
     )
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
@@ -21,7 +21,14 @@ object ByteWitch {
             isBase64 -> decodeBase64(cleanedData)
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                val filtered = data.filter { it in "0123456789abcdefABCDEF" }
+                // allow use of # as line comment
+                val stripped = data.split("\n").map { line ->
+                    val commentMarker = line.indexOfFirst{ it == '#' }
+                    val lineEnd = if(commentMarker == -1) line.length else commentMarker
+                    line.substring(0, lineEnd)
+                }.joinToString("")
+
+                val filtered = stripped.filter { it in "0123456789abcdefABCDEF" }
                 Logger.log(filtered)
                 if (filtered.length % 2 != 0)
                     byteArrayOf()
