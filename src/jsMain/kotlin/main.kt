@@ -2,18 +2,11 @@ import bitmage.hex
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.dom.clear
-import kotlinx.dom.createElement
-import org.w3c.dom.*
-import kotlinx.browser.document
-import kotlinx.browser.window
-import kotlinx.dom.clear
-import kotlinx.dom.createElement
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
 
 
