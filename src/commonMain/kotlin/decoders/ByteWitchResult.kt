@@ -7,6 +7,10 @@ interface ByteWitchResult {
     fun renderHTML(): String
 
     fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
+    fun relativeRangeTags(start: Int, length: Int) : String {
+        check(sourceByteRange != null) { "attempting use of relativeRangeTagsFor with null sourceByteRange" }
+        return rangeTagsFor(sourceByteRange!!.first+start, sourceByteRange!!.first+start+length)
+    }
 
     val sourceByteRange: Pair<Int,Int>?
 
