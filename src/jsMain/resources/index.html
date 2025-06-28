@@ -20,6 +20,8 @@
             --asn-highlight: #b346b9;
             --generic: #c9a074;
             --generic-highlight: #b98346;
+            --neutral: #a0a0a0;
+            --neutral-highlight: #838383;
             --rowgap: 0.3rem;
             --sans: Lato, Roboto, Helvetica, sans-serif;
             --mono: monospace;
@@ -190,11 +192,15 @@
             background: var(--generic);
         }
 
+        .neutral {
+            background: var(--neutral);
+        }
+
         .asn1 {
             background: var(--asn);
         }
 
-        .generic, .asn1, .flexy {
+        .generic, .neutral, .asn1, .flexy {
             display: flex;
             gap: var(--rowgap);
             align-items: start;
@@ -296,6 +302,10 @@
 
         .generic.highlight {
             background: var(--generic-highlight);
+        }
+
+        .neutral.highlight {
+            background: var(--neutral-highlight);
         }
     </style>
 </head>

@@ -1,5 +1,6 @@
 
 actual object Logger {
+    actual fun tag(tag: String, msg: String) = log("[$tag] $msg")
     actual fun log(vararg o: Any?) = console.log(*o)
 }
 
