@@ -100,21 +100,20 @@ fun decode(tryhard: Boolean) {
 }
 
 fun setByteFinderContent(bytes: ByteArray) {
-    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val hexview = document.getElementById("hexview") as HTMLDivElement
     val textview = document.getElementById("textview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    floatview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
     textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
     bytefinder.style.display = "flex"
 }
 
 fun setByteFinderHighlight(start: Int, end: Int) {
-    val floatview = document.getElementById("floatview")!!
-    
-    // apply highlighting in floatview
+    val hexview = document.getElementById("hexview")!!
+    hexview.innerHTML = hexview.textContent!! // re-set previous highlights
     val range = document.createRange()
-    val text = floatview.childNodes[0]!! as Text
+    val text = hexview.childNodes[0]!! as Text
     range.setStart(text, start*2 + start/8)
     range.setEnd(text, minOf(end*2 + end/8, text.length))
     range.surroundContents(document.createElement("span"))
