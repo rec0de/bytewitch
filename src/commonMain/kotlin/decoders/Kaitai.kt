@@ -6,8 +6,7 @@ import bitmage.toBooleanArray
 import bitmage.toByteArray
 import bitmage.toInt
 import bitmage.toUInt
-import kotlinx.browser.document
-import org.w3c.dom.HTMLTextAreaElement
+import bitmage.toUTF8String
 import kotlin.js.iterator
 
 @JsModule("js-yaml")
@@ -140,24 +139,23 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
         if (currentElementStruct.size != undefined) {
             val parsedValue = parseValue(currentElementStruct.size, bytesListTree)
             sizeInBits = parsedValue.toByteArray().toUInt(endianness) * 8u
-        } else {
-            if (currentElementStruct.contents != undefined) {
-                val tmp = parseValue(currentElementStruct.contents, bytesListTree)
-                sizeInBits = tmp.size.toUInt()
-                console.log(sizeInBits)
-            } else if (currentElementStruct["size-eos"]) {
-                sizeIsUntilEOS = true
-            } else if ((completeStruct.types != undefined) && completeStruct.types[this.type] != undefined) {  // parse subtypes
-                sizeInBits = 0u
-                for (subElementStruct in completeStruct.types[this.type].seq) {
-                    var subType = Type(completeStruct, subElementStruct, bytesListTree)
-                    subTypes.add(subType)
-                    sizeInBits += subType.sizeInBits
-                }
-            } else {  // TODO should be its own if not else if, as size-eos can be made of subtypes
-                // TODO could also be an imported type instead...
-                parseBuiltinType()
+        }
+        if (currentElementStruct.contents != undefined) {
+            val tmp = parseValue(currentElementStruct.contents, bytesListTree)
+            sizeInBits = tmp.size.toUInt()
+            console.log(sizeInBits)
+        } else if (currentElementStruct["size-eos"]) {
+            sizeIsUntilEOS = true
+        } else if ((completeStruct.types != undefined) && completeStruct.types[this.type] != undefined) {  // parse subtypes
+            sizeInBits = 0u
+            for (subElementStruct in completeStruct.types[this.type].seq) {
+                var subType = Type(completeStruct, subElementStruct, bytesListTree)
+                subTypes.add(subType)
+                sizeInBits += subType.sizeInBits
             }
+        } else {  // TODO should be its own if not else if, as size-eos can be made of subtypes
+            // TODO could also be an imported type instead...
+            parseBuiltinType()
         }
     }
 }
@@ -315,6 +313,14 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         value,
                         sourceByteRange
                     )
+                } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
+                    console.log(value.toByteArray().toUTF8String())
+                    KaitaiString(
+                        elementId,
+                        type.endianness,
+                        value,
+                        sourceByteRange
+                    )
                 } else { //displayStyle.HEX as the fallback
                     KaitaiBytes(
                         elementId,
@@ -391,7 +397,7 @@ class KaitaiBinary(override val id: String, override var endianness: ByteOrder, 
 
 class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>I am a String</div>"
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toUTF8String()})utf8</div>"
     }
 }
 /*
