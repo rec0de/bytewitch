@@ -177,7 +177,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "7b22" to Pair("JSON dict", null),
         "3a290a" to Pair("Smile Data Format", "https://github.com/FasterXML/smile-format-specification"),
         "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR"),
-        "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/")
+        "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/"),
+        "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
