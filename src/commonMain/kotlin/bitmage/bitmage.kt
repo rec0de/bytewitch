@@ -103,6 +103,17 @@ fun ByteArray.toBinaryString(): String {
     }
 }
 
+@JsName("TextDecoder")
+external class TextDecoder(encoding: String = definedExternally) {
+    fun decode(input: dynamic): String
+}
+fun ByteArray.toUTF8String(): String {
+    val bytes = this  // needs to be copied over as "this" is not recognized in the js(str) call
+    val uint8Array = js("new Uint8Array(bytes)") // Convert Kotlin ByteArray to JS Uint8Array
+    val decoder = TextDecoder("utf-8")
+    return decoder.decode(uint8Array)
+}
+
 // BooleanArray
 
 fun BooleanArray.toByteArray(): ByteArray {
