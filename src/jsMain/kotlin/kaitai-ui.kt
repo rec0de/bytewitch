@@ -62,11 +62,7 @@ object KaitaiUI {
                     continue
                 }
 
-                // Add the Kaitai Struct to the UI
-                val parserDiv = document.createElement("DIV") as HTMLDivElement
-                parserDiv.classList.add("kaitai")
-                parserDiv.innerHTML = kaitaiName
-                legendContainer.appendChild(parserDiv)
+                addParserToUI(kaitaiName)
             } else {
                 console.warn("Kaitai Struct $kaitaiName not found in storage")
             }
