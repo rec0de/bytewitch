@@ -1119,6 +1119,8 @@ class NemesysParser {
         result = slideCharWindow(result, bytes)
         result = nullByteTransitions(result, bytes)
         result = entropyMerge(result, bytes)
+        result = splitFixed(result, bytes)
+
         return result
     }
 
@@ -1140,6 +1142,36 @@ class NemesysParser {
 
         return entropy
     }
+
+    // split bytes at the beginning of the message
+    fun splitFixed(
+        segments: MutableList<NemesysSegment>,
+        bytes: ByteArray
+    ): MutableList<NemesysSegment> {
+        if (segments.isEmpty()) return segments
+
+        val firstSegment = segments[0]
+        val nextOffset = if (segments.size > 1) segments[1].offset else bytes.size
+        val firstSegmentLength = nextOffset - firstSegment.offset
+
+        // check if first segment has more than two bytes and every bytes is below 0x10
+        if (firstSegmentLength >= 2 &&
+            bytes.slice(firstSegment.offset until nextOffset).all { it.toUByte().toInt() < 0x10 }
+        ) {
+            // split bytes in own segments
+            val newSegments = mutableListOf<NemesysSegment>()
+            for (offset in firstSegment.offset until nextOffset) {
+                newSegments.add(NemesysSegment(offset, firstSegment.fieldType))
+            }
+
+            // add new segments at pos 0
+            segments.removeAt(0)
+            segments.addAll(0, newSegments)
+        }
+
+        return segments
+    }
+
 
     // merge two segments based on their entropy
     fun entropyMerge(

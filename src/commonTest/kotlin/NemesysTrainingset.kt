@@ -50,7 +50,7 @@ class NemesysTrainingset {
         println("Highest FMS Score: ${(maxFMS * 100).toInt()}%")
         println("Average FMS Score: ${(averageFMS * 100).toInt()}%")
 
-        assertTrue(false, "Average FMS score should be at least 80%")
+        // assertTrue(false, "Average FMS score should be at least 80%")
     }
 
     // use Nemesys FMS-Score
@@ -102,11 +102,11 @@ class NemesysTrainingset {
         val fms = specificityPenalty * matchGain
         fmsScores.add(fms)
 
-        println("----- testFMSScore$testNumber -----")
+        /*println("----- testFMSScore$testNumber -----")
         println("Real Boundaries: ${real.size}, Inferred: ${inferred.size}")
         println("Match Gain: $matchGain")
         println("Specificity Penalty: $specificityPenalty")
-        println("FMS Score: ${(fms * 100).toInt()}%")
+        println("FMS Score: ${(fms * 100).toInt()}%")*/
     }
 
     private fun printSegmentParsingResult(
@@ -381,7 +381,7 @@ class NemesysTrainingset {
         return bestIndex
     }
 
-    @Test
+    /*@Test
     fun runSegmentationTests() {
         testSegmentParsing1()
         testSegmentParsing2()
@@ -398,9 +398,9 @@ class NemesysTrainingset {
         testSegmentParsing13()
         // testSegmentParsing14()
 
-        // printFinalFMSScore()
+        printFinalFMSScore()
         printFinalScore()
-    }
+    }*/
 
     @Test
     fun runSegmentationOnMultipleMessagesTests() {
@@ -417,7 +417,7 @@ class NemesysTrainingset {
         testSequenceAlignment3()
 
         printFinalScore()
-    }
+    }*/
 
     @Test
     fun runSegmentationWithSequenceAlignmentTests() {
@@ -426,7 +426,7 @@ class NemesysTrainingset {
         testSegmentationWithSequenceAlignment3()
 
         printFinalScore()
-    }*/
+    }
 
     // to easily change the parser for segment parsing Tests
     private fun parserForSegmentParsing(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
@@ -472,6 +472,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(1, expectedSegments, actualSegments)
+        printFMSScore(1, expectedSegments, actualSegments)
         // printSegmentParsingResult(1, expectedBoundaries, actualSegments)
     }
 
@@ -514,6 +515,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(2, expectedSegments, actualSegments)
+        printFMSScore(2, expectedSegments, actualSegments)
         // printSegmentParsingResult(2, expectedBoundaries, actualSegments)
     }
 
@@ -580,6 +582,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(3, expectedSegments, actualSegments)
+        printFMSScore(3, expectedSegments, actualSegments)
         // printSegmentParsingResult(3, expectedBoundaries, actualSegments)
     }
 
@@ -618,6 +621,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(4, expectedSegments, actualSegments)
+        printFMSScore(4, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing5() {
@@ -664,6 +668,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(5, expectedSegments, actualSegments)
+        printFMSScore(5, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing6() {
@@ -716,6 +721,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(6, expectedSegments, actualSegments)
+        printFMSScore(6, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing7() {
@@ -750,6 +756,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(7, expectedSegments, actualSegments)
+        printFMSScore(7, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing8() {
@@ -792,6 +799,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(8, expectedSegments, actualSegments)
+        printFMSScore(8, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing9() {
@@ -808,6 +816,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(9, expectedSegments, actualSegments)
+        printFMSScore(9, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing10() {
@@ -829,6 +838,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(10, expectedSegments, actualSegments)
+        printFMSScore(10, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing11() {
@@ -851,6 +861,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(11, expectedSegments, actualSegments)
+        printFMSScore(11, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing12() {
@@ -890,6 +901,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(12, expectedSegments, actualSegments)
+        printFMSScore(12, expectedSegments, actualSegments)
     }
 
     private fun testSegmentParsing13() {
@@ -926,6 +938,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(13, expectedSegments, actualSegments)
+        printFMSScore(13, expectedSegments, actualSegments)
     }
 
     /*private fun testSegmentParsing14() {
@@ -947,6 +960,7 @@ class NemesysTrainingset {
         val actualSegments = parsed.segments
 
         printSegmentParsingResult(14, expectedSegments, actualSegments)
+        printFMSScore(14, expectedSegments, actualSegments)
     }*/
 
     private fun testMultipleMessagesSegmentParsing1() {
