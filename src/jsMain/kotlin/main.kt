@@ -29,6 +29,10 @@ fun main() {
                 decode(false)
         }
 
+        input.onselect = {
+            Logger.log("selected ${input.selectionStart} to ${input.selectionEnd}")
+        }
+
         decodeBtn.onclick = {
             decode(false)
         }
@@ -68,12 +72,15 @@ fun main() {
 
 fun decode(tryhard: Boolean) {
     val input = document.getElementById("data") as HTMLTextAreaElement
+    val sizeLabel = input.nextElementSibling as HTMLDivElement
     val output = document.getElementById("output") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
-    // no point in analyzing empty bytes
-    if (bytes.size == 0) { return }
+    sizeLabel.innerText = "${bytes.size} (0x${bytes.size.toString(16)}) B"
 
+    // no point in analyzing empty bytes
+    if (bytes.isEmpty()) { return }
+    
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
