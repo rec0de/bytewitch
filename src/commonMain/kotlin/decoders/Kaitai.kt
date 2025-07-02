@@ -153,7 +153,7 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
                 subTypes.add(subType)
                 sizeInBits += subType.sizeInBits
             }
-        } else {  // TODO should be its own if not else if, as size-eos can be made of subtypes
+        } else if (currentElementStruct.type != undefined){  // TODO should be its own if not else if, as size-eos can be made of subtypes
             // TODO could also be an imported type instead...
             parseBuiltinType()
         }
