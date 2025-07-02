@@ -1,6 +1,7 @@
 package decoders.Nemesys
 
 import bitmage.hex
+import bitmage.toHex
 import decoders.BWAnnotatedData
 import decoders.BWString
 import decoders.Utf8Decoder
@@ -90,10 +91,20 @@ object NemesysRenderer {
             val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
             val segmentBytes = bytes.sliceArray(start until end)
 
-            // create byte-groups of two bytes
-            val groupedHex = segmentBytes.hex().chunked(2).joinToString("<div class=\"separator-placeholder\"></div>") {
-                "<div class='bytegroup'>$it</div>"
-            }
+            // create a own group for each byte
+            val groupedHex = segmentBytes.mapIndexed { i, byte ->
+                val offset = start + i
+                val char = byte.toInt().toChar().let { c ->
+                    if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c else '.'
+                }
+                """
+                    <div class='bytegroup' data-start='$offset' data-end='${offset + 1}'>
+                        ${byte.toHex()}
+                        <div class='ascii-char'>$char</div>
+                    </div>
+                """.trimIndent()
+            }.joinToString("<div class=\"separator-placeholder\"></div>")
+
 
             if (end != bytes.size) {
                 "$groupedHex<div class='field-separator'>|</div>"

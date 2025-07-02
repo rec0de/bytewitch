@@ -1,7 +1,7 @@
 import decoders.Nemesys.NemesysField
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import decoders.Nemesys.NemesysSequenceAlignment
+import SequenceAlignment.NemesysSequenceAlignment
 import kotlin.test.assertContentEquals
 import kotlin.test.assertNotEquals
 

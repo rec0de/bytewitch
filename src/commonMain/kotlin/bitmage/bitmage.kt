@@ -172,6 +172,8 @@ fun String.fromHex(): ByteArray {
         .toByteArray()
 }
 
+fun Byte.toHex(): String = this.toUByte().toString(16).padStart(2, '0')
+
 
 
 // by ephemient from https://slack-chats.kotlinlang.org/t/527242/i-have-a-bytearray-of-utf-16-encoded-bytes-read-from-a-cinte

@@ -1,17 +1,12 @@
-package decoders.Nemesys
+package SequenceAlignment
 
-data class AlignedSegment(
-    val protocolA: Int,
-    val protocolB: Int,
-    val segmentIndexA: Int,
-    val segmentIndexB: Int,
-    val dissimilarity: Double
-)
+import decoders.Nemesys.NemesysField
+import decoders.Nemesys.NemesysParsedMessage
 
 // class for sequence alignment of nemesys object
-object NemesysSequenceAlignment {
+object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
     // main function for sequence alignment
-    fun alignSegments(messages: Map<Int, NemesysParsedMessage>): List<AlignedSegment> {
+    override fun align(messages: Map<Int, NemesysParsedMessage>): List<AlignedSegment> {
         val alignments = mutableListOf<AlignedSegment>()
         val tresholdAlignedSegment = 0.17
 

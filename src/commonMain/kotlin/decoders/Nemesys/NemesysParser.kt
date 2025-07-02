@@ -1011,13 +1011,30 @@ class NemesysParser {
 
     // check if complete field consists of printable chars
     fun fieldIsTextSegment(start: Int, end: Int, bytes: ByteArray): Boolean {
+        val length = end - start
+        if (length <= 0) return false
+
+        var nullByteCount = 0
+        for (i in start until end) {
+            val byte = bytes[i]
+            if (byte == 0x00.toByte()) {
+                nullByteCount++
+            } else if (!isPrintableChar(byte)) {
+                return false
+            }
+        }
+
+        val nullRatio = nullByteCount.toDouble() / length
+        return nullRatio < 0.33 // only accept sequence as text if less than 33% of the sequence are 0x00 bytes
+    }
+    /*fun fieldIsTextSegment(start: Int, end: Int, bytes: ByteArray): Boolean {
         for (j in start until end) {
             if (!isPrintableChar(bytes[j])) {
                 return false
             }
         }
         return true
-    }
+    }*/
 
     // check if byte is a printable char
     fun isPrintableChar(byte: Byte): Boolean {
@@ -1045,6 +1062,8 @@ class NemesysParser {
 
             var fieldType = NemesysField.UNKNOWN
             if (fieldIsTextSegment(start, end, bytes)) {
+                fieldType = NemesysField.STRING
+
                 // merge following segments together if they are also a text segments
                 while (i + 1 < boundaries.size) {
                     // set new start and end of segment
@@ -1053,7 +1072,7 @@ class NemesysParser {
 
                     if (fieldIsTextSegment(nextStart, nextEnd, bytes)) {
                         i++ // skip following segment because we merged it together
-                        fieldType = NemesysField.STRING // we have two consecutive text fields interpret it as a string
+                        // fieldType = NemesysField.STRING // we have two consecutive text fields interpret it as a string
                     } else {
                         break
                     }
@@ -1228,25 +1247,42 @@ class NemesysParser {
         segments: MutableList<NemesysSegment>,
         bytes: ByteArray
     ): MutableList<NemesysSegment> {
+        if (segments.size < 2) return segments.toMutableList()
+
+        val result = mutableListOf<NemesysSegment>()
+        result.add(segments[0])
+
         for (i in 1 until segments.size) {
-            val (prevStart, prevType) = segments[i - 1]
+            val (prevStart, prevType) = result.last()
             val (currStart, currType) = segments[i]
 
-            // Rule 1: allocate nullbytes to string field
+            Logger.log("Gegeben von $currStart")
+            var newSegment: NemesysSegment? = NemesysSegment(currStart, currType)
+
+            // Rule 1: allocate nullbytes to STRING field
             if (prevType == NemesysField.STRING) {
                 // count null bytes after the segment
                 var extra = 0
                 while (currStart + extra < bytes.size && bytes[currStart + extra] == 0.toByte()) {
                     extra++
                 }
+
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (extra in 1..2) {
-                    segments[i] = NemesysSegment(currStart + extra, currType)
+                    val shiftedOffset = currStart + extra
+                    val exists = segments.any { it.offset == shiftedOffset }
+
+                    if (!exists) { // only add boundary if it doesn't already exist
+                        Logger.log("Rule 1")
+                        newSegment = NemesysSegment(shiftedOffset, currType)
+                    } else {
+                        newSegment = null // don't override segment if it already exists
+                    }
                 }
             }
 
             // Rule 2: nullbytes before UNKNOWN
-            if (currType != NemesysField.STRING) {
+            if (newSegment != null && prevType != NemesysField.STRING && currType != NemesysField.STRING) {
                 // count null bytes in front of the segment
                 var count = 0
                 var idx = currStart - 1
@@ -1257,17 +1293,24 @@ class NemesysParser {
 
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (count in 1..2) {
-                    segments[i] = NemesysSegment(currStart - count, currType)
+                    Logger.log("Rule 2")
+                    newSegment = NemesysSegment(currStart - count, currType)
                 }
+            }
+
+            if (newSegment != null) {
+                Logger.log("Boundary at: ${newSegment.offset}")
+                result.add(newSegment)
             }
         }
 
-        return segments.sortedBy { it.offset }.distinctBy { it.offset }.toMutableList()
+        return result.sortedBy { it.offset }.distinctBy { it.offset }.toMutableList()
     }
 
 
+
     // check if left or right byte of char sequence is also part of it
-    private fun slideCharWindow(segments: List<NemesysSegment>, bytes: ByteArray): MutableList<NemesysSegment> {
+    fun slideCharWindow(segments: List<NemesysSegment>, bytes: ByteArray): MutableList<NemesysSegment> {
         val improved = mutableListOf<NemesysSegment>()
 
         var newEnd = 0
@@ -1297,6 +1340,9 @@ class NemesysParser {
                     newEnd++
                 }
 
+                // remove all boundaries between the new start and end
+                improved.removeAll { it.offset in newStart until newEnd }
+
                 improved.add(NemesysSegment(newStart, NemesysField.STRING))
             } else {
                 improved.add(NemesysSegment(start, type))
@@ -1305,6 +1351,7 @@ class NemesysParser {
 
         return improved
     }
+
 
 
     // check if segment is a char sequence

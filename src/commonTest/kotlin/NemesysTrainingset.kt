@@ -1,3 +1,5 @@
+import SequenceAlignment.AlignedSegment
+import SequenceAlignment.NemesysSequenceAlignment
 import bitmage.fromHex
 import decoders.Nemesys.*
 import kotlin.math.abs
@@ -114,7 +116,7 @@ class NemesysTrainingset {
         expectedSegments: List<NemesysSegment>,
         actualSegments: List<NemesysSegment>) {
 
-        val tolerance = 1
+        val tolerance = 0
         val tp = expectedSegments.count { e -> actualSegments.any { a -> abs(a.offset - e.offset) <= tolerance } }
         val fp = actualSegments.count { a -> expectedSegments.none { e -> abs(a.offset - e.offset) <= tolerance } }
         val fn = expectedSegments.count { e -> actualSegments.none { a -> abs(a.offset - e.offset) <= tolerance } }
@@ -184,7 +186,7 @@ class NemesysTrainingset {
             }
         }
 
-        val alignments = NemesysSequenceAlignment.alignSegments(messages)
+        val alignments = NemesysSequenceAlignment.align(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
 
         // normalise sequence alignment so both Triples have the same order
@@ -285,7 +287,7 @@ class NemesysTrainingset {
         expectedSegments: Map<Int, NemesysParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
-        val actualAlignments = NemesysSequenceAlignment.alignSegments(actualMessages)
+        val actualAlignments = NemesysSequenceAlignment.align(actualMessages)
 
         // get the byte-wise alignment
         val actualByteAlignments = createByteAlignments(actualMessages, actualAlignments)
@@ -381,7 +383,7 @@ class NemesysTrainingset {
         return bestIndex
     }
 
-    /*@Test
+    @Test
     fun runSegmentationTests() {
         testSegmentParsing1()
         testSegmentParsing2()
@@ -400,7 +402,7 @@ class NemesysTrainingset {
 
         printFinalFMSScore()
         printFinalScore()
-    }*/
+    }
 
     @Test
     fun runSegmentationOnMultipleMessagesTests() {

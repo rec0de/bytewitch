@@ -1,3 +1,4 @@
+import SequenceAlignment.NemesysSequenceAlignment
 import bitmage.fromHex
 import decoders.Nemesys.*
 import kotlin.collections.listOf
@@ -880,7 +881,7 @@ class NemesysTestset {
         messages: Map<Int, NemesysParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
-        val alignments = NemesysSequenceAlignment.alignSegments(messages)
+        val alignments = NemesysSequenceAlignment.align(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
 
         val tp = foundAlignments.intersect(expectedAlignments).size

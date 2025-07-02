@@ -148,21 +148,21 @@ class NemesysParserTests {
 
     @Test
     fun testIsPrintableChar() {
-        assertTrue(parser.isPrintableChar(0x41)) // 'A'
-        assertTrue(parser.isPrintableChar(0x7E)) // '~'
-        assertTrue(parser.isPrintableChar(0x20)) // ' '
-        assertTrue(parser.isPrintableChar(0x09)) // '\t'
-        assertTrue(parser.isPrintableChar(0x0A)) // '\n'
-        assertTrue(parser.isPrintableChar(0x0D)) // '\r'
-        assertFalse(parser.isPrintableChar(0x19)) // Non-printable
+        assertTrue(parser.isPrintableChar(0x41), "0x41 should be printable") // 'A'
+        assertTrue(parser.isPrintableChar(0x7E), "0x7E should be printable") // '~'
+        assertTrue(parser.isPrintableChar(0x20), "0x20 should be printable") // ' '
+        assertTrue(parser.isPrintableChar(0x0B), "0x0B should be printable") // '\t'
+        assertTrue(parser.isPrintableChar(0x0A), "0x0A should be printable") // '\n'
+        assertTrue(parser.isPrintableChar(0x0D), "0x0D should be printable") // '\r'
+        assertFalse(parser.isPrintableChar(0x19), "0x19 should not be printable") // Non-printable
     }
 
     @Test
     fun testFieldIsTextSegment() {
         val message = "48656C6C6F20576F726C6421".fromHex() // "Hello World!"
-        assertTrue(parser.fieldIsTextSegment(0, message.size, message)) // Whole message is text
-        assertTrue(parser.fieldIsTextSegment(0, 5, message)) // "Hello"
-        assertFalse(parser.fieldIsTextSegment(0, 6, "48656C6C6F00".fromHex())) // "Hello" + non-printable
+        assertTrue(parser.fieldIsTextSegment(0, message.size, message), "Whole message should be text") // Whole message is text
+        assertTrue(parser.fieldIsTextSegment(0, 5, message), "Byte 0 to 5 should be text") // "Hello"
+        assertFalse(parser.fieldIsTextSegment(0, 6, "48656C6C6FEE".fromHex()), "not everything is printable") // "Hello" + non-printable
     }
 
     @Test
@@ -171,9 +171,9 @@ class NemesysParserTests {
         val boundaries = mutableListOf(5, 6) // Segments: ["Hello"], ["\0"], ["World!"]
 
         val expectedValue1 = mutableListOf<NemesysSegment>()
-        expectedValue1.add(NemesysSegment(0, NemesysField.UNKNOWN))
+        expectedValue1.add(NemesysSegment(0, NemesysField.STRING))
         expectedValue1.add(NemesysSegment(5, NemesysField.UNKNOWN))
-        expectedValue1.add(NemesysSegment(6, NemesysField.UNKNOWN))
+        expectedValue1.add(NemesysSegment(6, NemesysField.STRING))
         val merged = parser.mergeCharSequences(boundaries, message)
         assertEquals(expectedValue1, merged) // No merge since '\0' breaks text sequence
 
@@ -184,6 +184,107 @@ class NemesysParserTests {
         expectedValue2.add(NemesysSegment(0, NemesysField.STRING))
         val merged2 = parser.mergeCharSequences(boundaries2, message2)
         assertEquals(expectedValue2, merged2) // Full merge, as both are text segments
+    }
+
+    @Test
+    fun testSlideCharWindowExpandSingleStringField() {
+        val bytes = "2A48656C6C6F2A".fromHex() // "*Hello*"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.STRING)
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.STRING) // expand left and right to include "*"
+        )
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testSlideCharWindowExpandSingleStringFieldTwice() {
+        val bytes = "2A2A48656C6C6F2A".fromHex() // "**Hello*"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.UNKNOWN),
+            NemesysSegment(2, NemesysField.STRING)
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.STRING) // expand left and right to include "*"
+        )
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testSlideCharWindowNoExpansionDueToNonPrintableLeft() {
+        val bytes = "0048656C6C6F".fromHex() // "\0Hello"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.STRING)
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.STRING) // no expansion due to \0 before
+        )
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testSlideCharWindowMixedFieldTypes() {
+        val bytes = "48656C6C6F002A".fromHex() // "Hello\0*"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.STRING),  // "Hello"
+            NemesysSegment(5, NemesysField.UNKNOWN)  // \0
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.STRING),  // no expansion, already correct
+            NemesysSegment(5, NemesysField.UNKNOWN)  // stays the same
+        )
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testSlideCharWindowExpandRightOnly() {
+        val bytes = "0048656C6C6F".fromHex() // "\0Hello"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN), // \0
+            NemesysSegment(1, NemesysField.STRING)   // Hello
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.UNKNOWN),
+            NemesysSegment(1, NemesysField.STRING) // no expansion left, no space right
+        )
+
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun testSlideCharWindowMultipleStringSegments() {
+        val bytes = "4869FF6D7954657874".fromHex() // "Hi" + 0xFF + "myText"
+        val segments = listOf(
+            NemesysSegment(0, NemesysField.STRING), // "Hi"
+            NemesysSegment(3, NemesysField.STRING)  // "myText"
+        )
+
+        val result = parser.slideCharWindow(segments, bytes)
+        val expected = listOf(
+            NemesysSegment(0, NemesysField.STRING),
+            NemesysSegment(3, NemesysField.STRING)
+        )
+
+        assertEquals(expected, result)
     }
 
     @Test
@@ -199,6 +300,19 @@ class NemesysParserTests {
         expectedResult.add(NemesysSegment(0, NemesysField.STRING))
         expectedResult.add(NemesysSegment(4, NemesysField.UNKNOWN))
         var actualResult = parser.nullByteTransitions(segments, bytes)
+
+        assertEquals(expectedResult, actualResult)
+
+
+        bytes = "7724636c617373007f1115".fromHex()
+        segments = mutableListOf<NemesysSegment>()
+        segments.add(NemesysSegment(0, NemesysField.STRING))
+        segments.add(NemesysSegment(8, NemesysField.UNKNOWN))
+
+        expectedResult = mutableListOf<NemesysSegment>()
+        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
+        expectedResult.add(NemesysSegment(8, NemesysField.UNKNOWN))
+        actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
 
