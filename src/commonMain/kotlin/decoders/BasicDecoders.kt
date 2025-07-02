@@ -1,6 +1,5 @@
 package decoders
 
-import Logger
 import bitmage.*
 import htmlEscape
 import looksLikeUtf16String
@@ -10,18 +9,16 @@ import kotlin.math.*
 object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
-
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
         val effectiveData = stripNullTerminator(data)
 
         val nullTerminatorBonus = if(effectiveData.size == data.size-1) 0.2 else 0.0
 
         try {
             val score = looksLikeUtf8String(effectiveData)
-            return min(score+nullTerminatorBonus, 1.0)
+            return Pair(min(score+nullTerminatorBonus, 1.0), null)
         } catch (e: Exception) {
-            return 0.0
+            return Pair(0.0, null)
         }
     }
 
@@ -30,7 +27,7 @@ object Utf8Decoder : ByteWitchDecoder {
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-        return if(confidence(data) > 0.25)
+        return if(confidence(data, 0).first > 0.25)
             decode(data, 0)
         else
             null
@@ -49,23 +46,25 @@ object Utf8Decoder : ByteWitchDecoder {
 object Utf16Decoder : ByteWitchDecoder {
     override val name = "utf16"
 
-    override fun confidence(data: ByteArray): Double {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        // utf16 should be even byte length
+        if(data.size % 2 == 1)
+            return Pair(0.0, null)
+
         try {
             val string = Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE()
-            return looksLikeUtf16String(string)
+            return Pair(looksLikeUtf16String(string), null)
         } catch (e: Exception) {
-            return 0.0
+            return Pair(0.0, null)
         }
     }
-
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.6, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         return BWString(Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE(), Pair(sourceOffset, sourceOffset+data.size))
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-        return if(confidence(data) > 0.25)
+        return if(confidence(data, 0).first > 0.25)
             decode(data, 0)
         else
             null
@@ -85,11 +84,6 @@ object IEEE754 : ByteWitchDecoder {
         //Logger.log("number plausibility: positive $positiveBonus exponent $exponent / $magnitudeScore roundness $mantissaComplexity stringLength $stringLength total $score")
         return score
     }
-
-    /*fun score(double: Long): Double {
-        val parts = dissectDouble(double)
-        return looksReasonable(parts.first, parts.second, parts.third, valueBE, isDouble = true)
-    }*/
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         when(data.size) {
@@ -140,107 +134,6 @@ object IEEE754 : ByteWitchDecoder {
     }
 }
 
-object EntropyDetector : ByteWitchDecoder {
-    override val name = "entropy"
-
-    override fun tryhardDecode(data: ByteArray) = null
-
-    override fun decodesAsValid(data: ByteArray) = Pair(true, null)
-
-    // we'll display entropy indicators in quick decode results (if no other decode is available) given sufficient length
-    // (for small payloads entropy doesn't really say anything)
-    override fun confidence(data: ByteArray) = if(data.size > 10) 0.76 else 0.00
-
-
-    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) =
-        if(data.size > 100)
-            decodeLong(data, sourceOffset, inlineDisplay)
-        else
-            decodeShort(data, sourceOffset, inlineDisplay)
-
-    private fun decodeLong(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        val byteCounts = IntArray(256){ 0 }
-
-        data.forEach { byte ->
-            byteCounts[byte.toUByte().toInt()] += 1
-        }
-
-        // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
-        val expected = data.size.toDouble() / 256
-        val sd = sqrt(0.003890991*data.size) // constant is p(1-p) = (1/256)*(1-(1/256))
-        val entropy = byteCounts.map { it.toDouble() / data.size }.filter { it > 0 }.sumOf { - it * log2(it) }
-
-        //Logger.log("expecting $expected counts per byte, 2sd above: ${expected+2*sd}")
-
-        val emoji = when {
-            entropy > 6.5 -> "\uD83C\uDFB2"
-            entropy > 5 -> "\uD83D\uDCDA"
-            entropy > 3 -> "📖"
-            else -> "\uD83D\uDDD2\uFE0F"
-        }
-
-        val rounded = round(entropy*10)/10
-        val iconHTML = "<span title=\"entropy: $rounded\">$emoji</span>"
-
-        // alright, here's how we'll do this:
-        // if a 'hot byte' (<5% chance of occurring this often randomly in the sample) occurs more than 2 times
-        // we color that byte according to its relative frequency, where full opacity of the highlight is applied to
-        // the most frequent byte
-        val hotByteRendering = if(expected+2*sd > 2) {
-            val mostFrequent = byteCounts.maxOrNull()!!
-            data.asUByteArray().joinToString("") {
-                val hexByte = it.toString(16).padStart(2, '0')
-                if(byteCounts[it.toInt()] > expected+2*sd) {
-                    val alpha = ((byteCounts[it.toInt()].toDouble() / mostFrequent)*255).roundToInt()
-                    "<span style=\"background: #c9748f${alpha.toString(16)}\">$hexByte</span>"
-                }
-                else
-                    hexByte
-            }
-        }
-        else
-            data.hex()
-
-        return if(inlineDisplay) {
-            BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
-        }
-        else
-            BWAnnotatedData("$iconHTML Shannon Entropy: $rounded (0-8 b/byte) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
-    }
-
-    private fun decodeShort(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        val nibbleCounts = IntArray(16){ 0 }
-
-        data.forEach { byte ->
-            val lowerNibble = (byte.toUByte().toInt() and 0x0F)
-            val upperNibble = (byte.toUByte().toInt() and 0xF0) ushr 4
-            nibbleCounts[lowerNibble] += 1
-            nibbleCounts[upperNibble] += 1
-        }
-
-        // we'll assume uniform distribution of bytes, which means byte counts should be approximately normally distributed
-        val entropyNibbles = nibbleCounts.map { it.toDouble() / (data.size*2) }.filter { it > 0 }.sumOf { - it * log2(it) }
-
-        val emojiNib = when {
-            entropyNibbles > 3.5 -> "\uD83C\uDFB2"
-            entropyNibbles > 3.1 -> "\uD83D\uDCDA"
-            entropyNibbles > 2.5 -> "📖"
-            else -> "\uD83D\uDDD2\uFE0F"
-        }
-
-        val roundedNib = round(entropyNibbles*10)/10
-        val iconHTML = "<span title=\"entropy: $roundedNib out of 4 b/nib\">$emojiNib</span>"
-
-        val hotByteRendering = data.hex()
-
-        return if(inlineDisplay) {
-            BWAnnotatedData(iconHTML+hotByteRendering, "".fromHex(), Pair(sourceOffset, sourceOffset + data.size))
-        }
-        else
-            BWAnnotatedData("$iconHTML Shannon Entropy: $roundedNib (0-4 b/nib) $hotByteRendering", "".fromHex(), Pair(sourceOffset, sourceOffset+data.size))
-    }
-}
-
 object HeuristicSignatureDetector : ByteWitchDecoder {
     override val name = "heuristic"
 
@@ -283,7 +176,9 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "4d500305" to Pair("Apple MsgPack header", null),
         "7b22" to Pair("JSON dict", null),
         "3a290a" to Pair("Smile Data Format", "https://github.com/FasterXML/smile-format-specification"),
-        "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR")
+        "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR"),
+        "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/"),
+        "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
@@ -306,7 +201,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
     }
 
     // we only want this to kick in as a last-ditch effort on a tryhard decode
-    override fun decodesAsValid(data: ByteArray) = Pair(false, null)
+    override fun confidence(data: ByteArray, sourceOffset: Int) = Pair(0.0, null)
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) = BWString("you should not see this", Pair(sourceOffset, sourceOffset))
 }

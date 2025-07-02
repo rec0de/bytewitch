@@ -3,6 +3,8 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import looksLikeUtf8String
+import kotlin.math.min
 
 
 // CBOR is basically MsgPack is basically OPack, so we'll re-use classes
@@ -37,12 +39,27 @@ class CborParser : ParseCompanion() {
             }
         }
 
-        // single bytes are often false-positive detected as booleans, return low confidence for those
-        override fun confidence(data: ByteArray): Double {
-            return if(data.size < 3)
-                    0.2
-                else
-                    super.confidence(data)
+        // single bytes are often false-positive detected as booleans
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            if(data.size < 4)
+                return Pair(0.0, null)
+
+            try {
+                val decoder = CborParser()
+                val result = decoder.parseTopLevel(data, sourceOffset)
+
+                var weirdTypePenalty = 0.0
+                if(result is OPTaggedParsedData && result.type > 32)
+                    weirdTypePenalty = -0.3
+                else if(result is OPTaggedData && result.type > 32)
+                    weirdTypePenalty = -0.3
+
+                val confidence = min(data.size.toDouble() / 16 + weirdTypePenalty, 1.0)
+
+                return Pair(confidence, result)
+            } catch (e: Exception) {
+                return Pair(0.0, null)
+            }
         }
     }
 
@@ -106,8 +123,11 @@ class CborParser : ParseCompanion() {
                     }
                     OPString(string, Pair(start, lastConsumedBytePosition))
                 }
-                else
-                    OPString(readBytes(bytes, length.toInt()).decodeToString(), Pair(start, lastConsumedBytePosition))
+                else {
+                    val stringBytes = readBytes(bytes, length.toInt())
+                    check(looksLikeUtf8String(stringBytes, false) > 0.5) { "cbor string with implausible content: ${stringBytes.hex()}" }
+                    OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
+                }
             }
             4 -> {
                 val length = readCount(bytes, count)

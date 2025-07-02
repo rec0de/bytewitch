@@ -8,12 +8,14 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
 
     override val name = "nskeyedarchive"
 
-    override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
-        return if (BPListParser.decodesAsValid(data).first) {
-            val parsed = BPListParser.decode(data, 0) as BPListObject
-            Pair(isKeyedArchive(parsed), parsed)
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        val bpConfidence = BPListParser.confidence(data, sourceOffset)
+        return if (bpConfidence.first > 0.5) {
+            val parsed = (bpConfidence.second ?: BPListParser.decode(data, sourceOffset)) as BPListObject
+            val nsConfidence = if(isKeyedArchive(parsed)) 1.0 else 0.0
+            Pair(nsConfidence, parsed)
         } else
-            Pair(false, null)
+            Pair(0.0, null)
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
@@ -38,20 +40,25 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
         val topDict = data.values[topKey]!! as BPDict
 
         // so, turns out the key for the top object is not ALWAYS "root" (but almost always?)
-        val top = if (topDict.values.containsKey(rootKey))
-            topDict.values[rootKey]!! as BPUid
+        if (topDict.values.containsKey(rootKey)) {
+            val top = topDict.values[rootKey]!! as BPUid
+            val topIndex = Int.fromBytes(top.value, ByteOrder.BIG)
+            val objects = data.values[objectsKey]!! as BPArray
+
+            val rootObj = objects.values[topIndex]
+            val resolved = optionallyResolveObjectReference(rootObj, objects)
+            return transformSupportedClasses(resolved)
+        }
         // empty archive case
         else if (topDict.values.isEmpty()) {
             return BPNull
-        } else
-            topDict.values.values.first { it is BPUid } as BPUid // this is about as good as we can do?
-
-        val topIndex = Int.fromBytes(top.value, ByteOrder.BIG)
-        val objects = data.values[objectsKey]!! as BPArray
-
-        val rootObj = objects.values[topIndex]
-        val resolved = optionallyResolveObjectReference(rootObj, objects)
-        return transformSupportedClasses(resolved)
+        }
+        // we're off the rails here but we'll just try to surface all the info contained in the payload
+        else {
+            val objects = data.values[objectsKey]!! as BPArray
+            val resolved = optionallyResolveObjectReference(topDict, objects)
+            return transformSupportedClasses(resolved)
+        }
     }
 
     private fun optionallyResolveObjectReference(thing: BPListObject, objects: BPArray, currentlyResolving: List<Int> = emptyList()): BPListObject {

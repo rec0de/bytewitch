@@ -9,6 +9,8 @@ import bitmage.fromIndex
 import bitmage.hex
 import dateFromUTCString
 import htmlEscape
+import looksLikeUtf8String
+import kotlin.math.min
 
 class ASN1BER : ParseCompanion() {
 
@@ -39,6 +41,22 @@ class ASN1BER : ParseCompanion() {
             } catch (e: Exception) {
                 Logger.log(e.toString())
                 return null
+            }
+        }
+
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            try {
+                val decoder = ASN1BER()
+                val result = decoder.decode(data, sourceOffset)
+                check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
+
+                val trivialLengthPenalty = if(result.length <= 1) -0.3 else 0.0
+                val weirdTypePenalty = if(result is GenericASN1Result) -0.15 else 0.0
+                val confidence = min(data.size.toDouble() / 16 + trivialLengthPenalty + weirdTypePenalty, 1.0)
+
+                return Pair(confidence, result)
+            } catch (e: Exception) {
+                return Pair(0.0, null)
             }
         }
     }
@@ -93,7 +111,10 @@ class ASN1BER : ParseCompanion() {
                     ASN1Sequence(tag, len, elements, byteRange)
                 }
                 // Strings
-                12, in 18..22, in 25..30 -> ASN1String(tag, len, payload.decodeToString(), byteRange)
+                12, in 18..22, in 25..30 -> {
+                    check(looksLikeUtf8String(payload, false) > 0.5) { "ASN.1 string with implausible content: ${payload.hex()}" }
+                    ASN1String(tag, len, payload.decodeToString(), byteRange)
+                }
                 // Time
                 23 -> {
                     val string = payload.decodeToString()
