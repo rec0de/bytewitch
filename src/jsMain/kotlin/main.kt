@@ -71,6 +71,9 @@ fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
+    // no point in analyzing empty bytes
+    if (bytes.size == 0) { return }
+
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
