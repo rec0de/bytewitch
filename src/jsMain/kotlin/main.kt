@@ -1,3 +1,4 @@
+import SequenceAlignment.ByteWiseSequenceAlignment
 import SequenceAlignment.NemesysSequenceAlignment
 import decoders.ByteWitchResult
 import decoders.Nemesys.*
@@ -123,7 +124,8 @@ fun decodeWithEntropy() { // TODO this can be removed
 
         val nemesysContent = document.createElement("DIV") as HTMLDivElement
         nemesysContent.classList.add("parsecontent")
-        nemesysContent.innerHTML = NemesysRenderer.render(it)
+        // nemesysContent.innerHTML = NemesysRenderer.render(it)
+        nemesysContent.innerHTML = NemesysRenderer.renderByteWiseHTML(it)
 
         attachRangeListeners(nemesysContent, it.msgIndex)
         attachNemesysButtons(nemesysContent, it.bytes, it.msgIndex)
@@ -210,7 +212,8 @@ private fun decodeWithNemesys(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 
     val nemesysContent = document.createElement("DIV") as HTMLDivElement
     nemesysContent.classList.add("parsecontent")
-    nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
+    // nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
+    nemesysContent.innerHTML = NemesysRenderer.renderByteWiseHTML(nemesysParsed)
 
     attachRangeListeners(nemesysContent, taIndex)
     attachNemesysButtons(nemesysContent, bytes, taIndex)
@@ -253,8 +256,10 @@ fun decode(isLiveDecoding: Boolean) {
 
     // for sequence alignment
     if (tryhard && !isLiveDecoding && showNemesysContent) {
-        val alignedSegment = NemesysSequenceAlignment.align(parsedMessages)
-        attachSequenceAlignmentListeners(alignedSegment)
+        // val alignedSegment = NemesysSequenceAlignment.align(parsedMessages)
+        // attachSequenceAlignmentListeners(alignedSegment)
+        val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+        attachByteWiseSequenceAlignmentListeners(alignedSegment)
     }
 
     // TODO for testing purposes only

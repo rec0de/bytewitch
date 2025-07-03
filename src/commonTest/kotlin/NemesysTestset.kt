@@ -882,7 +882,7 @@ class NemesysTestset {
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
         val alignments = NemesysSequenceAlignment.align(messages)
-        val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
+        val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.indexA to it.indexB) }.toSet()
 
         val tp = foundAlignments.intersect(expectedAlignments).size
         val fp = foundAlignments.subtract(expectedAlignments).size

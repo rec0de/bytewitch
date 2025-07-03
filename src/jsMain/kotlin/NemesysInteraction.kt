@@ -1,3 +1,4 @@
+import SequenceAlignment.ByteWiseSequenceAlignment
 import SequenceAlignment.NemesysSequenceAlignment
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -29,8 +30,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
 
             // rerun sequence alignment
             if (tryhard) {
-                val alignedSegment = NemesysSequenceAlignment.align(parsedMessages)
-                attachSequenceAlignmentListeners(alignedSegment)
+                // val alignedSequence = NemesysSequenceAlignment.align(parsedMessages)
+                // attachSequenceAlignmentListeners(alignedSequence)
+                val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)
+                attachByteWiseSequenceAlignmentListeners(alignedSequence)
             }
         })
     }
@@ -90,7 +93,8 @@ fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
 
     // create new div with new nemesys content
     val temp = document.createElement("div") as HTMLDivElement
-    val newHTML = NemesysRenderer.render(parsed)
+    // val newHTML = NemesysRenderer.render(parsed)
+    val newHTML = NemesysRenderer.renderByteWiseHTML(parsed)
     temp.innerHTML = newHTML
 
     val newWrapper = temp.firstElementChild as HTMLElement

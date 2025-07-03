@@ -81,6 +81,53 @@ object NemesysRenderer {
         """.trimIndent()
     }
 
+    // html view for byte-wise sequence alignment
+    fun renderByteWiseHTML(parsed: NemesysParsedMessage): String {
+        val segments = parsed.segments
+        val bytes = parsed.bytes
+        val msgIndex = parsed.msgIndex
+
+        val renderedFieldContents = segments.mapIndexed { index, segment ->
+            val start = segment.offset
+            val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
+            val segmentBytes = bytes.sliceArray(start until end)
+
+            val groupedHex = segmentBytes.mapIndexed { i, byte ->
+                val offset = start + i
+                val char = byte.toInt().toChar().let { c ->
+                    if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c else '.'
+                }
+
+                val valueAlignId = " value-align-id='$msgIndex-$offset'"
+                """
+                <div class='bytegroup' data-start='$offset' data-end='${offset + 1}' $valueAlignId>
+                    <div class="byte-hex">${byte.toHex()}</div>
+                    <div class='ascii-char'>$char</div>
+                </div>
+            """.trimIndent()
+            }.joinToString("")
+
+            val valueLengthTag = " data-start='$start' data-end='$end'"
+
+            """
+            <div class="nemesysfield roundbox data bytewise" $valueLengthTag>
+                $groupedHex
+            </div>
+        """.trimIndent()
+        }
+
+        val content = "<div class=\"nemesysfield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
+        val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+
+        return """
+        <div class="nemesys roundbox">
+            <div class="view-default">$editButton$content</div>
+            <div class="view-editable" style="display:none;">${renderEditableHTML(parsed)}</div>
+        </div>
+    """.trimIndent()
+    }
+
+
     // html view of editable byte sequences
     private fun renderEditableHTML(parsed: NemesysParsedMessage): String {
         val segments = parsed.segments
@@ -91,7 +138,7 @@ object NemesysRenderer {
             val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
             val segmentBytes = bytes.sliceArray(start until end)
 
-            // create a own group for each byte
+            // create an own group for each byte
             val groupedHex = segmentBytes.mapIndexed { i, byte ->
                 val offset = start + i
                 val char = byte.toInt().toChar().let { c ->

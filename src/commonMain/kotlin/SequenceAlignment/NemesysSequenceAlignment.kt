@@ -1,13 +1,14 @@
 package SequenceAlignment
 
+import SequenceAlignment.AlignmentUtils.byteCanberra
 import decoders.Nemesys.NemesysField
 import decoders.Nemesys.NemesysParsedMessage
 
 // class for sequence alignment of nemesys object
 object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
     // main function for sequence alignment
-    override fun align(messages: Map<Int, NemesysParsedMessage>): List<AlignedSegment> {
-        val alignments = mutableListOf<AlignedSegment>()
+    override fun align(messages: Map<Int, NemesysParsedMessage>): List<AlignedSequence> {
+        val alignments = mutableListOf<AlignedSequence>()
         val tresholdAlignedSegment = 0.17
 
         // get dissimilarity matrix (by using canberra-ulm dissimilarity)
@@ -37,7 +38,7 @@ object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
                 val sim = matrixS[i - 1 to j - 1] ?: Double.NEGATIVE_INFINITY
                 if (score == diag + sim) {
                     if (1.0 - sim < tresholdAlignedSegment) {
-                        alignments.add(AlignedSegment(protoA, protoB, i - 1, j - 1, 1.0 - sim))
+                        alignments.add(AlignedSequence(protoA, protoB, i - 1, j - 1, 1.0 - sim))
                     }
 
                     i--
@@ -217,15 +218,6 @@ object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
         // dp[m][n] is the score on the bottom right of the matrix. It says the distance of the best alignment
         return dp[m][n] / maxOf(m, n).toDouble()
     }
-
-    // scoring function for bytes using canberra
-    private fun byteCanberra(a: Byte, b: Byte): Double {
-        val ai = a.toInt() and 0xFF
-        val bi = b.toInt() and 0xFF
-        val denominator = ai + bi
-        return if (denominator == 0) 0.0 else kotlin.math.abs(ai - bi).toDouble() / denominator
-    }
-
 
     // Canberra Dissimilarity for segments of different sizes (using pooling)
     private fun canberraDissimilarityWithPooling(segmentA: ByteArray, segmentB: ByteArray): Double {
