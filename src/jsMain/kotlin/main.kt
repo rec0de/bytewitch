@@ -8,10 +8,14 @@ import org.w3c.files.File
 import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Uint8Array
+import kotlin.js.Date
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
+var lastSelectionEvent: Double? = null
 
 
 fun main() {
@@ -30,7 +34,42 @@ fun main() {
         }
 
         input.onselect = {
-            Logger.log("selected ${input.selectionStart} to ${input.selectionEnd}")
+            lastSelectionEvent = Date().getTime()
+
+            // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
+            if(ByteWitch.isPlainHex()) {
+                Logger.log("selected ${input.selectionStart} to ${input.selectionEnd}")
+
+                val prefix = input.value.substring(0, input.selectionStart!!)
+                val sizeLabel = input.nextElementSibling as HTMLDivElement
+
+                val r = Regex("#[^\n]*$")
+                if(r.containsMatchIn(prefix))
+                    sizeLabel.innerText = "" // selection starts in a comment
+                else {
+                    val selection = input.value.substring(input.selectionStart!!, input.selectionEnd!!)
+                    val offset = ByteWitch.stripCommentsAndFilterHex(prefix).length.toDouble()/2
+                    val range = ByteWitch.stripCommentsAndFilterHex(selection).length.toDouble()/2
+
+
+                    (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
+                }
+            }
+        }
+
+        // a click anywhere clears any present selection
+        // (as do specific keystrokes, but we'll see if we want to worry about those)
+        document.onclick = {
+            // avoid immediately clearing selection from click associated with select event
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+                lastSelectionEvent = null
+                val inputs = document.querySelectorAll("textarea")
+                inputs.asList().forEach {
+                    val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
+                    val selectionLabel = sizeLabel.firstChild!!.nextSibling as HTMLSpanElement
+                    selectionLabel.innerText = ""
+                }
+            }
         }
 
         decodeBtn.onclick = {
@@ -76,11 +115,11 @@ fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
-    sizeLabel.innerText = "${bytes.size} (0x${bytes.size.toString(16)}) B"
+    (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
 
     // no point in analyzing empty bytes
     if (bytes.isEmpty()) { return }
-    
+
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {

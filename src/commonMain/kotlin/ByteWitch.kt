@@ -12,23 +12,32 @@ object ByteWitch {
         Randomness, HeuristicSignatureDetector
     )
 
+    private var plainHex = false
+    fun isPlainHex() = plainHex
+
+    fun stripCommentsAndFilterHex(data: String): String {
+        // allow use of # as line comment
+        val stripped = data.split("\n").map { line ->
+            val commentMarker = line.indexOfFirst{ it == '#' }
+            val lineEnd = if(commentMarker == -1) line.length else commentMarker
+            line.substring(0, lineEnd)
+        }.joinToString("")
+
+        return stripped.filter { it in "0123456789abcdefABCDEF" }
+    }
+
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
         val isBase64 = cleanedData.matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
+        plainHex = false
 
         return when {
             isBase64 -> decodeBase64(cleanedData)
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                // allow use of # as line comment
-                val stripped = data.split("\n").map { line ->
-                    val commentMarker = line.indexOfFirst{ it == '#' }
-                    val lineEnd = if(commentMarker == -1) line.length else commentMarker
-                    line.substring(0, lineEnd)
-                }.joinToString("")
-
-                val filtered = stripped.filter { it in "0123456789abcdefABCDEF" }
+                plainHex = true
+                val filtered = stripCommentsAndFilterHex(cleanedData)
                 if (filtered.length % 2 != 0)
                     byteArrayOf()
                 else
@@ -37,6 +46,7 @@ object ByteWitch {
         }
 
     }
+
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
         if(tryhard) {
