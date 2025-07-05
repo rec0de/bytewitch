@@ -2,12 +2,13 @@ package decoders
 
 import bitmage.ByteOrder
 import bitmage.hex
+import bitmage.padLeft
 import bitmage.toBooleanArray
 import bitmage.toByteArray
 import bitmage.toInt
+import bitmage.toMinimalAmountOfBytes
 import bitmage.toUInt
 import bitmage.toUTF8String
-import kotlin.js.iterator
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -22,6 +23,8 @@ enum class DisplayStyle {
 
 // acts just like a MutableList except it also has the added features
 class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()) : MutableList<T> by innerList {
+    var byteOrder = ByteOrder.BIG
+
     var parent: MutableListTree<T>? = null
         get() { return field }
         set(value) {field = value}
@@ -43,7 +46,6 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
     var sizeIsUntilTerminator: Boolean = false
     var terminator: ByteArray? = null
     var type: String = currentElementStruct.type.toString()
-    var endianness: ByteOrder
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var subTypes: MutableList<Type> = mutableListOf<Type>()
 
@@ -72,29 +74,6 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
             } else {
                 throw RuntimeException("Attempted to parse as builtin type $type but that doesn't seem to be a valid type")
             }
-            if (type.endsWith("be")) { // We sometimes need to overwrite the byteorder even after parsing the endianness
-                this.endianness = ByteOrder.BIG
-            } else if (type.endsWith("le")) {
-                this.endianness = ByteOrder.LITTLE
-            }
-        }
-    }
-
-    // TODO: This is a duplicate of the one in Kaitai.kt, should be replaced as soon as the parse methods are moved to a companion object
-    fun parseEndian(currentElementStruct: dynamic, completeStruct: dynamic) : ByteOrder {
-        // TODO: endian is significantly more complicated with switch-on and the fact that its in a different location than what I assume here
-        val actualStruct = if (currentElementStruct.endian != undefined) {
-            currentElementStruct
-        } else if (completeStruct.endian != undefined) {
-            completeStruct
-        } else {
-            return ByteOrder.BIG
-        }
-
-        if (actualStruct.endian == "be") {
-            return ByteOrder.BIG
-        } else {
-            return ByteOrder.LITTLE
         }
     }
 
@@ -134,11 +113,9 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
     }
 
     init {
-        endianness = parseEndian(currentElementStruct, completeStruct)
-
         if (currentElementStruct.size != undefined) {
             val parsedValue = parseValue(currentElementStruct.size, bytesListTree)
-            sizeInBits = parsedValue.toByteArray().toUInt(endianness) * 8u
+            sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
         }
         if (currentElementStruct.contents != undefined) {
             val tmp = parseValue(currentElementStruct.contents, bytesListTree)
@@ -163,39 +140,22 @@ class Type(val completeStruct: dynamic, val currentElementStruct: dynamic, val b
 // TODO[IMPORTANT]: Move the ByteWitchDecoder into a companion object as the parse methods are static and do not need an instance. See the other decoders for examples
 class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
-    //lateinit var completeStruct: JsYaml
+    lateinit var completeStruct: JsYaml
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         /*
         val kaitaiInput = document.getElementById("kaitaiinput") as HTMLTextAreaElement
-        val kaitaiYaml = JsYaml.load(kaitaiInput.value)
-        //completeStruct = kaitaiYaml
-         */
+        val kaitaiYaml = JsYaml.load(kaitaiInput.value)*/
+
         val kaitaiYaml = JsYaml.load(kaitaiStruct)
+        completeStruct = kaitaiYaml
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
-            processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml.seq, data.toBooleanArray(), sourceOffset)
+            processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml, data.toBooleanArray(), sourceOffset)
         } catch (e: dynamic) {
             throw Exception("Unexpected JS Exception has been thrown:\n$e")
         }
 
         return result
-    }
-
-    fun parseEndian(currentElementStruct: dynamic, completeStruct: dynamic) : ByteOrder {
-        // TODO: endian is significantly more complicated with switch-on and the fact that its in a different location than what I assume here
-        val actualStruct = if (currentElementStruct.endian != undefined) {
-            currentElementStruct
-        } else if (completeStruct.endian != undefined) {
-            completeStruct
-        } else {
-            return ByteOrder.BIG
-        }
-
-        if (actualStruct.endian == "be") {
-            return ByteOrder.BIG
-        } else {
-            return ByteOrder.LITTLE
-        }
     }
 
     fun parseReference(reference: String, bytesListTree: MutableListTree<KaitaiElement>): BooleanArray {
@@ -217,13 +177,13 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         var fullyFlatArray = booleanArrayOf()
         for (element in flattenedArray) {
             if (element is Int) {
-                fullyFlatArray += (element as Int).toByte().toBooleanArray()
+                fullyFlatArray += (element as Int).toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
             } else {
                 try {
                     fullyFlatArray += parseReference(element, bytesListTree)
                 } catch (e: Exception) {
                     for (i in 0..element.length - 1) {
-                        fullyFlatArray += (element.charCodeAt(i) as Int).toByte().toBooleanArray()
+                        fullyFlatArray += (element.charCodeAt(i) as Int).toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
                     }
                 }
             }
@@ -237,12 +197,12 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
     fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
         if (seqElement.valid.min != undefined || seqElement.valid.max != undefined) {
-            val parsedValue = dataBytes.toByteArray().toUInt(kaitaiElement.endianness)
-            val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(kaitaiElement.endianness)
+            val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
+            val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
             if ((seqElement.valid.min != undefined) && (parsedValue < parsedValidMin)) {
                 return false
             }
-            val parsedValidMax = parseValue(seqElement.valid.max, bytesListTree).toByteArray().toUInt(kaitaiElement.endianness)
+            val parsedValidMax = parseValue(seqElement.valid.max, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
             if ((seqElement.valid.max != undefined) && (parsedValue > parsedValidMax)) {
                 return false
             }
@@ -271,12 +231,66 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             } else {
                 parseValue(seqElement.valid, bytesListTree)
             }
-            return valueToCheckAgainst.contentEquals(dataBytes)
+            return valueToCheckAgainst.padLeft(dataBytes.size - valueToCheckAgainst.size).contentEquals(dataBytes)
         }
         return true
     }
 
-    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, completeStruct: dynamic, currentSeqStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int) : KaitaiElement {
+    /*
+    parse a static path in a given scope recursively
+     */
+    fun parseStaticPath(currentScopeStruct: dynamic, path: String) : dynamic {
+        if (path.split("::").size == 1)
+            return currentScopeStruct.types[path]
+        else {
+            return parseStaticPath(currentScopeStruct.types[path.split("::")[0]], path.substringAfter("::")) // go one scope deeper
+        }
+    }
+
+    // TODO: add support for imports
+    /*
+        check if there is a fitting custom type defined in the current or global scope
+        @param path: might be just a type or prefixed by a path via "::"
+     */
+    fun getCustomType(currentScopeStruct: dynamic, path: String) : dynamic {
+        try {
+            return parseStaticPath(currentScopeStruct, path)
+        } catch (e: dynamic) { // catch js exceptions
+            try {
+                return parseStaticPath(completeStruct, path)
+            } catch (e: dynamic) { // catch js exceptions
+                return null
+            }
+        }
+    }
+
+    /*
+    parse the byte order/endianness of a sequence element
+     */
+    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableListTree<KaitaiElement>): ByteOrder {
+        var byteOrder = bytesListTree.byteOrder // use the byte order of the sequence
+
+        if (seqElement.type != undefined) { // if the element has a type
+            if (getCustomType(currentScopeStruct, seqElement.type) == null) { // if the type is not a custom type
+                if (seqElement.type.endsWith("be")) {
+                    byteOrder = ByteOrder.BIG
+                } else if (seqElement.type.endsWith("le")) {
+                    byteOrder = ByteOrder.LITTLE
+                } else if (seqElement.type.startsWith("str")) {
+                    if (seqElement.encoding != undefined) {
+                        if (seqElement.emcoding.endsWith("be")) {
+                            byteOrder = ByteOrder.BIG
+                        } else if (seqElement.encoding.endsWith("le")) {
+                            byteOrder = ByteOrder.LITTLE
+                        }
+                    }
+                }
+            }
+        }
+        return byteOrder
+    }
+
+    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, completeStruct: dynamic, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int) : KaitaiElement {
         var currentOffsetInBits = 0
         /*
         Entweder data als ByteArray und Bitshiften
@@ -288,11 +302,23 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         */
         val bytesListTree = MutableListTree<KaitaiElement>()
         bytesListTree.parent = parentBytesListTree
+        if (bytesListTree.parent != null) {
+            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
+        } else {
+            bytesListTree.byteOrder = ByteOrder.BIG
+        }
+        if (!(currentScopeStruct.meta == undefined || currentScopeStruct.meta.endian == undefined)) {
+            bytesListTree.byteOrder = if (currentScopeStruct.meta.endian == "be") {
+                ByteOrder.BIG
+            } else {
+                ByteOrder.LITTLE
+            }
+        }
         //val types = mutableSetOf<Type>()
 
-        val endianness = parseEndian(completeStruct, completeStruct)
+        for (seqElement in currentScopeStruct.seq) {
+            val byteOrder : ByteOrder = parseByteOrder(currentScopeStruct, seqElement, bytesListTree)
 
-        for (seqElement in currentSeqStruct) {
             val type = Type(completeStruct, seqElement, bytesListTree)
             if (type.sizeIsUntilEOS) {
                 type.sizeInBits = (data.size - currentOffsetInBits).toUInt()
@@ -300,31 +326,36 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             val elementId = seqElement.id
 
             var kaitaiElement : KaitaiElement
-            val value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits.toInt() -1)
+            var value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits.toInt() -1)
+            // flip bytes in case byteOrder is little and therefore different order than kotlin
+            if (type.subTypes.isEmpty() // no subtypes
+                && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
+                && byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
+                value = value.toByteArray().reversedArray().toBooleanArray()
+            }
             val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits.toInt()).toFloat()/8)
 
             if (type.subTypes.isNotEmpty()) {
-                kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type].seq, value, sourceOffsetInBits + currentOffsetInBits)
+                kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type], value, sourceOffsetInBits + currentOffsetInBits)
             } else {
                 kaitaiElement = if (type.usedDisplayStyle == DisplayStyle.BINARY) {
                     KaitaiBinary(
                         elementId,
-                        type.endianness,
+                        byteOrder,
                         value,
                         sourceByteRange
                     )
                 } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
-                    console.log(value.toByteArray().toUTF8String())
                     KaitaiString(
                         elementId,
-                        type.endianness,
+                        byteOrder,
                         value,
                         sourceByteRange
                     )
-                } else { //displayStyle.HEX as the fallback
+                } else { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
                     KaitaiBytes(
                         elementId,
-                        type.endianness,
+                        byteOrder,
                         value,
                         sourceByteRange
                     )
@@ -343,7 +374,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             currentOffsetInBits += type.sizeInBits.toInt()
         }
 
-        return KaitaiResult(id, endianness, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
+        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
     }
 
     override fun confidence(data: ByteArray): Double {
@@ -385,7 +416,7 @@ class KaitaiBytes(override val id: String, override var endianness: ByteOrder, o
 
 class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(endianness)})h</div>"
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(ByteOrder.BIG)})h</div>"
     }
 }
 

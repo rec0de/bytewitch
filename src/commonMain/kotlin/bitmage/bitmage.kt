@@ -129,6 +129,12 @@ fun BooleanArray.toByteArray(): ByteArray {
     }
 }
 
+fun BooleanArray.padLeft(padSize: Int): BooleanArray {
+    if (padSize <= 0) return this
+    val padding = BooleanArray(padSize) { false }
+    return padding + this
+}
+
 // Bytes
 
 fun Byte.toBooleanArray(): BooleanArray {
