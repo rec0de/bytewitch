@@ -12,6 +12,12 @@ object AlignmentUtils {
     fun byteCanberra(a: Byte, b: Byte): Double {
         val ai = a.toInt() and 0xFF
         val bi = b.toInt() and 0xFF
+
+        // if both bytes are 0x00 than don't return the best score. Often more complicated but similar bytes are more relevant
+        if (ai == 0 && bi == 0) {
+            return 0.1 // TODO what's the best value for this???
+        }
+
         val denominator = ai + bi
         return if (denominator == 0) 0.0 else kotlin.math.abs(ai - bi).toDouble() / denominator
     }

@@ -1256,7 +1256,6 @@ class NemesysParser {
             val (prevStart, prevType) = result.last()
             val (currStart, currType) = segments[i]
 
-            Logger.log("Gegeben von $currStart")
             var newSegment: NemesysSegment? = NemesysSegment(currStart, currType)
 
             // Rule 1: allocate nullbytes to STRING field
@@ -1273,7 +1272,6 @@ class NemesysParser {
                     val exists = segments.any { it.offset == shiftedOffset }
 
                     if (!exists) { // only add boundary if it doesn't already exist
-                        Logger.log("Rule 1")
                         newSegment = NemesysSegment(shiftedOffset, currType)
                     } else {
                         newSegment = null // don't override segment if it already exists
@@ -1293,13 +1291,11 @@ class NemesysParser {
 
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (count in 1..2) {
-                    Logger.log("Rule 2")
                     newSegment = NemesysSegment(currStart - count, currType)
                 }
             }
 
             if (newSegment != null) {
-                Logger.log("Boundary at: ${newSegment.offset}")
                 result.add(newSegment)
             }
         }

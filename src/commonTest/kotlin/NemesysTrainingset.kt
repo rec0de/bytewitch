@@ -207,6 +207,10 @@ class NemesysTrainingset {
         val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
         val f1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
 
+        val totalExpected = normalizedExpected.size
+        val correctPairs = normalizedExpected.intersect(normalizedFound).size
+        val accuracy = correctPairs.toDouble() / totalExpected.coerceAtLeast(1)
+
         println("----- testSequenceAlignment$testNumber -----")
         println("True Positives: $tp")
         println("False Positives: $fp")
@@ -214,6 +218,9 @@ class NemesysTrainingset {
         println("Precision: ${(precision * 100).toInt()}%")
         println("Recall: ${(recall * 100).toInt()}%")
         println("F1 Score: ${(f1 * 100).toInt()}%")
+        // That's actually not really the accurancy with tp,fn,... .
+        // we measure how many of the expected alignments were made correctly
+        println("Accuracy: ${(accuracy * 100).toInt()}%")
     }
 
 
@@ -383,7 +390,7 @@ class NemesysTrainingset {
         return bestIndex
     }
 
-    @Test
+    /*@Test
     fun runSegmentationTests() {
         testSegmentParsing1()
         testSegmentParsing2()
@@ -410,16 +417,16 @@ class NemesysTrainingset {
         testMultipleMessagesSegmentParsing2()
 
         printFinalScore()
-    }
+    }*/
 
-    /*@Test
+    @Test
     fun runSequenceAlignmentTests() {
         testSequenceAlignment1()
         testSequenceAlignment2()
         testSequenceAlignment3()
 
         printFinalScore()
-    }*/
+    }
 
     @Test
     fun runSegmentationWithSequenceAlignmentTests() {
