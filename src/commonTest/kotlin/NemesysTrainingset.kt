@@ -1,4 +1,5 @@
 import SequenceAlignment.AlignedSequence
+import SequenceAlignment.ByteWiseSequenceAlignment
 import SequenceAlignment.NemesysSequenceAlignment
 import bitmage.fromHex
 import decoders.Nemesys.*
@@ -222,6 +223,104 @@ class NemesysTrainingset {
         // we measure how many of the expected alignments were made correctly
         println("Accuracy: ${(accuracy * 100).toInt()}%")
     }
+
+
+    // Same as printSequenceAlignmentResult but for byte wise sequence alignment
+    private fun printByteWiseSequenceAlignmentResult(
+        testNumber: Int,
+        messages: Map<Int, NemesysParsedMessage>,
+        expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
+    ) {
+        // to set Triple<Int, Int, Pair<Int, Int>> in the right order
+        fun normalize(triple: Triple<Int, Int, Pair<Int, Int>>): Triple<Int, Int, Pair<Int, Int>> {
+            val (a, b, pair) = triple
+            return if (a < b || (a == b && pair.first <= pair.second)) {
+                Triple(a, b, pair)
+            } else {
+                Triple(b, a, pair.second to pair.first)
+            }
+        }
+
+        // map byte index to the segment start index
+        fun buildByteToSegmentOffsetMap(message: NemesysParsedMessage): Map<Int, Int> {
+            val map = mutableMapOf<Int, Int>()
+            val segments = message.segments + NemesysSegment(message.bytes.size, NemesysField.UNKNOWN)
+
+            for (i in 0 until message.segments.size) {
+                val start = segments[i].offset
+                val end = segments[i + 1].offset
+                for (j in start until end) {
+                    map[j] = start
+                }
+            }
+
+            return map
+        }
+
+        // convert expectedByteAlignment from segmentIndex to byteOffset
+        val expectedByteAlignments = expectedAlignments.mapNotNull { (protoA, protoB, segPair) ->
+            val msgA = messages[protoA]
+            val msgB = messages[protoB]
+
+            if (msgA == null || msgB == null) return@mapNotNull null
+            val segA = msgA.segments.getOrNull(segPair.first)
+            val segB = msgB.segments.getOrNull(segPair.second)
+
+            if (segA == null || segB == null) return@mapNotNull null
+
+            // Use start offset of every segment as a representation for byte-level matching
+            Triple(protoA, protoB, segA.offset to segB.offset)
+        }.toSet()
+
+        val alignments = ByteWiseSequenceAlignment.align(messages)
+        println("Alignments")
+        println(alignments)
+        // map every byte to the segment start
+        val byteToSegmentOffset: Map<Int, Map<Int, Int>> = messages.mapValues { (_, msg) ->
+            buildByteToSegmentOffsetMap(msg)
+        }
+        val foundAlignments = alignments.mapNotNull { alignment ->
+            val segOffsetA = byteToSegmentOffset[alignment.protocolA]?.get(alignment.indexA)
+            val segOffsetB = byteToSegmentOffset[alignment.protocolB]?.get(alignment.indexB)
+            if (segOffsetA != null && segOffsetB != null) {
+                Triple(alignment.protocolA, alignment.protocolB, segOffsetA to segOffsetB)
+            } else null
+        }.toSet()
+
+        val normalizedExpected = expectedByteAlignments.map { normalize(it) }.toSet()
+        val normalizedFound = foundAlignments.map { normalize(it) }.toSet()
+
+        println("normalizedExpected")
+        println(normalizedExpected)
+        println("normalizedFound")
+        println(normalizedFound)
+
+        val tp = normalizedFound.intersect(normalizedExpected).size
+        val fp = normalizedFound.subtract(normalizedExpected).size
+        val fn = normalizedExpected.subtract(normalizedFound).size
+
+        totalTP += tp
+        totalFP += fp
+        totalFN += fn
+
+        val precision = tp.toDouble() / (tp + fp).coerceAtLeast(1)
+        val recall = tp.toDouble() / (tp + fn).coerceAtLeast(1)
+        val f1 = 2 * precision * recall / (precision + recall).coerceAtLeast(1e-9)
+
+        val totalExpected = normalizedExpected.size
+        val correctPairs = normalizedExpected.intersect(normalizedFound).size
+        val accuracy = correctPairs.toDouble() / totalExpected.coerceAtLeast(1)
+
+        println("----- testByteWiseAlignment$testNumber -----")
+        println("True Positives: $tp")
+        println("False Positives: $fp")
+        println("False Negatives: $fn")
+        println("Precision: ${(precision * 100).toInt()}%")
+        println("Recall: ${(recall * 100).toInt()}%")
+        println("F1 Score: ${(f1 * 100).toInt()}%")
+        println("Accuracy: ${(accuracy * 100).toInt()}%")
+    }
+
 
 
     // calculate byte-wise sequence alignment result
@@ -1431,7 +1530,8 @@ class NemesysTrainingset {
             Triple(0, 1, Pair(12, 12))
         )
 
-        printSequenceAlignmentResult(1, messages, expectedAlignments)
+        // printSequenceAlignmentResult(1, messages, expectedAlignments)
+        printByteWiseSequenceAlignmentResult(1, messages, expectedAlignments)
     }
 
     private fun testSequenceAlignment2() {
@@ -1527,7 +1627,8 @@ class NemesysTrainingset {
             Triple(1, 0, Pair(24, 24)),
         )
 
-        printSequenceAlignmentResult(2, messages, expectedAlignments)
+        // printSequenceAlignmentResult(2, messages, expectedAlignments)
+        printByteWiseSequenceAlignmentResult(2, messages, expectedAlignments)
     }
 
     private fun testSequenceAlignment3() {
@@ -1648,7 +1749,8 @@ class NemesysTrainingset {
             Triple(1, 0, Pair(39, 33))
         )
 
-        printSequenceAlignmentResult(3, messages, expectedAlignments)
+        // printSequenceAlignmentResult(3, messages, expectedAlignments)
+        printByteWiseSequenceAlignmentResult(3, messages, expectedAlignments)
     }
 
 
