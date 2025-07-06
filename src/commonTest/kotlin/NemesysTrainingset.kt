@@ -302,6 +302,8 @@ class NemesysTrainingset {
 
         val (tp, fp, fn) = computeByteLevelConfusionMatrix(actualByteAlignments, expectedByteAlignments)
 
+        // TODO man könnte angeben als accurancy, dass vlt mindestens eine Verknüpfung existiert von einem Byte aus
+
         totalTP += tp
         totalFP += fp
         totalFN += fn
@@ -1816,7 +1818,7 @@ class NemesysTrainingset {
         )
 
         printSegmentationWithSequenceAlignmentResult(
-            testNumber = 1,
+            testNumber = 2,
             actualMessages = allParsed, // result of parser
             expectedSegments = combineActualSegments, // actual segmentation
             expectedAlignments = expectedAlignments // actual alginment
@@ -1946,7 +1948,7 @@ class NemesysTrainingset {
         )
 
         printSegmentationWithSequenceAlignmentResult(
-            testNumber = 1,
+            testNumber = 3,
             actualMessages = allParsed, // result of parser
             expectedSegments = combineActualSegments, // actual segmentation
             expectedAlignments = expectedAlignments // actual alginment
