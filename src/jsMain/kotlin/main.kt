@@ -127,13 +127,15 @@ fun setByteFinderContent(bytes: ByteArray) {
     bytefinder.style.display = "flex"
 }
 
-fun setByteFinderHighlight(start: Int, end: Int) {
+fun setByteFinderHighlight(start: Int, end: Int, startBitOffset: Int, endBitOffset: Int) {
     val hexview = document.getElementById("hexview")!!
     hexview.innerHTML = hexview.textContent!! // re-set previous highlights
     val range = document.createRange()
     val text = hexview.childNodes[0]!! as Text
-    range.setStart(text, start*2 + start/8)
-    range.setEnd(text, minOf(end*2 + end/8, text.length))
+    val startHex = start * 2 + start / 8 + startBitOffset / 4
+    val endHex = end * 2 + end / 8 + endBitOffset / 4
+    range.setStart(text, startHex)
+    range.setEnd(text, minOf(endHex, text.length))
     range.surroundContents(document.createElement("span"))
 
     val textview = document.getElementById("textview")!!
@@ -141,7 +143,7 @@ fun setByteFinderHighlight(start: Int, end: Int) {
     val txtText = textview.childNodes[0]!!
     val txtRange = document.createRange()
     txtRange.setStart(txtText, start);
-    txtRange.setEnd(txtText, end);
+    txtRange.setEnd(txtText, end + (if(endBitOffset > 0) 1 else 0))
     txtRange.surroundContents(document.createElement("span"))
 }
 
@@ -149,9 +151,12 @@ fun attachRangeListeners(element: Element) {
     if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
         val start = element.getAttribute("data-start")!!.toInt()
         val end =  element.getAttribute("data-end")!!.toInt()
+        val startBitOffset = element.getAttribute("data-start-bit-offset")?.toInt() ?: 0
+        val endBitOffset = element.getAttribute("data-end-bit-offset")?.toInt() ?: 0
+
         element.addEventListener("click", { evt ->
-            console.log("$start to $end")
-            setByteFinderHighlight(start, end)
+            console.log("$start (+ $startBitOffset bits) to $end (+ $endBitOffset bits)")
+            setByteFinderHighlight(start, end, startBitOffset, endBitOffset)
             evt.stopPropagation()
         })
 

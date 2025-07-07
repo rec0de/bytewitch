@@ -333,7 +333,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 && byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
                 value = value.toByteArray().reversedArray().toBooleanArray()
             }
-            val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits).toFloat()/8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits.toInt()).toFloat()/8)
+
+            val sourceByteRange = Pair((currentOffsetInBits + sourceOffsetInBits) / 8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits.toInt()) / 8)
+            val sourceRangeBitOffset = Pair((currentOffsetInBits + sourceOffsetInBits) % 8, (sourceOffsetInBits + currentOffsetInBits + type.sizeInBits.toInt()) % 8)
 
             if (type.subTypes.isNotEmpty()) {
                 kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, completeStruct.types[seqElement.type], value, sourceOffsetInBits + currentOffsetInBits)
@@ -343,21 +345,24 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         elementId,
                         byteOrder,
                         value,
-                        sourceByteRange
+                        sourceByteRange,
+                        sourceRangeBitOffset
                     )
                 } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
                     KaitaiString(
                         elementId,
                         byteOrder,
                         value,
-                        sourceByteRange
+                        sourceByteRange,
+                        sourceRangeBitOffset
                     )
                 } else { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
                     KaitaiBytes(
                         elementId,
                         byteOrder,
                         value,
-                        sourceByteRange
+                        sourceByteRange,
+                        sourceRangeBitOffset
                     )
                 }
             }
@@ -374,14 +379,10 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             currentOffsetInBits += type.sizeInBits.toInt()
         }
 
-        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, Pair(sourceOffsetInBits.toFloat()/8, (data.size + sourceOffsetInBits).toFloat()/8))
+        val resultSourceByteRange = Pair(sourceOffsetInBits / 8, (data.size + sourceOffsetInBits) / 8)
+        val resultSourceRangeBitOffset = Pair(sourceOffsetInBits % 8, (data.size + sourceOffsetInBits) % 8)
+        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset)
     }
-
-    override fun confidence(data: ByteArray): Double {
-        return 1.0
-    }
-
-    override fun decodesAsValid(data: ByteArray) = Pair(confidence(data) > 0.33, null)
 }
 
 interface KaitaiElement : ByteWitchResult {
@@ -392,7 +393,8 @@ interface KaitaiElement : ByteWitchResult {
 }
 
 class KaitaiResult(override val id: String, override var endianness: ByteOrder,
-                   override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+                   override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
+                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${bytesListTree.joinToString("") { it.renderHTML() }})</div>"
     }
@@ -408,25 +410,28 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
         }
 }
 
-class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
+                  override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().hex()})h</div>"
     }
 }
 
-class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(ByteOrder.BIG)})h</div>"
     }
 }
 
-class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
+                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.joinToString("") { if (it) "1" else "0" }})b</div>"
     }
 }
 
-class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Float, Float>): KaitaiElement {
+class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
+                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toUTF8String()})utf8</div>"
     }
