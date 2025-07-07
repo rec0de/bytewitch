@@ -3,6 +3,7 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import looksLikeUtf8String
 
 
 // MsgPack is basically a flavor of OPACK, so we'll reuse OPACK classes
@@ -49,12 +50,11 @@ class MsgPackParser : ParseCompanion() {
             }
         }
 
-        // single bytes are often false-positive detected as booleans, return low confidence for those
-        override fun confidence(data: ByteArray): Double {
-            return if(data.size < 3)
-                    0.2
-                else
-                    super.confidence(data)
+        // single bytes are often false-positive detected as booleans
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            if(data.size < 3)
+                return Pair(0.0, null)
+            return super.confidence(data, sourceOffset)
         }
     }
 
@@ -145,22 +145,17 @@ class MsgPackParser : ParseCompanion() {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
 
-        when(type) {
-            in 0xa0..0xbf -> return OPString(readBytes(bytes, type - 0xa0).decodeToString(), Pair(start, lastConsumedBytePosition))
-            0xd9 -> {
-                val length = readInt(bytes, 1)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
-            0xda -> {
-                val length = readInt(bytes, 2)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
-            0xdb -> {
-                val length = readInt(bytes, 4)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
+        val length = when(type) {
+            in 0xa0..0xbf -> type - 0xa0
+            0xd9 -> readInt(bytes, 1)
+            0xda -> readInt(bytes, 2)
+            0xdb -> readInt(bytes, 4)
             else -> throw Exception("Unexpected MsgPack string type $type in ${bytes.hex()}")
         }
+
+        val stringBytes = readBytes(bytes, length)
+        check(looksLikeUtf8String(stringBytes, enableLengthBias = false) > 0.5) { "msgpack string has implausible content: ${stringBytes.hex()}" }
+        return OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
     }
 
     private fun parseAsData(bytes: ByteArray): OPData {

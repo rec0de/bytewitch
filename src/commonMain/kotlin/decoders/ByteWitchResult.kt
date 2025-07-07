@@ -6,22 +6,26 @@ interface ByteWitchResult {
 
     fun renderHTML(): String
 
-    fun rangeTagsFor(start: Number, end: Number) = "data-start=\"$start\" data-end=\"$end\""
+    fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
+    fun relativeRangeTags(start: Int, length: Int) : String {
+        check(sourceByteRange != null) { "attempting use of relativeRangeTagsFor with null sourceByteRange" }
+        return rangeTagsFor(sourceByteRange!!.first+start, sourceByteRange!!.first+start+length)
+    }
 
-    val sourceByteRange: Pair<Number,Number>?
+    val sourceByteRange: Pair<Int,Int>?
 
     val byteRangeDataTags: String
-        get() = if(sourceByteRange == null || sourceByteRange!!.first.toFloat() < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
+        get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
 }
 
-class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suffix: ByteArray, override val sourceByteRange: Pair<Number, Number>): ByteWitchResult {
+class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suffix: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
     override fun renderHTML(): String {
         val pre = if(prefix.isNotEmpty())
-            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.first}\" data-end=\"${sourceByteRange.first.toFloat() + prefix.size}\">0x${prefix.hex()}</div>"
+            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.first}\" data-end=\"${sourceByteRange.first + prefix.size}\">0x${prefix.hex()}</div>"
         else ""
 
         val post = if(suffix.isNotEmpty())
-            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.second.toFloat() - suffix.size}\" data-end=\"${sourceByteRange.second}\">0x${suffix.hex()}</div>"
+            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.second - suffix.size}\" data-end=\"${sourceByteRange.second}\">0x${suffix.hex()}</div>"
         else ""
 
         return "<div class=\"roundbox generic largecollection\" $byteRangeDataTags>$pre ${result.renderHTML()} $post</div>"
