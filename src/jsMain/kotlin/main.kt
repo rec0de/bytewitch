@@ -132,8 +132,8 @@ fun setByteFinderHighlight(start: Int, end: Int, startBitOffset: Int, endBitOffs
     hexview.innerHTML = hexview.textContent!! // re-set previous highlights
     val range = document.createRange()
     val text = hexview.childNodes[0]!! as Text
-    val startHex = start * 2 + start / 8 + startBitOffset / 4
-    val endHex = end * 2 + end / 8 + endBitOffset / 4
+    val startHex = start * 2 + start / 8 + if (startBitOffset > 3) 1 else 0
+    val endHex = end * 2 + end / 8 + if (endBitOffset > 4) 2 else if (endBitOffset > 0) 1 else 0
     range.setStart(text, startHex)
     range.setEnd(text, minOf(endHex, text.length))
     range.surroundContents(document.createElement("span"))
