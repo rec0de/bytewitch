@@ -87,16 +87,13 @@ fun main() {
 fun decode(tryhard: Boolean) {
     val input = document.getElementById("data") as HTMLTextAreaElement
     val output = document.getElementById("output") as HTMLDivElement
-    val floatview = document.getElementById("floatview") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if(result.isNotEmpty()) {
         output.clear()
-        floatview.innerText = bytes.hex()
-        bytefinder.style.display = "flex"
+        setByteFinderContent(bytes)
 
         result.forEach {
             val parseResult = document.createElement("DIV") as HTMLDivElement
@@ -120,25 +117,51 @@ fun decode(tryhard: Boolean) {
     }
 }
 
+fun setByteFinderContent(bytes: ByteArray) {
+    val hexview = document.getElementById("hexview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+
+    hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    bytefinder.style.display = "flex"
+}
+
+fun setByteFinderHighlight(start: Int, end: Int, startBitOffset: Int, endBitOffset: Int) {
+    val hexview = document.getElementById("hexview")!!
+    hexview.innerHTML = hexview.textContent!! // re-set previous highlights
+    val range = document.createRange()
+    val text = hexview.childNodes[0]!! as Text
+    val startHex = start * 2 + start / 8 + if (startBitOffset > 3) 1 else 0
+    val endHex = end * 2 + end / 8 + if (endBitOffset > 4) 2 else if (endBitOffset > 0) 1 else 0
+    range.setStart(text, startHex)
+    range.setEnd(text, minOf(endHex, text.length))
+    range.surroundContents(document.createElement("span"))
+
+    val textview = document.getElementById("textview")!!
+    textview.innerHTML = textview.textContent!! // re-set previous highlights
+    val txtText = textview.childNodes[0]!!
+    val txtRange = document.createRange()
+    txtRange.setStart(txtText, start);
+    txtRange.setEnd(txtText, end + (if(endBitOffset > 0) 1 else 0))
+    txtRange.surroundContents(document.createElement("span"))
+}
+
 fun attachRangeListeners(element: Element) {
     if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
-        val start = element.getAttribute("data-start")!!.toFloat()
-        val end =  element.getAttribute("data-end")!!.toFloat()
-        element.addEventListener("click", { evt ->
-            console.log("$start to $end")
-            val floatview = document.getElementById("floatview")!!
-            floatview.innerHTML = floatview.textContent!! // re-set previous highlights
-            val text = floatview.childNodes[0]!!
-            val range = document.createRange()
-            range.setStart(text, (start * 2).toInt());
-            range.setEnd(text, (end * 2 + 0.5).toInt());
-            range.surroundContents(document.createElement("span"))
+        val start = element.getAttribute("data-start")!!.toInt()
+        val end =  element.getAttribute("data-end")!!.toInt()
+        val startBitOffset = element.getAttribute("data-start-bit-offset")?.toInt() ?: 0
+        val endBitOffset = element.getAttribute("data-end-bit-offset")?.toInt() ?: 0
 
+        element.addEventListener("click", { evt ->
+            console.log("$start (+ $startBitOffset bits) to $end (+ $endBitOffset bits)")
+            setByteFinderHighlight(start, end, startBitOffset, endBitOffset)
             evt.stopPropagation()
         })
 
         // highlightable elements
-        if(listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack").any { element.classList.contains(it) }) {
+        if(listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack", "neutral").any { element.classList.contains(it) }) {
             element.addEventListener("mouseover", { evt ->
                 if(currentHighlight != null)
                     currentHighlight!!.classList.remove("highlight")

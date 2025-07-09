@@ -1,12 +1,14 @@
 import bitmage.fromHex
 import decoders.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
 
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector, //Nemesys
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP,
+        Randomness, HeuristicSignatureDetector
     )
 
     private var bundledKaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
@@ -69,8 +71,14 @@ object ByteWitch {
             isBase64 -> decodeBase64(cleanedData)
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                val filtered = data.filter { it in "0123456789abcdefABCDEF" }
-                Logger.log(filtered)
+                // allow use of # as line comment
+                val stripped = data.split("\n").map { line ->
+                    val commentMarker = line.indexOfFirst{ it == '#' }
+                    val lineEnd = if(commentMarker == -1) line.length else commentMarker
+                    line.substring(0, lineEnd)
+                }.joinToString("")
+
+                val filtered = stripped.filter { it in "0123456789abcdefABCDEF" }
                 if (filtered.length % 2 != 0)
                     byteArrayOf()
                 else
@@ -91,7 +99,7 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = getAllDecoders().map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+            val possibleDecoders = getAllDecoders().map { Pair(it, it.confidence(data, 0)) }.filter { it.second.first > 0.3 }
 
             return possibleDecoders.mapNotNull {
                 try {
@@ -105,16 +113,20 @@ object ByteWitch {
     }
 
     fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
-        try {
-            return getAllDecoders().firstOrNull {
-                val confidence = it.confidence(data)
-                confidence > 0.75
-            }?.decode(data, sourceOffset, inlineDisplay = true)
-        } catch(e: Exception) {
-            Logger.log("Quick decode failed with exception: ${e.message}")
-            e.printStackTrace()
-            return null
+
+        getAllDecoders().forEach { decoder ->
+            val confidence = decoder.confidence(data, sourceOffset)
+            if (confidence.first > 0.75) {
+                try {
+                    return confidence.second ?: decoder.decode(data, sourceOffset, inlineDisplay = true)
+                } catch (e: Exception) {
+                    Logger.log("Quick decode failed with exception: '${e.message}' when assuming ${decoder.name} format with confidence ${confidence.first}")
+                    e.printStackTrace()
+                }
+            }
         }
+
+        return null
     }
 
     private fun decodeHexdump(hexdumpData: String): ByteArray {
@@ -144,13 +156,11 @@ object ByteWitch {
         return collectedBytes
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun decodeBase64(base64Data: String): ByteArray {
         // Decode Base64 directly into raw bytes
         return try {
-            js("atob(base64Data)").unsafeCast<String>()
-                .toCharArray()
-                .map { it.code.toByte() }
-                .toByteArray()
+            Base64.Default.decode(base64Data)
         }
         catch (e: Exception) {
             byteArrayOf()

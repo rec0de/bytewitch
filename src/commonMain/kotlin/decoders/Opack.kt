@@ -7,6 +7,7 @@ import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
 import htmlEscape
+import looksLikeUtf8String
 import kotlin.math.absoluteValue
 
 
@@ -40,12 +41,11 @@ class OpackParser : ParseCompanion() {
             }
         }
 
-        // single 0x01 / 0x02 bytes are often false-positive detected as booleans, return low confidence for those
-        override fun confidence(data: ByteArray): Double {
-            return if(data.size == 1 && data[0].toInt() in 1..2)
-                    0.2
-                else
-                    super.confidence(data)
+        // single bytes are often false-positive detected as booleans
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            if(data.size < 3)
+                return Pair(0.0, null)
+            return super.confidence(data, sourceOffset)
         }
     }
 
@@ -147,26 +147,18 @@ class OpackParser : ParseCompanion() {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
 
-        when(type) {
-            in 0x40..0x60 -> return OPString(readBytes(bytes, type - 0x40).decodeToString(), Pair(start, lastConsumedBytePosition))
-            0x61 -> {
-                val length = readInt(bytes, 1)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
-            0x62 -> {
-                val length = readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
-            0x63 -> {
-                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
-            0x64 -> {
-                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
-                return OPString(readBytes(bytes, length).decodeToString(), Pair(start, lastConsumedBytePosition))
-            }
+        val length = when(type) {
+            in 0x40..0x60 -> type - 0x40
+            0x61 -> readInt(bytes, 1)
+            0x62 -> readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
+            0x63 -> readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
+            0x64 -> readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
             else -> throw Exception("Unexpected OPACK string ${bytes.hex()}")
         }
+
+        val stringBytes = readBytes(bytes, length)
+        check(looksLikeUtf8String(stringBytes, false) > 0.5) { "OPString has implausible string content: ${stringBytes.hex()}" }
+        return OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
     }
 
     private fun parseAsData(bytes: ByteArray): OPData {

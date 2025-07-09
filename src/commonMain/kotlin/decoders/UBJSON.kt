@@ -3,6 +3,7 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import looksLikeUtf8String
 
 
 // Once again reusing OPack classes
@@ -39,12 +40,11 @@ class UbjsonParser : ParseCompanion() {
             }
         }
 
-        // single bytes are often false-positive detected as booleans, return low confidence for those
-        override fun confidence(data: ByteArray): Double {
-            return if(data.size < 3)
-                    0.2
-                else
-                    super.confidence(data)
+        // single bytes are often false-positive detected as booleans
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+            if(data.size < 3)
+                return Pair(0.0, null)
+            return super.confidence(data, sourceOffset)
         }
     }
 
@@ -76,7 +76,7 @@ class UbjsonParser : ParseCompanion() {
             bytes[parseOffset-1].toUByte().toInt().toChar()
         }
 
-        Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
+        //Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
 
         return when(typeByte) {
             'Z' -> OPNull(start)
@@ -100,6 +100,7 @@ class UbjsonParser : ParseCompanion() {
                     readInt(bytes, 4)
 
                 val stringBytes = readBytes(bytes, byteLength.toInt())
+                check(looksLikeUtf8String(stringBytes, enableLengthBias = false) > 0.5) { "UBJSON string has implausible content: ${stringBytes.hex()}" }
                 OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
             }
             'H' -> {

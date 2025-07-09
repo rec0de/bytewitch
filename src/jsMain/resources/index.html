@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <title>bytewitch</title>
     <link rel="icon" href="favicon.ico">
+
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="bytewitch - binary payload analyzer" />
+    <meta name="description" content="Instant, in-browser decoding & visualization for bplist, ASN.1, protobuf, opack, msgpack, CBOR and many more." />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://rec0de.net/open/bytewitch" />
+    <meta property="og:title" content="bytewitch - binary payload analyzer" />
+    <meta property="og:description" content="Instant, in-browser decoding & visualization for bplist, ASN.1, protobuf, opack, msgpack, CBOR and many more." />
+    <meta property="og:image" content="banner.png" />
+
     <style>
 
         :root {
@@ -21,6 +33,8 @@
             --asn-highlight: #b346b9;
             --generic: #c9a07420;
             --generic-highlight: #b98346;
+            --neutral: #a0a0a0;
+            --neutral-highlight: #838383;
             --kaitai: #c9a074;
             --kaitai-highlight: #b98346;
             --rowgap: 0.3rem;
@@ -193,6 +207,10 @@
             background: var(--generic);
         }
 
+        .neutral {
+            background: var(--neutral);
+        }
+
         .kaitai {
             background: var(--kaitai);
         }
@@ -201,7 +219,7 @@
             background: var(--asn);
         }
 
-        .generic, .asn1, .flexy {
+        .generic, .neutral, .asn1, .flexy {
             display: flex;
             gap: var(--rowgap);
             align-items: start;
@@ -271,13 +289,13 @@
             display: none;
         }
 
-        #floatview {
+        #hexview, #textview {
             margin-top: var(--rowgap);
             font-family: var(--mono);
             overflow-wrap: anywhere;
         }
 
-        #floatview > span {
+        #hexview > span, #textview > span {
             background: var(--accent);
         }
 
@@ -303,6 +321,10 @@
 
         .generic.highlight {
             background: var(--generic-highlight);
+        }
+
+        .neutral.highlight {
+            background: var(--neutral-highlight);
         }
 
         .kaitai.highlight {
@@ -337,7 +359,7 @@
         <label for="kaitai-name">Kaitai parser</label><input type="text" id="kaitai-name" placeholder="name" />
         <button id="add-kaitai">add parser</button>
     </div>
-    <textarea id="data" placeholder="Data"></textarea>
+    <textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>
     <div class="parsebuttons">
         <span>
             <input type="checkbox" id="livedecode" checked />
@@ -355,7 +377,8 @@
 <div class="container" id="bytefinder">
     <h3>Byte Finder</h3>
     <i>click parsed elements to highlight source bytes below</i>
-    <div id="floatview"></div>
+    <div id="hexview"></div>
+    <div id="textview"></div>
 </div>
 
 
