@@ -1,4 +1,4 @@
-package decoders.Nemesys
+package decoders.SwiftSegFinder
 
 import decoders.*
 import kotlin.math.ceil
@@ -6,36 +6,36 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.random.Random
 
-class NemesysParser {
-    // this finds all segment boundaries and returns a nemesys object that can be called to get the html code
-    fun parse(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+class SSFParser {
+    // this finds all segment boundaries and returns a SSF object that can be called to get the html code
+    fun parse(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val segments = findSegmentBoundaries(bytes)
-        return NemesysParsedMessage(segments, bytes, msgIndex)
+        return SSFParsedMessage(segments, bytes, msgIndex)
     }
 
-    fun parseEntropy(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    fun parseEntropy(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         val boundaries = findEntropyBoundaries(messages)
 
         return boundaries
     }
 
-    // parse bytewise and see every byte as one field without using Nemesys and without using Postprocessing
-    fun parseBytewiseWithoutOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+    // parse bytewise and see every byte as one field without using SSF and without using Postprocessing
+    fun parseBytewiseWithoutOptimization(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val segments = setBytewiseSegmentBoundaries(bytes)
 
-        return NemesysParsedMessage(segments, bytes, msgIndex)
+        return SSFParsedMessage(segments, bytes, msgIndex)
     }
 
-    // parse bytewise and see every byte as one field without using Nemesys
-    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+    // parse bytewise and see every byte as one field without using SSF
+    fun parseBytewiseWithOptimization(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val segments = setBytewiseSegmentBoundariesWithOptimization(bytes)
 
-        return NemesysParsedMessage(segments, bytes, msgIndex)
+        return SSFParsedMessage(segments, bytes, msgIndex)
     }
 
     // created my own byte wise parser using a sliding window
-    fun parseSmartWithoutOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        val segments = mutableListOf<NemesysSegment>()
+    fun parseSmartWithoutOptimization(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
+        val segments = mutableListOf<SSFSegment>()
         var index = 0
 
         val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV) // try these decoders
@@ -66,22 +66,22 @@ class NemesysParser {
 
             // set field boundary based on the best decoder
             if (bestDecoder != null && bestConfidence >= threshold) {
-                segments.add(NemesysSegment(index, NemesysUtil.setNemesysFieldfromDecoder(bestDecoder)))
+                segments.add(SSFSegment(index, SSFUtil.setSSFFieldfromDecoder(bestDecoder)))
                 index += bestWindowSize
             } else {
                 // Fallback: bytewise segmentation if no decoder could be found
-                segments.add(NemesysSegment(index, NemesysField.UNKNOWN))
+                segments.add(SSFSegment(index, SSFField.UNKNOWN))
                 index += 1
             }
         }
 
-        return NemesysParsedMessage(segments, bytes, msgIndex)
+        return SSFParsedMessage(segments, bytes, msgIndex)
     }
 
 
     // created my own byte wise parser using a sliding window - doesn't include pre processing
-    fun parseSmartWithHalfOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        val segments = mutableListOf<NemesysSegment>()
+    fun parseSmartWithHalfOptimization(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
+        val segments = mutableListOf<SSFSegment>()
         var index = 0
 
         val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV) // try these decoders
@@ -111,24 +111,24 @@ class NemesysParser {
 
             // set field boundary based on the best decoder
             if (bestDecoder != null && bestConfidence >= threshold) {
-                val fieldType = NemesysUtil.setNemesysFieldfromDecoder(bestDecoder)
-                segments.add(NemesysSegment(index, fieldType))
+                val fieldType = SSFUtil.setSSFFieldfromDecoder(bestDecoder)
+                segments.add(SSFSegment(index, fieldType))
                 index += bestWindowSize
             } else {
                 // Fallback: bytewise segmentation if no decoder could be found
-                segments.add(NemesysSegment(index, NemesysField.UNKNOWN))
+                segments.add(SSFSegment(index, SSFField.UNKNOWN))
                 index += 1
             }
         }
 
-        // transform NemesysSegment boundaries to a list
+        // transform SSFSegment boundaries to a list
         val boundaries = segments.map { it.offset }.toMutableList()
         val improvedSegments = postProcessing(boundaries, bytes) // do post processing
 
-        return NemesysParsedMessage(improvedSegments, bytes, msgIndex)
+        return SSFParsedMessage(improvedSegments, bytes, msgIndex)
     }
 
-    fun parseSmartWithFullOptimization(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
+    fun parseSmartWithFullOptimization(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val decoders = listOf(Utf8Decoder, Utf16Decoder, IEEE754, GenericTLV)
         val minWindow = 4
         val maxWindow = 32
@@ -157,7 +157,7 @@ class NemesysParser {
         }
 
         // iterate over free bytes
-        val smartSegments = mutableListOf<NemesysSegment>()
+        val smartSegments = mutableListOf<SSFSegment>()
         for ((start, end) in freeRanges) {
             var index = start
             while (index < end) {
@@ -184,15 +184,15 @@ class NemesysParser {
                 // set boundaries based on the best decoder
                 if (bestDecoder != null && bestConfidence >= threshold) {
                     smartSegments.add(
-                        NemesysSegment(
+                        SSFSegment(
                             index,
-                            NemesysUtil.setNemesysFieldfromDecoder(bestDecoder)
+                            SSFUtil.setSSFFieldfromDecoder(bestDecoder)
                         )
                     )
                     for (i in index until index + bestWindowSize) taken[i] = true
                     index += bestWindowSize
                 } else {
-                    smartSegments.add(NemesysSegment(index, NemesysField.UNKNOWN))
+                    smartSegments.add(SSFSegment(index, SSFField.UNKNOWN))
                     taken[index] = true
                     index += 1
                 }
@@ -204,14 +204,14 @@ class NemesysParser {
         val boundaries = combinedSegments.map { it.offset }.toMutableList()
         val improvedSegments = postProcessing(boundaries, bytes)
 
-        return NemesysParsedMessage(improvedSegments, bytes, msgIndex)
+        return SSFParsedMessage(improvedSegments, bytes, msgIndex)
     }
 
 
 
     // create a random parser - just for comparison reasons
-    fun parseRandom(bytes: ByteArray, msgIndex: Int): NemesysParsedMessage {
-        val segments = mutableListOf<NemesysSegment>()
+    fun parseRandom(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
+        val segments = mutableListOf<SSFSegment>()
 
         // set seed for randomizer
         val seed = bytes.contentHashCode()
@@ -219,33 +219,33 @@ class NemesysParser {
 
         var index = 0
         while (index < bytes.size) {
-            segments.add(NemesysSegment(index, NemesysField.UNKNOWN))
+            segments.add(SSFSegment(index, SSFField.UNKNOWN))
 
             // choose a random field length betwwen 1 and 8 bytes
             val fieldLength = 1 + random.nextInt(8)
             index += fieldLength
         }
 
-        return NemesysParsedMessage(segments, bytes, msgIndex)
+        return SSFParsedMessage(segments, bytes, msgIndex)
     }
 
 
     // every byte is one field. don't use postprocessing
-    private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<NemesysSegment>{
+    private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<SSFSegment>{
         // val taken = BooleanArray(bytes.size) { false }
 
         // preProcessing to detect length fields
         // val fixedSegments = detectLengthPrefixedFields(bytes, taken)
 
-        val dynamicSegments = mutableListOf<NemesysSegment>()
+        val dynamicSegments = mutableListOf<SSFSegment>()
         for (i in bytes.indices) { // go through each byte
             /* if (!taken[i]) {
                 val slice = byteArrayOf(bytes[i])
                 // do some post processing to merge bytes together
-                val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.fieldType ?: NemesysField.UNKNOWN
-                dynamicSegments.add(NemesysSegment(i, type))
+                val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.fieldType ?: SSFField.UNKNOWN
+                dynamicSegments.add(SSFSegment(i, type))
             } */
-            dynamicSegments.add(NemesysSegment(i, NemesysField.UNKNOWN))
+            dynamicSegments.add(SSFSegment(i, SSFField.UNKNOWN))
         }
 
         // return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
@@ -253,7 +253,7 @@ class NemesysParser {
     }
 
     // every byte is one field. only use pre- and postprocessing to merge bytes together
-    private fun setBytewiseSegmentBoundariesWithOptimization(bytes: ByteArray): List<NemesysSegment>{
+    private fun setBytewiseSegmentBoundariesWithOptimization(bytes: ByteArray): List<SSFSegment>{
         val taken = BooleanArray(bytes.size) { false }
 
         // preProcessing to detect length fields
@@ -277,7 +277,7 @@ class NemesysParser {
         }
 
         // set field boundaries after every byte
-        val dynamicSegments = mutableListOf<NemesysSegment>()
+        val dynamicSegments = mutableListOf<SSFSegment>()
         for ((start, end) in freeRanges) {
             val boundaries = (start..end).toMutableList()
             val segments = postProcessing(boundaries, bytes)
@@ -289,12 +289,12 @@ class NemesysParser {
 
 
     // count how often every segment exists
-    fun countSegmentValues(messages: List<NemesysParsedMessage>, minSegmentLength: Int = 2): Map<ByteArray, Int> {
+    fun countSegmentValues(messages: List<SSFParsedMessage>, minSegmentLength: Int = 2): Map<ByteArray, Int> {
         val segmentValueCounts = mutableMapOf<ByteArray, Int>()
 
         for (msg in messages) {
             for ((index, segment) in msg.segments.withIndex()) {
-                val segmentBytes = msg.bytes.sliceArray(NemesysUtil.getByteRange(msg, index))
+                val segmentBytes = msg.bytes.sliceArray(SSFUtil.getByteRange(msg, index))
 
                 // filter some segments
                 if (segmentBytes.size < minSegmentLength) continue
@@ -317,7 +317,7 @@ class NemesysParser {
 
 
     // Split segments if one segment of another message appears quite often
-    fun cropDistinct(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    fun cropDistinct(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         // count how often every segment exists
         val segmentValueCounts = countSegmentValues(messages)
 
@@ -327,7 +327,7 @@ class NemesysParser {
 
         // refine messages
         return messages.map { msg ->
-            val newSegments = mutableListOf<NemesysSegment>()
+            val newSegments = mutableListOf<SSFSegment>()
 
             // go through each segment of the message
             var i = 0
@@ -335,13 +335,13 @@ class NemesysParser {
                 val curr = msg.segments[i]
 
                 // don't split if it's a STRING field
-                if (curr.fieldType == NemesysField.STRING) {
+                if (curr.fieldType == SSFField.STRING) {
                     newSegments.add(curr)
                     i++
                     continue
                 }
 
-                val segmentBytes = msg.bytes.sliceArray(NemesysUtil.getByteRange(msg, i))
+                val segmentBytes = msg.bytes.sliceArray(SSFUtil.getByteRange(msg, i))
 
                 var splitOffsets = mutableSetOf<Int>()
                 splitOffsets.add(0) // segment start
@@ -372,7 +372,7 @@ class NemesysParser {
                 val sortedOffsets = splitOffsets.toList().sorted().distinct()
                 for (j in 0 until sortedOffsets.size - 1) {
                     val relativeOffset = sortedOffsets[j]
-                    newSegments.add(NemesysSegment(curr.offset + relativeOffset, curr.fieldType))
+                    newSegments.add(SSFSegment(curr.offset + relativeOffset, curr.fieldType))
                 }
 
                 i++
@@ -384,7 +384,7 @@ class NemesysParser {
     }
 
     // tries to detect length field that determines the rest of the message size in all messages
-    fun detectMessageLengthField(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    fun detectMessageLengthField(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         // test 1 byte, 2 byte and 4 bytes length field of both endian
         val candidateConfigs = listOf(
             Pair(1, true),
@@ -417,28 +417,28 @@ class NemesysParser {
             // replace old segment if it already exists
             val replacedSegments = newSegments.filterNot { it.offset == lengthFieldOffset }.toMutableList()
             replacedSegments.add(
-                NemesysSegment(
+                SSFSegment(
                     lengthFieldOffset,
                     if (chosenEndian)
-                        NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN
+                        SSFField.PAYLOAD_LENGTH_BIG_ENDIAN
                     else
-                        NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN
+                        SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN
                 )
             )
 
             // add field for payload if no border exits yet
             val payloadOffsetExists = replacedSegments.any { it.offset == payloadStart }
             if (!payloadOffsetExists) {
-                replacedSegments.add(NemesysSegment(payloadStart, NemesysField.UNKNOWN))
+                replacedSegments.add(SSFSegment(payloadStart, SSFField.UNKNOWN))
             }
 
             val finalSegments = replacedSegments.sortedBy { it.offset }
             msg.copy(segments = finalSegments)
 
             /*val newSegments = msg.segments.toMutableList()
-            newSegments.add(NemesysSegment(lengthFieldOffset,
-                if (chosenEndian) NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN else NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
-            newSegments.add(NemesysSegment(payloadStart, NemesysField.UNKNOWN))
+            newSegments.add(SSFSegment(lengthFieldOffset,
+                if (chosenEndian) SSFField.PAYLOAD_LENGTH_BIG_ENDIAN else SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
+            newSegments.add(SSFSegment(payloadStart, SSFField.UNKNOWN))
 
             msg.copy(segments = newSegments.sortedBy { it.offset }.distinctBy { it.offset })*/
         }
@@ -446,7 +446,7 @@ class NemesysParser {
 
     // find length field in one given message with specific endian and field size
     fun detectLengthFieldInMessage(
-        msg: NemesysParsedMessage,
+        msg: SSFParsedMessage,
         lengthFieldSize: Int,
         bigEndian: Boolean
     ): Pair<Int, Int>? {
@@ -454,7 +454,7 @@ class NemesysParser {
         val segments = msg.segments.sortedBy { it.offset }
 
         for (offset in 0 until bytes.size - lengthFieldSize) {
-            val length = NemesysUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: continue
+            val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: continue
             val payloadStart = offset + lengthFieldSize
             val payloadEnd = payloadStart + length
 
@@ -463,7 +463,7 @@ class NemesysParser {
 
             // length field must be of type UNKNOWN
             val currentSegment = findSegmentForOffset(segments, offset)
-            if (currentSegment?.fieldType != NemesysField.UNKNOWN) continue
+            if (currentSegment?.fieldType != SSFField.UNKNOWN) continue
 
             return offset to length
         }
@@ -471,8 +471,8 @@ class NemesysParser {
         return null
     }
 
-    // get NemesysSegment given an offset
-    fun findSegmentForOffset(segments: List<NemesysSegment>, offset: Int): NemesysSegment? {
+    // get SSFSegment given an offset
+    fun findSegmentForOffset(segments: List<SSFSegment>, offset: Int): SSFSegment? {
         for (i in segments.indices) {
             val start = segments[i].offset
             val end = segments.getOrNull(i + 1)?.offset ?: Int.MAX_VALUE
@@ -482,7 +482,7 @@ class NemesysParser {
     }
 
     // refine segments based on all messages
-    fun refineSegmentsAcrossMessages(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    fun refineSegmentsAcrossMessages(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         // maybe also implement PCA by Stephan Kleber (written in his dissertation), not sure if it's fast enough
         return messages
             .let(::cropDistinct)
@@ -502,7 +502,7 @@ class NemesysParser {
     }
 
     // calculate information entropy H(Di) for every position
-    fun calcBytewiseEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
+    fun calcBytewiseEntropy(messages: List<SSFParsedMessage>): DoubleArray {
         val minLength = messages.minOf { it.bytes.size }
         val entropy = DoubleArray(minLength) { 0.0 }
 
@@ -525,7 +525,7 @@ class NemesysParser {
     }
 
     // calc Gain Ratio GR. GR(Di) means IGR from Di to Di+1. This says how much neighboring bytes belong together
-    fun calcGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
+    fun calcGainRatio(messages: List<SSFParsedMessage>, entropy: DoubleArray): DoubleArray {
         val minLength = messages.minOf { it.bytes.size }
         val gr = DoubleArray(minLength) { 0.0 }
 
@@ -578,7 +578,7 @@ class NemesysParser {
         return if (isHigh) (byte shr 4) and 0x0F else byte and 0x0F
     }
 
-    private fun calcHalfByteGainRatio(messages: List<NemesysParsedMessage>, entropy: DoubleArray): DoubleArray {
+    private fun calcHalfByteGainRatio(messages: List<SSFParsedMessage>, entropy: DoubleArray): DoubleArray {
         val minHalfBytes = messages.minOf { it.bytes.size } * 2
         val gr = DoubleArray(minHalfBytes) { 0.0 }
 
@@ -626,7 +626,7 @@ class NemesysParser {
 
 
     // set boundaries using Entropy and Gain Ratio
-    fun getBoundariesUsingEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+    fun getBoundariesUsingEntropy(messages: List<SSFParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
         val minLength = messages.minOf { it.bytes.size }
         val boundaries = mutableSetOf<Int>()
 
@@ -661,7 +661,7 @@ class NemesysParser {
 
 
     // set boundaries using Entropy and Gain Ratio
-    private fun getBoundariesUsingHalbByteEntropy(messages: List<NemesysParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+    private fun getBoundariesUsingHalbByteEntropy(messages: List<SSFParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
         val minHalfBytes = messages.minOf { it.bytes.size } * 2
 
         val boundaries = mutableSetOf<Int>()
@@ -696,7 +696,7 @@ class NemesysParser {
         return boundaries.sorted().toSet()
     }
 
-    fun calcHalfByteEntropy(messages: List<NemesysParsedMessage>): DoubleArray {
+    fun calcHalfByteEntropy(messages: List<SSFParsedMessage>): DoubleArray {
         val minLength = messages.minOf { it.bytes.size }
         val entropy = DoubleArray(minLength * 2) { 0.0 } // 2 half-bytes per byte
 
@@ -732,7 +732,7 @@ class NemesysParser {
 
 
     // entropy decoder for multiple messages
-    fun findEntropyBoundaries(messages: List<NemesysParsedMessage>): List<NemesysParsedMessage> {
+    fun findEntropyBoundaries(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         if (messages.isEmpty()) return emptyList()
 
         // TODO calculation of entropy and gr could be made in one step. This saves performance but is harder to read.
@@ -756,7 +756,7 @@ class NemesysParser {
             val segments = postProcessing(localOffsets, message.bytes).toMutableList()
             // if want to be used without postProcessing (performs worse)
             /*val segments = localOffsets.map { offset ->
-                NemesysSegment(offset = offset, fieldType = NemesysField.UNKNOWN)
+                SSFSegment(offset = offset, fieldType = SSFField.UNKNOWN)
             }*/
 
 
@@ -767,7 +767,7 @@ class NemesysParser {
 
             // Safety check (it mostly enters if the bytes are too short)
             /*if (smoothed.isEmpty()) { // TODO ???
-                segments.add(NemesysSegment(0, NemesysField.UNKNOWN))
+                segments.add(SSFSegment(0, SSFField.UNKNOWN))
                 continue
             }*/
 
@@ -786,18 +786,18 @@ class NemesysParser {
 
             // add relativeStart to the boundaries
             for ((relativeStart, type) in improved) {
-                segments.add(NemesysSegment(relativeStart, type))
+                segments.add(SSFSegment(relativeStart, type))
             }*/
 
 
 
-            NemesysParsedMessage(segments, message.bytes, message.msgIndex)
+            SSFParsedMessage(segments, message.bytes, message.msgIndex)
         }
     }
 
 
     // find segmentation boundaries
-    private fun findSegmentBoundaries(bytes: ByteArray): List<NemesysSegment> {
+    private fun findSegmentBoundaries(bytes: ByteArray): List<SSFSegment> {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
 
         // pre processing
@@ -820,7 +820,7 @@ class NemesysParser {
             freeRanges.add(currentStart to bytes.size)
         }
 
-        val dynamicSegments = mutableListOf<NemesysSegment>()
+        val dynamicSegments = mutableListOf<SSFSegment>()
         for ((start, end) in freeRanges) {
             val slice = bytes.sliceArray(start until end)
             val deltaBC = computeDeltaBC(slice)
@@ -830,7 +830,7 @@ class NemesysParser {
 
             // Safety check (it mostly enters if the bytes are too short)
             if (smoothed.isEmpty()) {
-                dynamicSegments.add(NemesysSegment(start, NemesysField.UNKNOWN))
+                dynamicSegments.add(SSFSegment(start, SSFField.UNKNOWN))
                 continue
             }
 
@@ -849,7 +849,7 @@ class NemesysParser {
 
             // add relativeStart to the boundaries
             for ((relativeStart, type) in improved) {
-                dynamicSegments.add(NemesysSegment(start + relativeStart, type))
+                dynamicSegments.add(SSFSegment(start + relativeStart, type))
             }
         }
 
@@ -1042,12 +1042,12 @@ class NemesysParser {
     }
 
     // merge consecutive fields together if both are printable char values
-    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<NemesysSegment> {
-        val mergedSegments = mutableListOf<NemesysSegment>()
+    fun mergeCharSequences(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<SSFSegment> {
+        val mergedSegments = mutableListOf<SSFSegment>()
 
         // if no boundary detected set start boundary to 0
         if (boundaries.isEmpty()) {
-            mergedSegments.add(NemesysSegment(0, NemesysField.UNKNOWN))
+            mergedSegments.add(SSFSegment(0, SSFField.UNKNOWN))
             return mergedSegments
         }
 
@@ -1060,9 +1060,9 @@ class NemesysParser {
             val start = boundaries[i]
             val end = if (i + 1 < boundaries.size) boundaries[i + 1] else bytes.size
 
-            var fieldType = NemesysField.UNKNOWN
+            var fieldType = SSFField.UNKNOWN
             if (fieldIsTextSegment(start, end, bytes)) {
-                fieldType = NemesysField.STRING
+                fieldType = SSFField.STRING
 
                 // merge following segments together if they are also a text segments
                 while (i + 1 < boundaries.size) {
@@ -1072,14 +1072,14 @@ class NemesysParser {
 
                     if (fieldIsTextSegment(nextStart, nextEnd, bytes)) {
                         i++ // skip following segment because we merged it together
-                        // fieldType = NemesysField.STRING // we have two consecutive text fields interpret it as a string
+                        // fieldType = SSFField.STRING // we have two consecutive text fields interpret it as a string
                     } else {
                         break
                     }
                 }
             }
 
-            mergedSegments.add(NemesysSegment(start, fieldType))
+            mergedSegments.add(SSFSegment(start, fieldType))
             i++
         }
 
@@ -1087,12 +1087,12 @@ class NemesysParser {
     }
 
     // merge char sequences together - this is the way how it's done by Stephan Kleber in his paper (explained in 10.4.4.2)
-    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<NemesysSegment> {
-        val mergedBoundaries = mutableListOf<NemesysSegment>()
+    private fun mergeCharSequences2(boundaries: MutableList<Int>, bytes: ByteArray): MutableList<SSFSegment> {
+        val mergedBoundaries = mutableListOf<SSFSegment>()
 
         // if no boundary detected set start boundary to 0
         if (boundaries.isEmpty()) {
-            mergedBoundaries.add(NemesysSegment(0, NemesysField.UNKNOWN))
+            mergedBoundaries.add(SSFSegment(0, SSFField.UNKNOWN))
             return mergedBoundaries
         }
 
@@ -1121,10 +1121,10 @@ class NemesysParser {
             val fullSegment = bytes.sliceArray(start until end)
 
             if (isCharSegment(fullSegment)) {
-                mergedBoundaries.add(NemesysSegment(start, NemesysField.STRING))
+                mergedBoundaries.add(SSFSegment(start, SSFField.STRING))
                 i = j
             } else {
-                mergedBoundaries.add(NemesysSegment(start, NemesysField.UNKNOWN))
+                mergedBoundaries.add(SSFSegment(start, SSFField.UNKNOWN))
                 i++
             }
         }
@@ -1133,7 +1133,7 @@ class NemesysParser {
     }
 
     // try to improve boundaries by shifting them a bit
-    private fun postProcessing(boundaries: MutableList<Int>, bytes: ByteArray): List<NemesysSegment> {
+    private fun postProcessing(boundaries: MutableList<Int>, bytes: ByteArray): List<SSFSegment> {
         var result = mergeCharSequences(boundaries, bytes)
         result = slideCharWindow(result, bytes)
         result = nullByteTransitions(result, bytes)
@@ -1164,9 +1164,9 @@ class NemesysParser {
 
     // split bytes at the beginning of the message
     fun splitFixed(
-        segments: MutableList<NemesysSegment>,
+        segments: MutableList<SSFSegment>,
         bytes: ByteArray
-    ): MutableList<NemesysSegment> {
+    ): MutableList<SSFSegment> {
         if (segments.isEmpty()) return segments
 
         val firstSegment = segments[0]
@@ -1178,9 +1178,9 @@ class NemesysParser {
             bytes.slice(firstSegment.offset until nextOffset).all { it.toUByte().toInt() < 0x10 }
         ) {
             // split bytes in own segments
-            val newSegments = mutableListOf<NemesysSegment>()
+            val newSegments = mutableListOf<SSFSegment>()
             for (offset in firstSegment.offset until nextOffset) {
-                newSegments.add(NemesysSegment(offset, firstSegment.fieldType))
+                newSegments.add(SSFSegment(offset, firstSegment.fieldType))
             }
 
             // add new segments at pos 0
@@ -1194,10 +1194,10 @@ class NemesysParser {
 
     // merge two segments based on their entropy
     fun entropyMerge(
-        segments: List<NemesysSegment>,
+        segments: List<SSFSegment>,
         bytes: ByteArray
-    ): MutableList<NemesysSegment> {
-        val result = mutableListOf<NemesysSegment>()
+    ): MutableList<SSFSegment> {
+        val result = mutableListOf<SSFSegment>()
 
         var index = 0
         while (index < segments.size) {
@@ -1226,7 +1226,7 @@ class NemesysParser {
 
                         if (xorEntropy > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
                             // merge segments together
-                            result.add(NemesysSegment(start, fieldType))
+                            result.add(SSFSegment(start, fieldType))
                             index += 2 // skip the following field because we want to merge it to this one
                             continue
                         }
@@ -1235,7 +1235,7 @@ class NemesysParser {
             }
 
             // add regular boundary if we didn't merge any segments
-            result.add(NemesysSegment(start, fieldType))
+            result.add(SSFSegment(start, fieldType))
             index++
         }
 
@@ -1244,22 +1244,22 @@ class NemesysParser {
 
     // shift null bytes to the right field
     fun nullByteTransitions(
-        segments: MutableList<NemesysSegment>,
+        segments: MutableList<SSFSegment>,
         bytes: ByteArray
-    ): MutableList<NemesysSegment> {
+    ): MutableList<SSFSegment> {
         if (segments.size < 2) return segments.toMutableList()
 
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
         result.add(segments[0])
 
         for (i in 1 until segments.size) {
             val (prevStart, prevType) = result.last()
             val (currStart, currType) = segments[i]
 
-            var newSegment: NemesysSegment? = NemesysSegment(currStart, currType)
+            var newSegment: SSFSegment? = SSFSegment(currStart, currType)
 
             // Rule 1: allocate nullbytes to STRING field
-            if (prevType == NemesysField.STRING) {
+            if (prevType == SSFField.STRING) {
                 // count null bytes after the segment
                 var extra = 0
                 while (currStart + extra < bytes.size && bytes[currStart + extra] == 0.toByte()) {
@@ -1272,7 +1272,7 @@ class NemesysParser {
                     val exists = segments.any { it.offset == shiftedOffset }
 
                     if (!exists) { // only add boundary if it doesn't already exist
-                        newSegment = NemesysSegment(shiftedOffset, currType)
+                        newSegment = SSFSegment(shiftedOffset, currType)
                     } else {
                         newSegment = null // don't override segment if it already exists
                     }
@@ -1280,7 +1280,7 @@ class NemesysParser {
             }
 
             // Rule 2: nullbytes before UNKNOWN
-            if (newSegment != null && prevType != NemesysField.STRING && currType != NemesysField.STRING) {
+            if (newSegment != null && prevType != SSFField.STRING && currType != SSFField.STRING) {
                 // count null bytes in front of the segment
                 var count = 0
                 var idx = currStart - 1
@@ -1291,7 +1291,7 @@ class NemesysParser {
 
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (count in 1..2) {
-                    newSegment = NemesysSegment(currStart - count, currType)
+                    newSegment = SSFSegment(currStart - count, currType)
                 }
             }
 
@@ -1306,8 +1306,8 @@ class NemesysParser {
 
 
     // check if left or right byte of char sequence is also part of it
-    fun slideCharWindow(segments: List<NemesysSegment>, bytes: ByteArray): MutableList<NemesysSegment> {
-        val improved = mutableListOf<NemesysSegment>()
+    fun slideCharWindow(segments: List<SSFSegment>, bytes: ByteArray): MutableList<SSFSegment> {
+        val improved = mutableListOf<SSFSegment>()
 
         var newEnd = 0
 
@@ -1322,7 +1322,7 @@ class NemesysParser {
             }
 
             // only shift boundaries if it's a string field
-            if (type == NemesysField.STRING) {
+            if (type == SSFField.STRING) {
                 var newStart = start
                 newEnd = end
 
@@ -1339,9 +1339,9 @@ class NemesysParser {
                 // remove all boundaries between the new start and end
                 improved.removeAll { it.offset in newStart until newEnd }
 
-                improved.add(NemesysSegment(newStart, NemesysField.STRING))
+                improved.add(SSFSegment(newStart, SSFField.STRING))
             } else {
-                improved.add(NemesysSegment(start, type))
+                improved.add(SSFSegment(start, type))
             }
         }
 
@@ -1368,7 +1368,7 @@ class NemesysParser {
 
     // handle length field payload and add it to the result
     fun handlePrintablePayload(
-        bytes: ByteArray, taken: BooleanArray, result: MutableList<NemesysSegment>,
+        bytes: ByteArray, taken: BooleanArray, result: MutableList<SSFSegment>,
         offset: Int, lengthFieldSize: Int, payloadLength: Int, bigEndian: Boolean
     ): Int? {
         // check if payload is printable
@@ -1388,11 +1388,11 @@ class NemesysParser {
 
         // finally add fields
         if (bigEndian) {
-            result.add(NemesysSegment(offset,NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN))
+            result.add(SSFSegment(offset,SSFField.PAYLOAD_LENGTH_BIG_ENDIAN))
         } else {
-            result.add(NemesysSegment(offset,NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
+            result.add(SSFSegment(offset,SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
         }
-        result.add(NemesysSegment(payloadStart,NemesysField.STRING_PAYLOAD))
+        result.add(SSFSegment(payloadStart,SSFField.STRING_PAYLOAD))
         for (j in offset until payloadEnd) taken[j] = true
 
         return payloadEnd
@@ -1402,14 +1402,14 @@ class NemesysParser {
     fun checkLengthPrefixedSegment(
         bytes: ByteArray,
         taken: BooleanArray,
-        result: MutableList<NemesysSegment>,
+        result: MutableList<SSFSegment>,
         offset: Int,
         lengthFieldSize: Int,
         bigEndian: Boolean
     ): Int? {
         if (offset + lengthFieldSize >= bytes.size) return null
 
-        val length = NemesysUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: return null
+        val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: return null
 
         val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + length
@@ -1423,8 +1423,8 @@ class NemesysParser {
 
 
     // detect length prefixes and the corresponding payload
-    fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<NemesysSegment> {
-        val segments = mutableListOf<NemesysSegment>()
+    fun detectLengthPrefixedFields(bytes: ByteArray, taken: BooleanArray): List<SSFSegment> {
+        val segments = mutableListOf<SSFSegment>()
         var i = 0
 
         while (i < bytes.size - 1) {
@@ -1456,8 +1456,8 @@ class NemesysParser {
     }
 }
 
-// this object is used as a tool for nemesys classes
-object NemesysUtil {
+// this object is used as a tool for SwiftSegFinder classes
+object SSFUtil {
     // get actual length given the bytes and endian
     fun tryParseLength(
         bytes: ByteArray,
@@ -1490,18 +1490,18 @@ object NemesysUtil {
     }
 
     // to detect the range of a segment
-    fun getByteRange(message: NemesysParsedMessage, index: Int): IntRange {
+    fun getByteRange(message: SSFParsedMessage, index: Int): IntRange {
         val start = message.segments[index].offset
         val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
         return start until end
     }
 
-    fun setNemesysFieldfromDecoder(decoder: ByteWitchDecoder): NemesysField {
+    fun setSSFFieldfromDecoder(decoder: ByteWitchDecoder): SSFField {
         return when (decoder.name.lowercase()) {
-            "utf8" -> NemesysField.STRING
-            "utf16" -> NemesysField.UNKNOWN // STRING_UTF16
-            "ieee754" -> NemesysField.UNKNOWN // FLOAT
-            else -> NemesysField.UNKNOWN
+            "utf8" -> SSFField.STRING
+            "utf16" -> SSFField.UNKNOWN // STRING_UTF16
+            "ieee754" -> SSFField.UNKNOWN // FLOAT
+            else -> SSFField.UNKNOWN
         }
     }
 }

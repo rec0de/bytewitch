@@ -1,14 +1,13 @@
 package ParserTests
 
-import decoders.Nemesys.NemesysParsedMessage
-import decoders.Nemesys.NemesysParser
-import decoders.Nemesys.NemesysSegment
+import decoders.SwiftSegFinder.SSFParsedMessage
+import decoders.SwiftSegFinder.SSFParser
 import kotlin.test.Test
 
 class TestCustomParser {
     // choose the parser
-    private fun parserForSegmentParsing(bytes: ByteArray, index: Int): NemesysParsedMessage {
-        return NemesysParser().parse(bytes, index)
+    private fun parserForSegmentParsing(bytes: ByteArray, index: Int): SSFParsedMessage {
+        return SSFParser().parse(bytes, index)
     }
 
     @Test
@@ -40,8 +39,8 @@ class TestCustomParser {
             val msgA = TrainingMessageSamples.testMessages[test.messageAIndex]
             val msgB = TrainingMessageSamples.testMessages[test.messageBIndex]
             val messages = mapOf(
-                test.messageAIndex to NemesysParsedMessage(msgA.segments, msgA.message, test.messageAIndex),
-                test.messageBIndex to NemesysParsedMessage(msgB.segments, msgB.message, test.messageBIndex)
+                test.messageAIndex to SSFParsedMessage(msgA.segments, msgA.message, test.messageAIndex),
+                test.messageBIndex to SSFParsedMessage(msgB.segments, msgB.message, test.messageBIndex)
             )
             EvaluationHelper.printSequenceAlignmentResult(index, messages, test.expectedAlignments)
         }
@@ -65,8 +64,8 @@ class TestCustomParser {
             )
 
             val expectedParsed = mapOf(
-                test.messageAIndex to NemesysParsedMessage(msgA.segments, msgA.message, test.messageAIndex),
-                test.messageBIndex to NemesysParsedMessage(msgB.segments, msgB.message, test.messageBIndex)
+                test.messageAIndex to SSFParsedMessage(msgA.segments, msgA.message, test.messageAIndex),
+                test.messageBIndex to SSFParsedMessage(msgB.segments, msgB.message, test.messageBIndex)
             )
 
             // do segmentation

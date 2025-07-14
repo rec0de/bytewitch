@@ -1,12 +1,12 @@
 import bitmage.fromHex
-import decoders.Nemesys.*
+import decoders.SwiftSegFinder.*
 import kotlin.collections.listOf
 import kotlin.test.*
 
 
-class NemesysParserTests {
+class SSFParserTests {
 
-    private val parser = NemesysParser()
+    private val parser = SSFParser()
 
     @Test
     fun testFindExtremaInList() {
@@ -170,18 +170,18 @@ class NemesysParserTests {
         val message = "48656C6C6F00576F726C6421".fromHex() // "Hello\0World!"
         val boundaries = mutableListOf(5, 6) // Segments: ["Hello"], ["\0"], ["World!"]
 
-        val expectedValue1 = mutableListOf<NemesysSegment>()
-        expectedValue1.add(NemesysSegment(0, NemesysField.STRING))
-        expectedValue1.add(NemesysSegment(5, NemesysField.UNKNOWN))
-        expectedValue1.add(NemesysSegment(6, NemesysField.STRING))
+        val expectedValue1 = mutableListOf<SSFSegment>()
+        expectedValue1.add(SSFSegment(0, SSFField.STRING))
+        expectedValue1.add(SSFSegment(5, SSFField.UNKNOWN))
+        expectedValue1.add(SSFSegment(6, SSFField.STRING))
         val merged = parser.mergeCharSequences(boundaries, message)
         assertEquals(expectedValue1, merged) // No merge since '\0' breaks text sequence
 
         val message2 = "48656C6C6F20576F726C6421".fromHex() // "Hello World!"
         val boundaries2 = mutableListOf(6) // ["Hello "], ["World!"]
 
-        val expectedValue2 = mutableListOf<NemesysSegment>()
-        expectedValue2.add(NemesysSegment(0, NemesysField.STRING))
+        val expectedValue2 = mutableListOf<SSFSegment>()
+        expectedValue2.add(SSFSegment(0, SSFField.STRING))
         val merged2 = parser.mergeCharSequences(boundaries2, message2)
         assertEquals(expectedValue2, merged2) // Full merge, as both are text segments
     }
@@ -190,13 +190,13 @@ class NemesysParserTests {
     fun testSlideCharWindowExpandSingleStringField() {
         val bytes = "2A48656C6C6F2A".fromHex() // "*Hello*"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(1, NemesysField.STRING)
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(1, SSFField.STRING)
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.STRING) // expand left and right to include "*"
+            SSFSegment(0, SSFField.STRING) // expand left and right to include "*"
         )
 
         assertEquals(expected, result)
@@ -206,14 +206,14 @@ class NemesysParserTests {
     fun testSlideCharWindowExpandSingleStringFieldTwice() {
         val bytes = "2A2A48656C6C6F2A".fromHex() // "**Hello*"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(1, NemesysField.UNKNOWN),
-            NemesysSegment(2, NemesysField.STRING)
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(1, SSFField.UNKNOWN),
+            SSFSegment(2, SSFField.STRING)
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.STRING) // expand left and right to include "*"
+            SSFSegment(0, SSFField.STRING) // expand left and right to include "*"
         )
 
         assertEquals(expected, result)
@@ -223,14 +223,14 @@ class NemesysParserTests {
     fun testSlideCharWindowNoExpansionDueToNonPrintableLeft() {
         val bytes = "0048656C6C6F".fromHex() // "\0Hello"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(1, NemesysField.STRING)
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(1, SSFField.STRING)
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(1, NemesysField.STRING) // no expansion due to \0 before
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(1, SSFField.STRING) // no expansion due to \0 before
         )
 
         assertEquals(expected, result)
@@ -240,14 +240,14 @@ class NemesysParserTests {
     fun testSlideCharWindowMixedFieldTypes() {
         val bytes = "48656C6C6F002A".fromHex() // "Hello\0*"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.STRING),  // "Hello"
-            NemesysSegment(5, NemesysField.UNKNOWN)  // \0
+            SSFSegment(0, SSFField.STRING),  // "Hello"
+            SSFSegment(5, SSFField.UNKNOWN)  // \0
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.STRING),  // no expansion, already correct
-            NemesysSegment(5, NemesysField.UNKNOWN)  // stays the same
+            SSFSegment(0, SSFField.STRING),  // no expansion, already correct
+            SSFSegment(5, SSFField.UNKNOWN)  // stays the same
         )
 
         assertEquals(expected, result)
@@ -257,14 +257,14 @@ class NemesysParserTests {
     fun testSlideCharWindowExpandRightOnly() {
         val bytes = "0048656C6C6F".fromHex() // "\0Hello"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN), // \0
-            NemesysSegment(1, NemesysField.STRING)   // Hello
+            SSFSegment(0, SSFField.UNKNOWN), // \0
+            SSFSegment(1, SSFField.STRING)   // Hello
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(1, NemesysField.STRING) // no expansion left, no space right
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(1, SSFField.STRING) // no expansion left, no space right
         )
 
         assertEquals(expected, result)
@@ -274,14 +274,14 @@ class NemesysParserTests {
     fun testSlideCharWindowMultipleStringSegments() {
         val bytes = "4869FF6D7954657874".fromHex() // "Hi" + 0xFF + "myText"
         val segments = listOf(
-            NemesysSegment(0, NemesysField.STRING), // "Hi"
-            NemesysSegment(3, NemesysField.STRING)  // "myText"
+            SSFSegment(0, SSFField.STRING), // "Hi"
+            SSFSegment(3, SSFField.STRING)  // "myText"
         )
 
         val result = parser.slideCharWindow(segments, bytes)
         val expected = listOf(
-            NemesysSegment(0, NemesysField.STRING),
-            NemesysSegment(3, NemesysField.STRING)
+            SSFSegment(0, SSFField.STRING),
+            SSFSegment(3, SSFField.STRING)
         )
 
         assertEquals(expected, result)
@@ -292,26 +292,26 @@ class NemesysParserTests {
         // check if 00 is added to the previous string
         var bytes = "556c6d00037a".fromHex()
 
-        var segments = mutableListOf<NemesysSegment>()
-        segments.add(NemesysSegment(0, NemesysField.STRING))
-        segments.add(NemesysSegment(3, NemesysField.UNKNOWN))
+        var segments = mutableListOf<SSFSegment>()
+        segments.add(SSFSegment(0, SSFField.STRING))
+        segments.add(SSFSegment(3, SSFField.UNKNOWN))
 
-        var expectedResult = mutableListOf<NemesysSegment>()
-        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
-        expectedResult.add(NemesysSegment(4, NemesysField.UNKNOWN))
+        var expectedResult = mutableListOf<SSFSegment>()
+        expectedResult.add(SSFSegment(0, SSFField.STRING))
+        expectedResult.add(SSFSegment(4, SSFField.UNKNOWN))
         var actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
 
 
         bytes = "7724636c617373007f1115".fromHex()
-        segments = mutableListOf<NemesysSegment>()
-        segments.add(NemesysSegment(0, NemesysField.STRING))
-        segments.add(NemesysSegment(8, NemesysField.UNKNOWN))
+        segments = mutableListOf<SSFSegment>()
+        segments.add(SSFSegment(0, SSFField.STRING))
+        segments.add(SSFSegment(8, SSFField.UNKNOWN))
 
-        expectedResult = mutableListOf<NemesysSegment>()
-        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
-        expectedResult.add(NemesysSegment(8, NemesysField.UNKNOWN))
+        expectedResult = mutableListOf<SSFSegment>()
+        expectedResult.add(SSFSegment(0, SSFField.STRING))
+        expectedResult.add(SSFSegment(8, SSFField.UNKNOWN))
         actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -320,13 +320,13 @@ class NemesysParserTests {
         // check if 00 is added to the next field
         bytes = "015bf9000003".fromHex()
 
-        segments = mutableListOf<NemesysSegment>()
-        segments.add(NemesysSegment(0, NemesysField.UNKNOWN))
-        segments.add(NemesysSegment(4, NemesysField.UNKNOWN))
+        segments = mutableListOf<SSFSegment>()
+        segments.add(SSFSegment(0, SSFField.UNKNOWN))
+        segments.add(SSFSegment(4, SSFField.UNKNOWN))
 
-        expectedResult = mutableListOf<NemesysSegment>()
-        expectedResult.add(NemesysSegment(0, NemesysField.UNKNOWN))
-        expectedResult.add(NemesysSegment(3, NemesysField.UNKNOWN))
+        expectedResult = mutableListOf<SSFSegment>()
+        expectedResult.add(SSFSegment(0, SSFField.UNKNOWN))
+        expectedResult.add(SSFSegment(3, SSFField.UNKNOWN))
         actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -335,13 +335,13 @@ class NemesysParserTests {
         // check that 00 won't be added to the string because x0 row is too long
         bytes = "7d6e6f746966794576656e743a00000000".fromHex()
 
-        segments = mutableListOf<NemesysSegment>()
-        segments.add(NemesysSegment(0, NemesysField.STRING))
-        segments.add(NemesysSegment(13, NemesysField.UNKNOWN))
+        segments = mutableListOf<SSFSegment>()
+        segments.add(SSFSegment(0, SSFField.STRING))
+        segments.add(SSFSegment(13, SSFField.UNKNOWN))
 
-        expectedResult = mutableListOf<NemesysSegment>()
-        expectedResult.add(NemesysSegment(0, NemesysField.STRING))
-        expectedResult.add(NemesysSegment(13, NemesysField.UNKNOWN))
+        expectedResult = mutableListOf<SSFSegment>()
+        expectedResult.add(SSFSegment(0, SSFField.STRING))
+        expectedResult.add(SSFSegment(13, SSFField.UNKNOWN))
         actualResult = parser.nullByteTransitions(segments, bytes)
 
         assertEquals(expectedResult, actualResult)
@@ -394,7 +394,7 @@ class NemesysParserTests {
     @Test
     fun testNoMergeDueToLowEntropy() {
         val bytes = byteArrayOf(0x00.toByte(), 0x00.toByte(), 0x11.toByte(), 0x11.toByte())
-        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(2, NemesysField.UNKNOWN))
+        val segments = listOf(SSFSegment(0, SSFField.UNKNOWN), SSFSegment(2, SSFField.UNKNOWN))
 
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(segments, result) // no merging, because of low entropy
@@ -406,8 +406,8 @@ class NemesysParserTests {
             0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
             0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte()  // Segment 2
         )
-        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
-        val expected = listOf(NemesysSegment(0, NemesysField.UNKNOWN)) // merge together
+        val segments = listOf(SSFSegment(0, SSFField.UNKNOWN), SSFSegment(4, SSFField.UNKNOWN))
+        val expected = listOf(SSFSegment(0, SSFField.UNKNOWN)) // merge together
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)
     }
@@ -418,9 +418,9 @@ class NemesysParserTests {
             0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), // Segment 1
             0x8A.toByte(), 0x4F.toByte(), 0x2D.toByte(), 0x10.toByte() // Segment 2
         )
-        val segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
+        val segments = listOf(SSFSegment(0, SSFField.UNKNOWN), SSFSegment(4, SSFField.UNKNOWN))
         // no merging because first two bytes are too similar
-        val expected = listOf(NemesysSegment(0, NemesysField.UNKNOWN), NemesysSegment(4, NemesysField.UNKNOWN))
+        val expected = listOf(SSFSegment(0, SSFField.UNKNOWN), SSFSegment(4, SSFField.UNKNOWN))
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)
     }
@@ -428,7 +428,7 @@ class NemesysParserTests {
     @Test
     fun testNoMergeDueToDifferentFieldTypes() {
         val bytes = byteArrayOf(0x8A.toByte(), 0x4F.toByte(), 0x2C.toByte(), 0x10.toByte(), 0x4B.toByte(), 0xD1.toByte(), 0x33.toByte(), 0x27.toByte())
-        val segments = listOf(NemesysSegment(0, NemesysField.STRING), NemesysSegment(4, NemesysField.UNKNOWN))
+        val segments = listOf(SSFSegment(0, SSFField.STRING), SSFSegment(4, SSFField.UNKNOWN))
         val expected = segments // no merging because of different field types
         val result = parser.entropyMerge(segments, bytes)
         assertEquals(expected, result)
@@ -438,7 +438,7 @@ class NemesysParserTests {
     fun testHandlePrintablePayload_validString() {
         val bytes = "0748656C6C6F2121".fromHex() // 07 'Hello!!'
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val newIndex = parser.handlePrintablePayload(
             bytes = bytes,
@@ -452,8 +452,8 @@ class NemesysParserTests {
 
         assertEquals(8, newIndex)
         assertEquals(listOf(
-            NemesysSegment(0, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
-            NemesysSegment(1, NemesysField.STRING_PAYLOAD)
+            SSFSegment(0, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
+            SSFSegment(1, SSFField.STRING_PAYLOAD)
         ), result)
         assertTrue(taken.slice(0..7).all { it })
     }
@@ -462,15 +462,15 @@ class NemesysParserTests {
     fun testCheckLengthPrefixedSegment_valid1Byte() {
         val bytes = "0648656C6C6F21".fromHex() // 06 + "Hello!"
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
         assertEquals(7, nextIndex) // i + 1 + 6
         assertEquals(
             listOf(
-                NemesysSegment(0, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
-                NemesysSegment(1, NemesysField.STRING_PAYLOAD)
+                SSFSegment(0, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
+                SSFSegment(1, SSFField.STRING_PAYLOAD)
             ),
             result
         )
@@ -481,15 +481,15 @@ class NemesysParserTests {
     fun testCheckLengthPrefixedSegment_valid2ByteLE() {
         val bytes = "060048656C6C6F21".fromHex() // 06 00 + "Hello!"
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 2, false)
 
         assertEquals(8, nextIndex) // i + 2 + 6
         assertEquals(
             listOf(
-                NemesysSegment(0, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
-                NemesysSegment(2, NemesysField.STRING_PAYLOAD)
+                SSFSegment(0, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
+                SSFSegment(2, SSFField.STRING_PAYLOAD)
             ),
             result
         )
@@ -500,7 +500,7 @@ class NemesysParserTests {
     fun testCheckLengthPrefixedSegment_rejectsShortPayload() {
         val bytes = "024142".fromHex() // 02 + "AB"
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
@@ -513,7 +513,7 @@ class NemesysParserTests {
     fun testCheckLengthPrefixedSegment_rejectsContinuationText() {
         val bytes = "0548656C6C6F576F".fromHex() // 05 + "HelloWo"
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
@@ -527,7 +527,7 @@ class NemesysParserTests {
         val bytes = "0548656C6C6F21".fromHex()
         val taken = BooleanArray(bytes.size) { false }
         taken[3] = true // simulate overlap
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
 
@@ -539,7 +539,7 @@ class NemesysParserTests {
     fun testHandlePrintablePayload_rejectsContinuation() {
         val bytes = "0548656C6C6F576F72".fromHex() // 05 'Hello' + 'Wor...'
         val taken = BooleanArray(bytes.size) { false }
-        val result = mutableListOf<NemesysSegment>()
+        val result = mutableListOf<SSFSegment>()
 
         val newIndex = parser.handlePrintablePayload(
             bytes = bytes,
@@ -567,10 +567,10 @@ class NemesysParserTests {
         val result = parser.detectLengthPrefixedFields(bytes, taken)
 
         val expected = listOf(
-            NemesysSegment(2, NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN),
-            NemesysSegment(3, NemesysField.STRING_PAYLOAD),
-            NemesysSegment(8, NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
-            NemesysSegment(10, NemesysField.STRING_PAYLOAD)
+            SSFSegment(2, SSFField.PAYLOAD_LENGTH_BIG_ENDIAN),
+            SSFSegment(3, SSFField.STRING_PAYLOAD),
+            SSFSegment(8, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN),
+            SSFSegment(10, SSFField.STRING_PAYLOAD)
         )
 
         assertEquals(expected, result)
@@ -578,19 +578,19 @@ class NemesysParserTests {
 
     @Test
     fun testCountSegmentValues_countsCorrectly() {
-        val msg1 = NemesysParsedMessage(
+        val msg1 = SSFParsedMessage(
             segments = listOf(
-                NemesysSegment(0, NemesysField.STRING),
-                NemesysSegment(5, NemesysField.UNKNOWN)
+                SSFSegment(0, SSFField.STRING),
+                SSFSegment(5, SSFField.UNKNOWN)
             ),
             bytes = "48656C6C6F123456".fromHex(), // "Hello" + 0x12 0x34 0x56
             msgIndex = 0
         )
 
-        val msg2 = NemesysParsedMessage(
+        val msg2 = SSFParsedMessage(
             segments = listOf(
-                NemesysSegment(0, NemesysField.STRING),
-                NemesysSegment(5, NemesysField.UNKNOWN)
+                SSFSegment(0, SSFField.STRING),
+                SSFSegment(5, SSFField.UNKNOWN)
             ),
             bytes = "48656C6C6F999999".fromHex(), // "Hello" + 0x99 0x99 0x99
             msgIndex = 1
@@ -614,14 +614,14 @@ class NemesysParserTests {
 
     @Test
     fun testRefineSegmentsAcrossMessages_splitsOnFrequentValue() {
-        val msg1 = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg1 = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = "ABCD1234EF".fromHex(), // Contains "1234"
             msgIndex = 0
         )
 
-        val msg2 = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg2 = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = "1234".fromHex(), // Just the "frequent" sequence
             msgIndex = 1
         )
@@ -655,66 +655,66 @@ class NemesysParserTests {
     @Test
     fun testTryParseLength_1Byte() {
         val bytes = byteArrayOf(0x0A)
-        val length = NemesysUtil.tryParseLength(bytes, 0, 1, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 1, true)
         assertEquals(10, length)
     }
 
     @Test
     fun testTryParseLength_2Byte_BigEndian() {
         val bytes = byteArrayOf(0x01, 0x02) // 0x0102 = 258
-        val length = NemesysUtil.tryParseLength(bytes, 0, 2, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 2, true)
         assertEquals(258, length)
     }
 
     @Test
     fun testTryParseLength_2Byte_LittleEndian() {
         val bytes = byteArrayOf(0x02, 0x01) // 0x0102 = 258 (little endian)
-        val length = NemesysUtil.tryParseLength(bytes, 0, 2, false)
+        val length = SSFUtil.tryParseLength(bytes, 0, 2, false)
         assertEquals(258, length)
     }
 
     @Test
     fun testTryParseLength_4Byte_BigEndian() {
         val bytes = byteArrayOf(0x00, 0x00, 0x01, 0x00) // 256
-        val length = NemesysUtil.tryParseLength(bytes, 0, 4, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 4, true)
         assertEquals(256, length)
     }
 
     @Test
     fun testTryParseLength_4Byte_LittleEndian() {
         val bytes = byteArrayOf(0x00, 0x01, 0x00, 0x00) // 256
-        val length = NemesysUtil.tryParseLength(bytes, 0, 4, false)
+        val length = SSFUtil.tryParseLength(bytes, 0, 4, false)
         assertEquals(256, length)
     }
 
     @Test
     fun testTryParseLength_invalidLengthSize_returnsNull() {
         val bytes = byteArrayOf(0x01, 0x02, 0x03)
-        val length = NemesysUtil.tryParseLength(bytes, 0, 3, true) // unsupported size
+        val length = SSFUtil.tryParseLength(bytes, 0, 3, true) // unsupported size
         assertNull(length)
     }
 
     @Test
     fun testFindSegmentForOffset_findsCorrectSegment() {
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(5, NemesysField.STRING),
-            NemesysSegment(10, NemesysField.STRING_PAYLOAD)
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(5, SSFField.STRING),
+            SSFSegment(10, SSFField.STRING_PAYLOAD)
         )
 
-        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 0)?.fieldType)
-        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
-        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
-        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 9)?.fieldType)
-        assertEquals(NemesysField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 10)?.fieldType)
-        assertEquals(NemesysField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 999999)?.fieldType)
+        assertEquals(SSFField.UNKNOWN, parser.findSegmentForOffset(segments, 0)?.fieldType)
+        assertEquals(SSFField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
+        assertEquals(SSFField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
+        assertEquals(SSFField.STRING, parser.findSegmentForOffset(segments, 9)?.fieldType)
+        assertEquals(SSFField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 10)?.fieldType)
+        assertEquals(SSFField.STRING_PAYLOAD, parser.findSegmentForOffset(segments, 999999)?.fieldType)
     }
 
     @Test
     fun testFindSegmentForOffset_returnsNullIfBeforeFirstSegment() {
         val segments = listOf(
-            NemesysSegment(5, NemesysField.STRING),
-            NemesysSegment(10, NemesysField.STRING_PAYLOAD)
+            SSFSegment(5, SSFField.STRING),
+            SSFSegment(10, SSFField.STRING_PAYLOAD)
         )
 
         assertNull(parser.findSegmentForOffset(segments, 0))
@@ -723,38 +723,38 @@ class NemesysParserTests {
 
     @Test
     fun testFindSegmentForOffset_returnsNullIfEmptyList() {
-        val segments = emptyList<NemesysSegment>()
+        val segments = emptyList<SSFSegment>()
         assertNull(parser.findSegmentForOffset(segments, 0))
     }
 
     @Test
     fun testFindSegmentForOffset_exactlyOnSegmentStart() {
         val segments = listOf(
-            NemesysSegment(3, NemesysField.UNKNOWN),
-            NemesysSegment(7, NemesysField.STRING)
+            SSFSegment(3, SSFField.UNKNOWN),
+            SSFSegment(7, SSFField.STRING)
         )
 
-        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 3)?.fieldType)
-        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 7)?.fieldType)
+        assertEquals(SSFField.UNKNOWN, parser.findSegmentForOffset(segments, 3)?.fieldType)
+        assertEquals(SSFField.STRING, parser.findSegmentForOffset(segments, 7)?.fieldType)
     }
 
     @Test
     fun testFindSegmentForOffset_exactlyOnSegmentEnd_returnsPrevious() {
         val segments = listOf(
-            NemesysSegment(0, NemesysField.UNKNOWN),
-            NemesysSegment(5, NemesysField.STRING)
+            SSFSegment(0, SSFField.UNKNOWN),
+            SSFSegment(5, SSFField.STRING)
         )
         // Offset 5 is start of next segment, so should return segment[1]
-        assertEquals(NemesysField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
+        assertEquals(SSFField.STRING, parser.findSegmentForOffset(segments, 5)?.fieldType)
         // Offset 4 is still within segment[0]
-        assertEquals(NemesysField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
+        assertEquals(SSFField.UNKNOWN, parser.findSegmentForOffset(segments, 4)?.fieldType)
     }
 
     @Test
     fun testDetectLengthFieldInMessage_valid1ByteLE() {
         // 03 41 42 43 → length=3, payload="ABC", UNKNOWN segment
-        val msg = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43),
             msgIndex = 0
         )
@@ -766,8 +766,8 @@ class NemesysParserTests {
     @Test
     fun testDetectLengthFieldInMessage_valid2ByteBE() {
         // 00 03 41 42 43 → BE: length = 3
-        val msg = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = byteArrayOf(0x00, 0x03, 0x41, 0x42, 0x43),
             msgIndex = 0
         )
@@ -779,8 +779,8 @@ class NemesysParserTests {
     @Test
     fun testDetectLengthFieldInMessage_rejectsWrongSegmentType() {
         // valid length, but segment is STRING not UNKNOWN
-        val msg = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.STRING)),
+        val msg = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.STRING)),
             bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43),
             msgIndex = 0
         )
@@ -792,8 +792,8 @@ class NemesysParserTests {
     @Test
     fun testDetectLengthFieldInMessage_rejectsIfPayloadEndNotEqualToMessageSize() {
         // length = 3, but message size is 5 → should be rejected
-        val msg = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43, 0x44),
             msgIndex = 0
         )
@@ -805,8 +805,8 @@ class NemesysParserTests {
     @Test
     fun testDetectLengthFieldInMessage_returnsNullIfNoMatch() {
         // no valid length field
-        val msg = NemesysParsedMessage(
-            segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+        val msg = SSFParsedMessage(
+            segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
             bytes = byteArrayOf(0x7F, 0x00), // length = 127, too long
             msgIndex = 0
         )
@@ -818,10 +818,10 @@ class NemesysParserTests {
     @Test
     fun testDetectLengthFieldInMessage_findsCorrectOffsetAmongMultiple() {
         // 02 00 03 41 42 43 → LE: offset 2 → length = 3, payload="ABC"
-        val msg = NemesysParsedMessage(
+        val msg = SSFParsedMessage(
             segments = listOf(
-                NemesysSegment(0, NemesysField.STRING),
-                NemesysSegment(2, NemesysField.UNKNOWN)
+                SSFSegment(0, SSFField.STRING),
+                SSFSegment(2, SSFField.UNKNOWN)
             ),
             bytes = byteArrayOf(0x02, 0x00, 0x03, 0x41, 0x42, 0x43),
             msgIndex = 0
@@ -834,13 +834,13 @@ class NemesysParserTests {
     @Test
     fun testDetectMessageLengthField_setsLengthSegmentsWhenValidGlobally() {
         val messages = listOf(
-            NemesysParsedMessage(
-                segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            SSFParsedMessage(
+                segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
                 bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43), // length = 3, payload = "ABC"
                 msgIndex = 0
             ),
-            NemesysParsedMessage(
-                segments = listOf(NemesysSegment(0, NemesysField.UNKNOWN)),
+            SSFParsedMessage(
+                segments = listOf(SSFSegment(0, SSFField.UNKNOWN)),
                 bytes = byteArrayOf(0x02, 0x41, 0x42), // length = 2, payload = "AB"
                 msgIndex = 1
             )
@@ -856,15 +856,15 @@ class NemesysParserTests {
             val unknownAfterLength = segments.find { it.offset > (lengthField?.offset ?: -1) }
 
             assertNotNull(lengthField, "Length field missing in msg[$index]")
-            assertEquals(NemesysField.UNKNOWN, unknownAfterLength?.fieldType)
+            assertEquals(SSFField.UNKNOWN, unknownAfterLength?.fieldType)
         }
     }
 
     @Test
     fun testDetectMessageLengthField_returnsOriginalWhenNoValidConfig() {
         val messages = listOf(
-            NemesysParsedMessage(
-                segments = listOf(NemesysSegment(0, NemesysField.STRING)),
+            SSFParsedMessage(
+                segments = listOf(SSFSegment(0, SSFField.STRING)),
                 bytes = byteArrayOf(0xFF.toByte(), 0x00), // length = 255 (invalid for short payload)
                 msgIndex = 0
             )
@@ -878,10 +878,10 @@ class NemesysParserTests {
     @Test
     fun testDetectMessageLengthField_preservesOriginalSegments() {
         val messages = listOf(
-            NemesysParsedMessage(
+            SSFParsedMessage(
                 segments = listOf(
-                    NemesysSegment(0, NemesysField.UNKNOWN),
-                    NemesysSegment(2, NemesysField.STRING)
+                    SSFSegment(0, SSFField.UNKNOWN),
+                    SSFSegment(2, SSFField.STRING)
                 ),
                 bytes = byteArrayOf(0x03, 0x41, 0x42, 0x43), // length = 3, payload = "ABC"
                 msgIndex = 0
@@ -908,7 +908,7 @@ class NemesysParserTests {
         val bytes3 = "1111443344".fromHex()
 
         val messages = listOf(bytes1, bytes2, bytes3).mapIndexed { index, bytes ->
-            NemesysParsedMessage(
+            SSFParsedMessage(
                 segments = emptyList(),
                 bytes = bytes,
                 msgIndex = index
@@ -932,7 +932,7 @@ class NemesysParserTests {
         val bytes3 = "000000A3DD".fromHex()
 
         val messages = listOf(bytes1, bytes2, bytes3).mapIndexed { index, bytes ->
-            NemesysParsedMessage(
+            SSFParsedMessage(
                 segments = emptyList(),
                 bytes = bytes,
                 msgIndex = index
@@ -951,9 +951,9 @@ class NemesysParserTests {
     @Test
     fun testBoundaryDetectedAfterStaticBlock_rule2() {
         val messages = listOf(
-            NemesysParsedMessage(emptyList(), "000000AA".fromHex(), 0),
-            NemesysParsedMessage(emptyList(), "000000BB".fromHex(), 1),
-            NemesysParsedMessage(emptyList(), "000000CC".fromHex(), 2)
+            SSFParsedMessage(emptyList(), "000000AA".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "000000BB".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "000000CC".fromHex(), 2)
         )
 
         val result = parser.findEntropyBoundaries(messages)
@@ -965,9 +965,9 @@ class NemesysParserTests {
 
     @Test
     fun testEntropy_zeroWhenAllValuesSame() {
-        val msg1 = NemesysParsedMessage(emptyList(), "FF01A1".fromHex(), 0)
-        val msg2 = NemesysParsedMessage(emptyList(), "FF02A2".fromHex(), 1)
-        val msg3 = NemesysParsedMessage(emptyList(), "FF03A3".fromHex(), 2)
+        val msg1 = SSFParsedMessage(emptyList(), "FF01A1".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF02A2".fromHex(), 1)
+        val msg3 = SSFParsedMessage(emptyList(), "FF03A3".fromHex(), 2)
 
         val result = parser.calcBytewiseEntropy(listOf(msg1, msg2, msg3))
 
@@ -977,8 +977,8 @@ class NemesysParserTests {
 
     @Test
     fun testEntropy_highWhenUniformDistribution() {
-        val msg1 = NemesysParsedMessage(emptyList(), "00".fromHex(), 0)
-        val msg2 = NemesysParsedMessage(emptyList(), "FF".fromHex(), 1)
+        val msg1 = SSFParsedMessage(emptyList(), "00".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF".fromHex(), 1)
 
         val result = parser.calcBytewiseEntropy(listOf(msg1, msg2))
 
@@ -989,9 +989,9 @@ class NemesysParserTests {
 
     @Test
     fun testEntropy_lowButNotZeroWhenBiasedDistribution() {
-        val msg1 = NemesysParsedMessage(emptyList(), "FF".fromHex(), 0)
-        val msg2 = NemesysParsedMessage(emptyList(), "FF".fromHex(), 1)
-        val msg3 = NemesysParsedMessage(emptyList(), "00".fromHex(), 2)
+        val msg1 = SSFParsedMessage(emptyList(), "FF".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF".fromHex(), 1)
+        val msg3 = SSFParsedMessage(emptyList(), "00".fromHex(), 2)
 
         val result = parser.calcBytewiseEntropy(listOf(msg1, msg2, msg3))
 
@@ -1002,8 +1002,8 @@ class NemesysParserTests {
 
     @Test
     fun testEntropy_truncatesToShortestMessage() {
-        val msg1 = NemesysParsedMessage(emptyList(), "FF00AA".fromHex(), 0)
-        val msg2 = NemesysParsedMessage(emptyList(), "FF00".fromHex(), 1)
+        val msg1 = SSFParsedMessage(emptyList(), "FF00AA".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF00".fromHex(), 1)
 
         val result = parser.calcBytewiseEntropy(listOf(msg1, msg2))
 
@@ -1014,9 +1014,9 @@ class NemesysParserTests {
     @Test
     fun testGainRatio_zeroWhenEntropyIsZero() {
         val messages = listOf(
-            NemesysParsedMessage(emptyList(), "AA11".fromHex(), 0),
-            NemesysParsedMessage(emptyList(), "AA22".fromHex(), 1),
-            NemesysParsedMessage(emptyList(), "AA33".fromHex(), 2)
+            SSFParsedMessage(emptyList(), "AA11".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "AA22".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "AA33".fromHex(), 2)
         )
 
         // entropy at position 0 is 0 as all bytes are "AA"
@@ -1029,9 +1029,9 @@ class NemesysParserTests {
     @Test
     fun testGainRatio_highWhenPairCorrelationIsStrong() {
         val messages = listOf(
-            NemesysParsedMessage(emptyList(), "0011".fromHex(), 0),
-            NemesysParsedMessage(emptyList(), "2233".fromHex(), 1),
-            NemesysParsedMessage(emptyList(), "4455".fromHex(), 2)
+            SSFParsedMessage(emptyList(), "0011".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "2233".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "4455".fromHex(), 2)
         )
 
         val entropy = parser.calcBytewiseEntropy(messages)
@@ -1044,9 +1044,9 @@ class NemesysParserTests {
     @Test
     fun testGainRatio_lowerWhenPairingIsWeak() {
         val messages = listOf(
-            NemesysParsedMessage(emptyList(), "00AA".fromHex(), 0),
-            NemesysParsedMessage(emptyList(), "00BB".fromHex(), 1),
-            NemesysParsedMessage(emptyList(), "00CC".fromHex(), 2)
+            SSFParsedMessage(emptyList(), "00AA".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "00BB".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "00CC".fromHex(), 2)
         )
 
         val entropy = parser.calcBytewiseEntropy(messages)
@@ -1059,8 +1059,8 @@ class NemesysParserTests {
     @Test
     fun testGainRatio_skipsLastByte() {
         val messages = listOf(
-            NemesysParsedMessage(emptyList(), "1122".fromHex(), 0),
-            NemesysParsedMessage(emptyList(), "334455".fromHex(), 1)
+            SSFParsedMessage(emptyList(), "1122".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "334455".fromHex(), 1)
         )
 
         val entropy = parser.calcBytewiseEntropy(messages)

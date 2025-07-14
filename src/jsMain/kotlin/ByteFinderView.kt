@@ -52,7 +52,7 @@ fun attachRangeListeners(element: Element, msgIndex: Int) {
         })
 
         // highlightable elements
-        if (listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack", "nemesys").any { element.classList.contains(it) }) {
+        if (listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack", "ssf").any { element.classList.contains(it) }) {
             element.addEventListener("mouseover", { evt ->
                 if (currentHighlight != null)
                     currentHighlight!!.classList.remove("highlight")

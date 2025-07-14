@@ -1,12 +1,12 @@
 package SequenceAlignment
 
-import decoders.Nemesys.NemesysField
-import decoders.Nemesys.NemesysParsedMessage
+import decoders.SwiftSegFinder.SSFField
+import decoders.SwiftSegFinder.SSFParsedMessage
 
-// class for sequence alignment of nemesys object
-object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
+// class for sequence alignment of SSF object
+object SSFSequenceAlignment : AlignmentResult<SSFParsedMessage> {
     // main function for sequence alignment
-    override fun align(messages: Map<Int, NemesysParsedMessage>): List<AlignedSegment> {
+    override fun align(messages: Map<Int, SSFParsedMessage>): List<AlignedSegment> {
         val alignments = mutableListOf<AlignedSegment>()
         val tresholdAlignedSegment = 0.17
 
@@ -84,7 +84,7 @@ object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
      * @return Map< Pair(protocolA_ID, protocolB_ID) -> Map<Pair(segmentIndexA, segmentIndexB) -> similarityValue> >
      */
     private fun calcSparseSimilarityMatrix(
-        messages: Map<Int, NemesysParsedMessage>,
+        messages: Map<Int, SSFParsedMessage>,
         similarityThreshold: Double
     ): Map<Pair<Int, Int>, Map<Pair<Int, Int>, Double>> {
         val result = mutableMapOf<Pair<Int, Int>, MutableMap<Pair<Int, Int>, Double>>()
@@ -152,15 +152,15 @@ object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
     }
 
     // Canberra-Ulm Dissimilarity for segments of different sizes (sliding window approach)
-    fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
+    fun canberraUlmDissimilarity(segmentS: ByteArray, segmentT: ByteArray, typeA: SSFField, typeB: SSFField): Double {
         val shortSegment = if (segmentS.size <= segmentT.size) segmentS else segmentT
         val longSegment = if (segmentS.size > segmentT.size) segmentS else segmentT
 
         var minD = Double.MAX_VALUE
 
         // if both segments are a payload length field so set canberra distance to 0
-        if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
-            || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
+        if ((typeA == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
             minD = 0.0
         } else {
             // sliding window to search for the lowest dissimilarity
@@ -184,10 +184,10 @@ object NemesysSequenceAlignment : AlignmentResult<NemesysParsedMessage> {
     }
 
     // using canberra dissimilarity byte wise
-    private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: NemesysField, typeB: NemesysField): Double {
+    private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: SSFField, typeB: SSFField): Double {
         // if both segments are a payload length field so set canberra distance to 0
-        if ((typeA == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
-            || (typeA == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == NemesysField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
+        if ((typeA == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
+            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
             return 0.0
         }
 

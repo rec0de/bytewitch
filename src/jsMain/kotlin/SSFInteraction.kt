@@ -1,16 +1,16 @@
-import SequenceAlignment.NemesysSequenceAlignment
+import SequenceAlignment.SSFSequenceAlignment
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
 import org.w3c.dom.events.MouseEvent
-import decoders.Nemesys.*
+import decoders.SwiftSegFinder.*
 
-// attach finish button handler for editable nemesys content
+// attach finish button handler for editable SwiftSegFinder content
 fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgIndex: Int) {
     container.querySelectorAll(".finish-button").asList().forEach { btnElement ->
         val button = btnElement as HTMLElement
         button.addEventListener("click", {
-            val oldWrapper = button.closest(".nemesys") as HTMLElement
+            val oldWrapper = button.closest(".ssf") as HTMLElement
             val byteContainer = oldWrapper.querySelector("#byteContainer") as HTMLElement
 
             // read out where to start in the byte sequence. This is important for the offset
@@ -21,15 +21,15 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             // read out new segment structure based on separators
             val newSegments = rebuildSegmentsFromDOM(byteContainer, msgIndex)
 
-            val newParsed = NemesysParsedMessage(newSegments, slicedBytes, msgIndex)
+            val newParsed = SSFParsedMessage(newSegments, slicedBytes, msgIndex)
             parsedMessages[msgIndex] = newParsed
 
             // render new html content
-            rerenderNemesys(msgIndex, newParsed)
+            rerenderSSF(msgIndex, newParsed)
 
             // rerun sequence alignment
             if (tryhard) {
-                val alignedSegment = NemesysSequenceAlignment.align(parsedMessages)
+                val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
                 attachSequenceAlignmentListeners(alignedSegment)
             }
         })
@@ -41,7 +41,7 @@ fun attachEditButtonHandler(container: Element) {
     container.querySelectorAll(".edit-button").asList().forEach { btnElement ->
         val button = btnElement as HTMLElement
         button.addEventListener("click", {
-            val wrapper = button.closest(".nemesys") as HTMLElement
+            val wrapper = button.closest(".ssf") as HTMLElement
             val prettyView = wrapper.querySelector(".view-default") as HTMLElement
             val editableView = wrapper.querySelector(".view-editable") as HTMLElement
 
@@ -50,14 +50,14 @@ fun attachEditButtonHandler(container: Element) {
             editableView.style.display = "block"
 
             // this is needed to work with the separator
-            attachNemesysSeparatorHandlers()
+            attachSSFSeparatorHandlers()
             attachSeparatorPlaceholderClickHandlers()
         })
     }
 }
 
-// read out nemesys segments based on separators set by the user
-fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<NemesysSegment> {
+// read out SwiftSegFinder segments based on separators set by the user
+fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<SSFSegment> {
     val byteElements = container.querySelectorAll(".bytegroup + .field-separator, .bytegroup")
     var byteOffset = 0
     val segmentOffsets = mutableListOf(0)
@@ -79,18 +79,18 @@ fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<NemesysS
     // In my opinion this behaves a bit weird and isn't the best solution.
     // Another way would be to just rerun a field type detection. This also behaves weird
     return segmentOffsets.map { offset ->
-        NemesysSegment(offset, NemesysField.UNKNOWN)
+        SSFSegment(offset, SSFField.UNKNOWN)
     }
 }
 
-// rerender nemesys html view
-fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
+// rerender SwiftSegFinder html view
+fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
     val messageBox = document.getElementById("message-output-$msgIndex") as HTMLDivElement
-    val oldWrapper = messageBox.querySelector(".nemesys") as HTMLDivElement
+    val oldWrapper = messageBox.querySelector(".ssf") as HTMLDivElement
 
-    // create new div with new nemesys content
+    // create new div with new SSF content
     val temp = document.createElement("div") as HTMLDivElement
-    val newHTML = NemesysRenderer.render(parsed)
+    val newHTML = SSFRenderer.render(parsed)
     temp.innerHTML = newHTML
 
     val newWrapper = temp.firstElementChild as HTMLElement
@@ -103,14 +103,14 @@ fun rerenderNemesys(msgIndex: Int, parsed: NemesysParsedMessage) {
 }
 
 
-// attach button handlers for nemesys
-fun attachNemesysButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
+// attach button handlers for SSF
+fun attachSSFButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
     attachEditButtonHandler(parseContent)
     attachFinishButtonHandler(parseContent, bytes, msgIndex)
 }
 
-// separator handler to change boundaries of nemesys content
-fun attachNemesysSeparatorHandlers() {
+// separator handler to change boundaries of SwiftSegFinder content
+fun attachSSFSeparatorHandlers() {
     // get all separators
     val separators = document.querySelectorAll(".field-separator")
 
@@ -243,7 +243,7 @@ fun moveSeparatorToTarget(separator: HTMLElement, target: HTMLElement, mouseX: D
     val parent = separator.parentElement ?: return
     val targetParent = target.parentElement ?: return
 
-    // check that separator hasn't moved into another editable nemesys field
+    // check that separator hasn't moved into another editable SwiftSegFinder field
     if (parent == targetParent) {
         // calc target position
         val rect = target.getBoundingClientRect()
@@ -277,7 +277,7 @@ fun attachSeparatorPlaceholderClickHandlers() {
             fieldSeparator.innerText = "|"
 
             placeholder.parentElement?.replaceChild(fieldSeparator, placeholder)
-            attachNemesysSeparatorHandlers()
+            attachSSFSeparatorHandlers()
             attachSeparatorPlaceholderClickHandlers()
         })
     }

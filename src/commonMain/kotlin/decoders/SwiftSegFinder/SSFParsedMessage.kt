@@ -1,17 +1,17 @@
-package decoders.Nemesys
+package decoders.SwiftSegFinder
 
-data class NemesysParsedMessage(
-    val segments: List<NemesysSegment>,
+data class SSFParsedMessage(
+    val segments: List<SSFSegment>,
     val bytes: ByteArray,
     val msgIndex: Int
 )
 
-data class NemesysSegment(
+data class SSFSegment(
     val offset: Int,
-    val fieldType: NemesysField
+    val fieldType: SSFField
 )
 
-enum class NemesysField {
+enum class SSFField {
     UNKNOWN,
     STRING,
     PAYLOAD_LENGTH_LITTLE_ENDIAN,

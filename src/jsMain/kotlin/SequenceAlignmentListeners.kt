@@ -2,7 +2,7 @@ import SequenceAlignment.AlignedSegment
 import org.w3c.dom.*
 import org.w3c.dom.events.Event
 import kotlinx.browser.document
-import decoders.Nemesys.*
+import decoders.SwiftSegFinder.*
 
 // global values for SequenceAlignment listeners
 val alignmentMouseEnterListeners = mutableMapOf<String, (Event) -> Unit>()
@@ -32,10 +32,10 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
         val msgA = parsedMessages[segment.protocolA]
         val msgB = parsedMessages[segment.protocolB]
         if (msgA != null) {
-            alignmentBytes[idA] = msgA.bytes.sliceArray(NemesysUtil.getByteRange(msgA, segment.segmentIndexA))
+            alignmentBytes[idA] = msgA.bytes.sliceArray(SSFUtil.getByteRange(msgA, segment.segmentIndexA))
         }
         if (msgB != null) {
-            alignmentBytes[idB] = msgB.bytes.sliceArray(NemesysUtil.getByteRange(msgB, segment.segmentIndexB))
+            alignmentBytes[idB] = msgB.bytes.sliceArray(SSFUtil.getByteRange(msgB, segment.segmentIndexB))
         }
     }
 

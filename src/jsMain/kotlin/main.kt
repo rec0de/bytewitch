@@ -1,6 +1,6 @@
-import SequenceAlignment.NemesysSequenceAlignment
+import SequenceAlignment.SSFSequenceAlignment
 import decoders.ByteWitchResult
-import decoders.Nemesys.*
+import decoders.SwiftSegFinder.*
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
@@ -11,8 +11,8 @@ var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 var tryhard = false
 
-// save parsed messages for float view and nemesys
-var parsedMessages = mutableMapOf<Int, NemesysParsedMessage>()
+// save parsed messages for float view and SwiftSegFinder
+var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 
 fun main() {
     window.addEventListener("load", {
@@ -100,44 +100,44 @@ fun main() {
 
 // use entropy decoder and attach output to messageBox
 fun decodeWithEntropy() { // TODO this can be removed
-    val  nemesysParsedMessages = NemesysParser().parseEntropy(parsedMessages.values.toList())
+    val  parsedMessages = SSFParser().parseEntropy(parsedMessages.values.toList())
 
-    nemesysParsedMessages.forEach {
+    parsedMessages.forEach {
         val messageId = "message-output-${it.msgIndex}"
         var messageBox = document.getElementById(messageId) as HTMLDivElement
 
-        // remove old nemesys content
+        // remove old ssf content
         val existingParsers = messageBox.querySelectorAll("h3")
         for (i in 0 until existingParsers.length) {
             val heading = existingParsers.item(i) as? HTMLHeadingElement ?: continue
-            if (heading.innerText.lowercase() == "nemesysparser") {
+            if (heading.innerText.lowercase() == "SwiftSegFinder") {
                 heading.parentElement?.remove()
                 break
             }
         }
 
-        // add new nemesys content
-        val nemesysResult = document.createElement("DIV") as HTMLDivElement
-        val nemesysName = document.createElement("H3") as HTMLHeadingElement
-        nemesysName.innerText = "nemesysparser"
+        // add new ssf content
+        val ssfResult = document.createElement("DIV") as HTMLDivElement
+        val ssfName = document.createElement("H3") as HTMLHeadingElement
+        ssfName.innerText = "SwiftSegFinder"
 
-        val nemesysContent = document.createElement("DIV") as HTMLDivElement
-        nemesysContent.classList.add("parsecontent")
-        nemesysContent.innerHTML = NemesysRenderer.render(it)
+        val ssfContent = document.createElement("DIV") as HTMLDivElement
+        ssfContent.classList.add("parsecontent")
+        ssfContent.innerHTML = SSFRenderer.render(it)
 
-        attachRangeListeners(nemesysContent, it.msgIndex)
-        attachNemesysButtons(nemesysContent, it.bytes, it.msgIndex)
+        attachRangeListeners(ssfContent, it.msgIndex)
+        attachSSFButtons(ssfContent, it.bytes, it.msgIndex)
 
-        nemesysResult.appendChild(nemesysName)
-        nemesysResult.appendChild(nemesysContent)
+        ssfResult.appendChild(ssfName)
+        ssfResult.appendChild(ssfContent)
 
-        messageBox.appendChild(nemesysResult)
+        messageBox.appendChild(ssfResult)
     }
 }
 
 
 // decode one specific byte sequence
-fun decodeBytes(bytes: ByteArray, taIndex: Int, showNemesysContent: Boolean) {
+fun decodeBytes(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val floatview = document.getElementById("floatview") as HTMLDivElement
@@ -173,9 +173,9 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int, showNemesysContent: Boolean) {
             messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
 
-        // for nemesys content
-        if (showNemesysContent) {
-            messageBox.appendChild(decodeWithNemesys(bytes, taIndex))
+        // for SSF content
+        if (showSSFContent) {
+            messageBox.appendChild(decodeWithSSF(bytes, taIndex))
         }
     }
 }
@@ -199,31 +199,31 @@ private fun renderByteWitchResult(it: Pair<String, ByteWitchResult>, taIndex: In
     return parseResult
 }
 
-// decode bytes with nemesys and return HTML content
-private fun decodeWithNemesys(bytes: ByteArray, taIndex: Int): HTMLDivElement {
-    val nemesysParsed = NemesysParser().parse(bytes, taIndex)
-    parsedMessages[taIndex] = nemesysParsed
+// decode bytes with SwiftSegFinder and return HTML content
+private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
+    val ssfParsed = SSFParser().parse(bytes, taIndex)
+    parsedMessages[taIndex] = ssfParsed
 
-    val nemesysResult = document.createElement("DIV") as HTMLDivElement
-    val nemesysName = document.createElement("H3") as HTMLHeadingElement
-    nemesysName.innerText = "nemesysparser"
+    val ssfResult = document.createElement("DIV") as HTMLDivElement
+    val ssfName = document.createElement("H3") as HTMLHeadingElement
+    ssfName.innerText = "SwiftSegFinder"
 
-    val nemesysContent = document.createElement("DIV") as HTMLDivElement
-    nemesysContent.classList.add("parsecontent")
-    nemesysContent.innerHTML = NemesysRenderer.render(nemesysParsed)
+    val ssfContent = document.createElement("DIV") as HTMLDivElement
+    ssfContent.classList.add("parsecontent")
+    ssfContent.innerHTML = SSFRenderer.render(ssfParsed)
 
-    attachRangeListeners(nemesysContent, taIndex)
-    attachNemesysButtons(nemesysContent, bytes, taIndex)
+    attachRangeListeners(ssfContent, taIndex)
+    attachSSFButtons(ssfContent, bytes, taIndex)
 
-    nemesysResult.appendChild(nemesysName)
-    nemesysResult.appendChild(nemesysContent)
+    ssfResult.appendChild(ssfName)
+    ssfResult.appendChild(ssfContent)
 
-    return nemesysResult
+    return ssfResult
 }
 
 // decode all text areas
 fun decode(isLiveDecoding: Boolean) {
-    val showNemesysContent = true
+    val showSSFContent = true
 
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
@@ -235,25 +235,25 @@ fun decode(isLiveDecoding: Boolean) {
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
-            parsedMessages[i] = NemesysParsedMessage(listOf(), bytes, i) // for float view if showNemesysContent is set to false
-            decodeBytes(bytes, i, showNemesysContent)
+            parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+            decodeBytes(bytes, i, showSSFContent)
         }
     }
 
 
-    if (showNemesysContent) { // refine nemesys fields and rerender html content
-        val refined = NemesysParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+    if (showSSFContent) { // refine ssf fields and rerender html content
+        val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
         refined.forEach { msg ->
             parsedMessages[msg.msgIndex] = msg
-            rerenderNemesys(msg.msgIndex, msg)
+            rerenderSSF(msg.msgIndex, msg)
         }
     } else { // show output of entropy decoder
         decodeWithEntropy()
     }
 
     // for sequence alignment
-    if (tryhard && !isLiveDecoding && showNemesysContent) {
-        val alignedSegment = NemesysSequenceAlignment.align(parsedMessages)
+    if (tryhard && !isLiveDecoding && showSSFContent) {
+        val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
         attachSequenceAlignmentListeners(alignedSegment)
     }
 
@@ -267,22 +267,22 @@ fun decode(isLiveDecoding: Boolean) {
     val messageBox = document.createElement("DIV") as HTMLDivElement
     messageBox.classList.add("message-output")
     for ((index, message) in testingMessages) {
-        val nemesysResult = document.createElement("DIV") as HTMLDivElement
-        val nemesysName = document.createElement("H3") as HTMLHeadingElement
-        nemesysName.innerText = "nemesysparser $index"
+        val ssfResult = document.createElement("DIV") as HTMLDivElement
+        val ssfName = document.createElement("H3") as HTMLHeadingElement
+        ssfName.innerText = "SwiftSegFinder $index"
 
-        val nemesysContent = document.createElement("DIV") as HTMLDivElement
-        nemesysContent.classList.add("parsecontent")
+        val ssfContent = document.createElement("DIV") as HTMLDivElement
+        ssfContent.classList.add("parsecontent")
 
         if (message != null) {
-            nemesysContent.innerHTML = NemesysRenderer.render(message)
+            ssfContent.innerHTML = SSFRenderer.render(message)
         } else {
-            nemesysContent.innerText = "Error: message $index is null"
+            ssfContent.innerText = "Error: message $index is null"
         }
 
-        nemesysResult.appendChild(nemesysName)
-        nemesysResult.appendChild(nemesysContent)
-        messageBox.appendChild(nemesysResult)
+        ssfResult.appendChild(ssfName)
+        ssfResult.appendChild(ssfContent)
+        messageBox.appendChild(ssfResult)
         output.appendChild(messageBox)
     }
     setupSelectableSegments()

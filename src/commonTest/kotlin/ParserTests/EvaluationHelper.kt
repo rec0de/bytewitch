@@ -1,17 +1,17 @@
 package ParserTests
 
 import SequenceAlignment.AlignedSegment
-import SequenceAlignment.NemesysSequenceAlignment
-import decoders.Nemesys.NemesysParsedMessage
-import decoders.Nemesys.NemesysSegment
-import decoders.Nemesys.NemesysUtil
+import SequenceAlignment.SSFSequenceAlignment
+import decoders.SwiftSegFinder.SSFParsedMessage
+import decoders.SwiftSegFinder.SSFSegment
+import decoders.SwiftSegFinder.SSFUtil
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.test.assertTrue
 
 // to test segmentation
-data class TestMessage(val index: Int, val message: ByteArray, val segments: List<NemesysSegment>)
+data class TestMessage(val index: Int, val message: ByteArray, val segments: List<SSFSegment>)
 
 // to test segmentation for multiple similar messages
 data class MessageGroup(val typeId: Int, val messages: List<TestMessage>)
@@ -29,8 +29,8 @@ object EvaluationHelper {
 
     fun printSegmentParsingResult(
         testNumber: Int,
-        expectedSegments: List<NemesysSegment>,
-        actualSegments: List<NemesysSegment>) {
+        expectedSegments: List<SSFSegment>,
+        actualSegments: List<SSFSegment>) {
 
         val tolerance = 0
         val tp = expectedSegments.count { e -> actualSegments.any { a -> abs(a.offset - e.offset) <= tolerance } }
@@ -57,8 +57,8 @@ object EvaluationHelper {
     // use Nemesys FMS-Score
     fun printFMSScore(
         testNumber: Int,
-        expectedSegments: List<NemesysSegment>,
-        actualSegments: List<NemesysSegment>,
+        expectedSegments: List<SSFSegment>,
+        actualSegments: List<SSFSegment>,
         gamma: Double = 2.0
     ) {
         val real = expectedSegments.map { it.offset }.sorted()
@@ -157,7 +157,7 @@ object EvaluationHelper {
 
     fun printSequenceAlignmentResult(
         testNumber: Int,
-        messages: Map<Int, NemesysParsedMessage>,
+        messages: Map<Int, SSFParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
         // needed to change Triple(it.protocolB, it.protocolA, it.segmentIndexB to it.segmentIndexA) to
@@ -171,14 +171,14 @@ object EvaluationHelper {
             }
         }
 
-        val alignments = NemesysSequenceAlignment.align(messages)
+        val alignments = SSFSequenceAlignment.align(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
 
         // normalise sequence alignment so both Triples have the same order
         val normalizedExpected = expectedAlignments.map { normalize(it) }.toSet()
         val normalizedFound = foundAlignments.map { normalize(it) }.toSet()
 
-        // TODO we need to call "val refined = NemesysParser().refineSegmentsAcrossMessages(listOf(parsedMessages))"
+        // TODO we need to call "val refined = SSFParser().refineSegmentsAcrossMessages(listOf(parsedMessages))"
 
         val tp = normalizedFound.intersect(normalizedExpected).size
         val fp = normalizedFound.subtract(normalizedExpected).size
@@ -204,11 +204,11 @@ object EvaluationHelper {
 
     fun printSegmentationWithSequenceAlignmentResult(
         testNumber: Int,
-        actualMessages: Map<Int, NemesysParsedMessage>,
-        expectedSegments: Map<Int, NemesysParsedMessage>,
+        actualMessages: Map<Int, SSFParsedMessage>,
+        expectedSegments: Map<Int, SSFParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
-        val actualAlignments = NemesysSequenceAlignment.align(actualMessages)
+        val actualAlignments = SSFSequenceAlignment.align(actualMessages)
 
         // get the byte-wise alignment
         val actualByteAlignments = createByteAlignments(actualMessages, actualAlignments)
@@ -235,7 +235,7 @@ object EvaluationHelper {
 
     // calculate byte-wise sequence alignment result
     private fun createByteAlignments(
-        messages: Map<Int, NemesysParsedMessage>, // Map<ProtocolIndex, NemesysParsedMessage>
+        messages: Map<Int, SSFParsedMessage>, // Map<ProtocolIndex, SSFParsedMessage>
         alignments: List<AlignedSegment>
     ): Map<Pair<Int, Int>, Set<Pair<Int, Int>>> { // Map<Pair<ProtocolIndex, ByteIndex>, Set<Pair<ProtocolIndex, ByteIndex>>>
         val result = mutableMapOf<Pair<Int, Int>, MutableSet<Pair<Int, Int>>>()
@@ -244,8 +244,8 @@ object EvaluationHelper {
             val msgA = messages[protoA] ?: continue
             val msgB = messages[protoB] ?: continue
 
-            val rangeA = NemesysUtil.getByteRange(msgA, segIdxA)
-            val rangeB = NemesysUtil.getByteRange(msgB, segIdxB)
+            val rangeA = SSFUtil.getByteRange(msgA, segIdxA)
+            val rangeB = SSFUtil.getByteRange(msgB, segIdxB)
 
             for (byteA in rangeA) {
                 val keyA = protoA to byteA
