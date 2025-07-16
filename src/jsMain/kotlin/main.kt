@@ -1,4 +1,4 @@
-import SequenceAlignment.SSFSequenceAlignment
+import SequenceAlignment.SegmentWiseSequenceAlignment
 import SequenceAlignment.ByteWiseSequenceAlignment
 import decoders.ByteWitchResult
 import decoders.SwiftSegFinder.*
@@ -264,7 +264,7 @@ fun decode(isLiveDecoding: Boolean) {
     // for sequence alignment
     if (tryhard && !isLiveDecoding && showSSFContent) {
         if (showSegmentWiseAlignment) {
-            val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
+            val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
             attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
         } else {
             val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)

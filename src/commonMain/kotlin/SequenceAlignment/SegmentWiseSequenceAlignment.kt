@@ -5,7 +5,7 @@ import decoders.SwiftSegFinder.SSFParsedMessage
 import SequenceAlignment.AlignmentUtils.byteCanberra
 
 // class for sequence alignment of SSF object
-object SSFSequenceAlignment : AlignmentResult<SSFParsedMessage> {
+object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
     // main function for sequence alignment
     override fun align(messages: Map<Int, SSFParsedMessage>): List<AlignedSequence> {
         val alignments = mutableListOf<AlignedSequence>()

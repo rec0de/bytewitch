@@ -1,4 +1,4 @@
-import SequenceAlignment.SSFSequenceAlignment
+import SequenceAlignment.SegmentWiseSequenceAlignment
 import SequenceAlignment.ByteWiseSequenceAlignment
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -21,7 +21,7 @@ fun attachToggleSequenceAlignmentButtonHandler(container: Element) {
             // realign sequence
             if (tryhard) {
                 if (showSegmentWiseAlignment) {
-                    val aligned = SSFSequenceAlignment.align(parsedMessages)
+                    val aligned = SegmentWiseSequenceAlignment.align(parsedMessages)
                     attachSegmentWiseSequenceAlignmentListeners(aligned)
                 } else {
                     val aligned = ByteWiseSequenceAlignment.align(parsedMessages)
@@ -57,7 +57,7 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             // rerun sequence alignment
             if (tryhard) {
                 if (showSegmentWiseAlignment) {
-                    val alignedSequence = SSFSequenceAlignment.align(parsedMessages)
+                    val alignedSequence = SegmentWiseSequenceAlignment.align(parsedMessages)
                     attachSegmentWiseSequenceAlignmentListeners(alignedSequence)
                 } else {
                     val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)

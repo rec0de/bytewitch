@@ -1,7 +1,7 @@
 package ParserTests
 
 import SequenceAlignment.AlignedSequence
-import SequenceAlignment.SSFSequenceAlignment
+import SequenceAlignment.SegmentWiseSequenceAlignment
 import decoders.SwiftSegFinder.SSFParsedMessage
 import decoders.SwiftSegFinder.SSFSegment
 import decoders.SwiftSegFinder.SSFUtil
@@ -171,7 +171,7 @@ object EvaluationHelper {
             }
         }
 
-        val alignments = SSFSequenceAlignment.align(messages)
+        val alignments = SegmentWiseSequenceAlignment.align(messages)
         val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.indexA to it.indexB) }.toSet()
 
         // normalise sequence alignment so both Triples have the same order
@@ -208,7 +208,7 @@ object EvaluationHelper {
         expectedSegments: Map<Int, SSFParsedMessage>,
         expectedAlignments: Set<Triple<Int, Int, Pair<Int, Int>>>
     ) {
-        val actualAlignments = SSFSequenceAlignment.align(actualMessages)
+        val actualAlignments = SegmentWiseSequenceAlignment.align(actualMessages)
 
         // get the byte-wise alignment
         val actualByteAlignments = createByteAlignments(actualMessages, actualAlignments)
