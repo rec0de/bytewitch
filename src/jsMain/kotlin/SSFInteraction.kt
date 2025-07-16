@@ -1,4 +1,5 @@
 import SequenceAlignment.SSFSequenceAlignment
+import SequenceAlignment.ByteWiseSequenceAlignment
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
@@ -29,8 +30,10 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
 
             // rerun sequence alignment
             if (tryhard) {
-                val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
-                attachSequenceAlignmentListeners(alignedSegment)
+                // val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
+                // attachSequenceAlignmentListeners(alignedSegment)
+                val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)
+                attachByteWiseSequenceAlignmentListeners(alignedSequence)
             }
         })
     }
@@ -90,7 +93,8 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
 
     // create new div with new SSF content
     val temp = document.createElement("div") as HTMLDivElement
-    val newHTML = SSFRenderer.render(parsed)
+    // val newHTML = SSFRenderer.render(parsed)
+    val newHTML = SSFRenderer.renderByteWiseHTML(parsed)
     temp.innerHTML = newHTML
 
     val newWrapper = temp.firstElementChild as HTMLElement

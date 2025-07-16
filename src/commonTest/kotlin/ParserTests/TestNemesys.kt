@@ -5,11 +5,11 @@ import decoders.SwiftSegFinder.SSFField
 import decoders.SwiftSegFinder.SSFSegment
 import kotlin.test.Test
 
-class TestSSF {
+class TestNemesys {
 
     @Test
-    fun testSSFSegmentation() {
-        actualSSFSegmentation.forEach { actual ->
+    fun testNemesysSegmentation() {
+        actualNemesysSegmentation.forEach { actual ->
             val expected = TrainingMessageSamples.testMessages.firstOrNull { it.index == actual.index }
                 ?: error("Expected segmentation for message ${actual.index} not found.")
 
@@ -24,7 +24,7 @@ class TestSSF {
     }
 
 
-    val actualSSFSegmentation = listOf(
+    val actualNemesysSegmentation = listOf(
         TestMessage(0,
             "62706c6973743030d20102030457636f6d6d616e6459756e697175652d6964100b5f102437444431444343412d374330442d343145362d423337342d433133333935354443373634080d151f210000000000000101000000000000000500000000000000000000000000000048".fromHex(),
             listOf(

@@ -1,4 +1,4 @@
-import SequenceAlignment.AlignedSegment
+import SequenceAlignment.AlignedSequence
 import org.w3c.dom.*
 import org.w3c.dom.events.Event
 import kotlinx.browser.document
@@ -10,7 +10,90 @@ val alignmentMouseLeaveListeners = mutableMapOf<String, (Event) -> Unit>()
 
 
 // attach sequence alignment listeners
-fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
+fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
+    // remove old sequence alignment listeners
+    removeAllSequenceAlignmentListeners()
+
+    // group all aligned segments
+    // for example: if AlignedSequence(0, 1, 3, 2, 0.05) is given
+    // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
+    val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
+    val alignmentColors = mutableMapOf<String, Triple<Float, Float, Float>>() // safe highlighting color
+    val alignmentBytes = mutableMapOf<String, ByteArray>() // save byte segment of corresponding id
+    for (segment in alignedSegments) {
+        val idA = "${segment.protocolA}-${segment.indexA}"
+        val idB = "${segment.protocolB}-${segment.indexB}"
+
+        alignmentGroups.getOrPut(idA) { mutableSetOf() }.add(idB)
+        alignmentGroups.getOrPut(idB) { mutableSetOf() }.add(idA)
+        alignmentGroups[idA]!!.add(idA)
+        alignmentGroups[idB]!!.add(idB)
+
+        val msgA = parsedMessages[segment.protocolA]
+        val msgB = parsedMessages[segment.protocolB]
+        if (msgA != null) {
+            alignmentBytes[idA] = msgA.bytes.sliceArray(SSFUtil.getByteRange(msgA, segment.indexA))
+        }
+        if (msgB != null) {
+            alignmentBytes[idB] = msgB.bytes.sliceArray(SSFUtil.getByteRange(msgB, segment.indexB))
+        }
+    }
+
+    // go through all groups and save color with the lowest difference to the nearest aligned segment
+    for ((id, group) in alignmentGroups) {
+        for (entry in group) {
+            val thisBytes = alignmentBytes[entry] ?: continue
+
+            val minDiff = group
+                .filter { it != entry }
+                .mapNotNull { other -> alignmentBytes[other]?.let { byteDistance(thisBytes, it) } }
+                .minOrNull() ?: 1.0
+
+            alignmentColors[entry] = getHslColorForDifference(minDiff)
+        }
+    }
+
+
+    // set up event listeners for every value-align-id
+    for (id in alignmentGroups.keys) {
+        val el = document.querySelector("[value-align-id='${id}']") as? HTMLElement ?: continue
+
+        // set style for all aligned elements
+        val mouseEnterHandler: (Event) -> Unit = {
+            alignmentGroups[id]?.forEach { linkedId ->
+                val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
+
+                // set style
+                val (h, s, l) = alignmentColors[linkedId] ?: Triple(0, 0, 1)
+                for (i in 0 until elements.length) {
+                    (elements[i] as HTMLElement).classList.add("hovered-alignment")
+                    (elements[i] as HTMLElement).setAttribute("style", "background-color: hsla($h, $s%, $l%, 0.3);")
+                }
+            }
+        }
+
+        // remove styles after hovering
+        val mouseLeaveHandler: (Event) -> Unit = {
+            alignmentGroups[id]?.forEach { linkedId ->
+                val elements = document.querySelectorAll("[value-align-id='${linkedId}']")
+                for (i in 0 until elements.length) {
+                    (elements[i] as HTMLElement).classList.remove("hovered-alignment")
+                    (elements[i] as HTMLElement).removeAttribute("style")
+                }
+            }
+        }
+
+
+        el.addEventListener("mouseenter", mouseEnterHandler)
+        el.addEventListener("mouseleave", mouseLeaveHandler)
+
+        alignmentMouseEnterListeners[id] = mouseEnterHandler
+        alignmentMouseLeaveListeners[id] = mouseLeaveHandler
+    }
+}
+
+// attach sequence alignment listeners
+fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
     // remove old sequence alignment listeners
     removeAllSequenceAlignmentListeners()
 
@@ -21,8 +104,8 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
     val alignmentColors = mutableMapOf<String, Triple<Float, Float, Float>>() // safe highlighting color
     val alignmentBytes = mutableMapOf<String, ByteArray>() // save byte segment of corresponding id
     for (segment in alignedSegments) {
-        val idA = "${segment.protocolA}-${segment.segmentIndexA}"
-        val idB = "${segment.protocolB}-${segment.segmentIndexB}"
+        val idA = "${segment.protocolA}-${segment.indexA}"
+        val idB = "${segment.protocolB}-${segment.indexB}"
 
         alignmentGroups.getOrPut(idA) { mutableSetOf() }.add(idB)
         alignmentGroups.getOrPut(idB) { mutableSetOf() }.add(idA)
@@ -32,10 +115,12 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSegment>) {
         val msgA = parsedMessages[segment.protocolA]
         val msgB = parsedMessages[segment.protocolB]
         if (msgA != null) {
-            alignmentBytes[idA] = msgA.bytes.sliceArray(SSFUtil.getByteRange(msgA, segment.segmentIndexA))
+            // alignmentBytes[idA] = msgA.bytes.sliceArray(SSFUtil.getByteRange(msgA, segment.segmentIndexA))
+            alignmentBytes[idA] = byteArrayOf(msgA.bytes[segment.indexA])
         }
         if (msgB != null) {
-            alignmentBytes[idB] = msgB.bytes.sliceArray(SSFUtil.getByteRange(msgB, segment.segmentIndexB))
+            // alignmentBytes[idB] = msgB.bytes.sliceArray(SSFUtil.getByteRange(msgB, segment.segmentIndexB))
+            alignmentBytes[idB] = byteArrayOf(msgB.bytes[segment.indexB])
         }
     }
 

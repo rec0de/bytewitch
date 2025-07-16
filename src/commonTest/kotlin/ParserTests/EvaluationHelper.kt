@@ -1,6 +1,6 @@
 package ParserTests
 
-import SequenceAlignment.AlignedSegment
+import SequenceAlignment.AlignedSequence
 import SequenceAlignment.SSFSequenceAlignment
 import decoders.SwiftSegFinder.SSFParsedMessage
 import decoders.SwiftSegFinder.SSFSegment
@@ -172,7 +172,7 @@ object EvaluationHelper {
         }
 
         val alignments = SSFSequenceAlignment.align(messages)
-        val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.segmentIndexA to it.segmentIndexB) }.toSet()
+        val foundAlignments = alignments.map { Triple(it.protocolA, it.protocolB, it.indexA to it.indexB) }.toSet()
 
         // normalise sequence alignment so both Triples have the same order
         val normalizedExpected = expectedAlignments.map { normalize(it) }.toSet()
@@ -236,7 +236,7 @@ object EvaluationHelper {
     // calculate byte-wise sequence alignment result
     private fun createByteAlignments(
         messages: Map<Int, SSFParsedMessage>, // Map<ProtocolIndex, SSFParsedMessage>
-        alignments: List<AlignedSegment>
+        alignments: List<AlignedSequence>
     ): Map<Pair<Int, Int>, Set<Pair<Int, Int>>> { // Map<Pair<ProtocolIndex, ByteIndex>, Set<Pair<ProtocolIndex, ByteIndex>>>
         val result = mutableMapOf<Pair<Int, Int>, MutableSet<Pair<Int, Int>>>()
 
@@ -263,9 +263,9 @@ object EvaluationHelper {
 
     private fun convertExpectedAlignmentsToAligned(
         expected: Set<Triple<Int, Int, Pair<Int, Int>>>
-    ): List<AlignedSegment> {
+    ): List<AlignedSequence> {
         return expected.map { (protoA, protoB, pair) ->
-            AlignedSegment(protoA, protoB, pair.first, pair.second, 0.0)
+            AlignedSequence(protoA, protoB, pair.first, pair.second, 0.0)
         }
     }
 

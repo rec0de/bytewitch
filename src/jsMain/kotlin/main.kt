@@ -1,4 +1,5 @@
 import SequenceAlignment.SSFSequenceAlignment
+import SequenceAlignment.ByteWiseSequenceAlignment
 import decoders.ByteWitchResult
 import decoders.SwiftSegFinder.*
 import kotlinx.browser.document
@@ -123,7 +124,8 @@ fun decodeWithEntropy() { // TODO this can be removed
 
         val ssfContent = document.createElement("DIV") as HTMLDivElement
         ssfContent.classList.add("parsecontent")
-        ssfContent.innerHTML = SSFRenderer.render(it)
+        // ssfContent.innerHTML = SSFRenderer.render(it)
+        ssfContent.innerHTML = SSFRenderer.renderByteWiseHTML(it)
 
         attachRangeListeners(ssfContent, it.msgIndex)
         attachSSFButtons(ssfContent, it.bytes, it.msgIndex)
@@ -210,7 +212,8 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 
     val ssfContent = document.createElement("DIV") as HTMLDivElement
     ssfContent.classList.add("parsecontent")
-    ssfContent.innerHTML = SSFRenderer.render(ssfParsed)
+    // ssfContent.innerHTML = SSFRenderer.render(ssfParsed)
+    ssfContent.innerHTML = SSFRenderer.renderByteWiseHTML(ssfParsed)
 
     attachRangeListeners(ssfContent, taIndex)
     attachSSFButtons(ssfContent, bytes, taIndex)
@@ -253,8 +256,10 @@ fun decode(isLiveDecoding: Boolean) {
 
     // for sequence alignment
     if (tryhard && !isLiveDecoding && showSSFContent) {
-        val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
-        attachSequenceAlignmentListeners(alignedSegment)
+        // val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
+        // attachSequenceAlignmentListeners(alignedSegment)
+        val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+        attachByteWiseSequenceAlignmentListeners(alignedSegment)
     }
 
     // TODO for testing purposes only
