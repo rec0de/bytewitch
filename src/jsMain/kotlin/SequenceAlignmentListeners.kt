@@ -10,7 +10,9 @@ val alignmentMouseLeaveListeners = mutableMapOf<String, (Event) -> Unit>()
 
 
 // attach sequence alignment listeners
-fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
+fun attachSegmentWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
+    showSequenceAlignmentToggleButton()
+
     // remove old sequence alignment listeners
     removeAllSequenceAlignmentListeners()
 
@@ -94,11 +96,13 @@ fun attachSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
 
 // attach sequence alignment listeners
 fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequence>) {
+    showSequenceAlignmentToggleButton()
+
     // remove old sequence alignment listeners
     removeAllSequenceAlignmentListeners()
 
-    // group all aligned segments
-    // for example: if AlignedSegment(0, 1, 3, 2, 0.05) is given
+    // group all aligned bytes
+    // for example: if AlignedSequence(0, 1, 3, 2, 0.05) is given
     // then create add alignmentGroups["0-3"] = {"1-2", "0-3"} and alignmentGroups["1-2"] = {"0-3", "1-2"}
     val alignmentGroups = mutableMapOf<String, MutableSet<String>>()
     val alignmentColors = mutableMapOf<String, Triple<Float, Float, Float>>() // safe highlighting color
@@ -174,6 +178,14 @@ fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequen
 
         alignmentMouseEnterListeners[id] = mouseEnterHandler
         alignmentMouseLeaveListeners[id] = mouseLeaveHandler
+    }
+}
+
+// show toggle button to switch to segment wise sequence alignment
+fun showSequenceAlignmentToggleButton() {
+    val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
+    for (i in 0 until toggleButtons.length) {
+        (toggleButtons[i] as HTMLElement).style.display = "block"
     }
 }
 

@@ -15,6 +15,9 @@ var tryhard = false
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 
+// choose between segment- and byte-wise sequence alignment
+var showSegmentWiseAlignment = true
+
 fun main() {
     window.addEventListener("load", {
         val dataContainer = document.getElementById("data_container")!!
@@ -212,8 +215,12 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 
     val ssfContent = document.createElement("DIV") as HTMLDivElement
     ssfContent.classList.add("parsecontent")
-    // ssfContent.innerHTML = SSFRenderer.render(ssfParsed)
-    ssfContent.innerHTML = SSFRenderer.renderByteWiseHTML(ssfParsed)
+    ssfContent.innerHTML = if (showSegmentWiseAlignment) {
+        SSFRenderer.renderSegmentWiseHTML(ssfParsed)
+    } else {
+        SSFRenderer.renderByteWiseHTML(ssfParsed)
+    }
+
 
     attachRangeListeners(ssfContent, taIndex)
     attachSSFButtons(ssfContent, bytes, taIndex)
@@ -256,10 +263,14 @@ fun decode(isLiveDecoding: Boolean) {
 
     // for sequence alignment
     if (tryhard && !isLiveDecoding && showSSFContent) {
-        // val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
-        // attachSequenceAlignmentListeners(alignedSegment)
-        val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
-        attachByteWiseSequenceAlignmentListeners(alignedSegment)
+        if (showSegmentWiseAlignment) {
+            val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
+            attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
+        } else {
+            val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+            attachByteWiseSequenceAlignmentListeners(alignedSegment)
+        }
+
     }
 
     // TODO for testing purposes only

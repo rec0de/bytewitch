@@ -8,7 +8,7 @@ import decoders.BWString
 object SSFRenderer {
 
     // html view of the normal (non-editable) byte sequences
-    fun render(parsed: SSFParsedMessage): String {
+    fun renderSegmentWiseHTML(parsed: SSFParsedMessage): String {
         val sourceOffset = 0
         val msgIndex = parsed.msgIndex
         val segments = parsed.segments
@@ -71,10 +71,12 @@ object SSFRenderer {
 
         val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+        val toggleButton = "<div class=\"icon icon-toggle toggle-seqalign-button\" style=\"display:none;\"></div>"
+        val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
 
         return """
             <div class="ssf roundbox">
-                <div class="view-default">$editButton$content</div>
+                <div class="view-default">$iconBar$content</div>
                 <div class="view-editable" style="display:none;">${renderEditableHTML(parsed)}</div>
             </div>
         """.trimIndent()
@@ -117,10 +119,12 @@ object SSFRenderer {
 
         val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+        val toggleButton = "<div class=\"icon icon-toggle toggle-seqalign-button\" style=\"display:none;\"></div>"
+        val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
 
         return """
         <div class="ssf roundbox">
-            <div class="view-default">$editButton$content</div>
+            <div class="view-default">$iconBar$content</div>
             <div class="view-editable" style="display:none;">${renderEditableHTML(parsed)}</div>
         </div>
     """.trimIndent()

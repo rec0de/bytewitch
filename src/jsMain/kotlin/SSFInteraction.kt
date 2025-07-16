@@ -6,6 +6,32 @@ import org.w3c.dom.*
 import org.w3c.dom.events.MouseEvent
 import decoders.SwiftSegFinder.*
 
+// to toggle between sequence and segment wise sequence alignment
+fun attachToggleSequenceAlignmentButtonHandler(container: Element) {
+    container.querySelectorAll(".toggle-seqalign-button").asList().forEach { btnElement ->
+        val button = btnElement as HTMLElement
+        button.addEventListener("click", {
+            showSegmentWiseAlignment = !showSegmentWiseAlignment
+
+            // rerender all SwiftSegFinder
+            parsedMessages.forEach { (msgIndex, parsed) ->
+                rerenderSSF(msgIndex, parsed)
+            }
+
+            // realign sequence
+            if (tryhard) {
+                if (showSegmentWiseAlignment) {
+                    val aligned = SSFSequenceAlignment.align(parsedMessages)
+                    attachSegmentWiseSequenceAlignmentListeners(aligned)
+                } else {
+                    val aligned = ByteWiseSequenceAlignment.align(parsedMessages)
+                    attachByteWiseSequenceAlignmentListeners(aligned)
+                }
+            }
+        })
+    }
+}
+
 // attach finish button handler for editable SwiftSegFinder content
 fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgIndex: Int) {
     container.querySelectorAll(".finish-button").asList().forEach { btnElement ->
@@ -30,10 +56,13 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
 
             // rerun sequence alignment
             if (tryhard) {
-                // val alignedSegment = SSFSequenceAlignment.align(parsedMessages)
-                // attachSequenceAlignmentListeners(alignedSegment)
-                val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)
-                attachByteWiseSequenceAlignmentListeners(alignedSequence)
+                if (showSegmentWiseAlignment) {
+                    val alignedSequence = SSFSequenceAlignment.align(parsedMessages)
+                    attachSegmentWiseSequenceAlignmentListeners(alignedSequence)
+                } else {
+                    val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)
+                    attachByteWiseSequenceAlignmentListeners(alignedSequence)
+                }
             }
         })
     }
@@ -93,8 +122,11 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
 
     // create new div with new SSF content
     val temp = document.createElement("div") as HTMLDivElement
-    // val newHTML = SSFRenderer.render(parsed)
-    val newHTML = SSFRenderer.renderByteWiseHTML(parsed)
+    val newHTML = if (showSegmentWiseAlignment) {
+        SSFRenderer.renderSegmentWiseHTML(parsed)
+    } else {
+        SSFRenderer.renderByteWiseHTML(parsed)
+    }
     temp.innerHTML = newHTML
 
     val newWrapper = temp.firstElementChild as HTMLElement
@@ -102,6 +134,7 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
 
     // attach javascript handlers
     attachRangeListeners(newWrapper, msgIndex)
+    attachToggleSequenceAlignmentButtonHandler(newWrapper)
     attachEditButtonHandler(newWrapper)
     attachFinishButtonHandler(newWrapper, parsed.bytes, msgIndex)
 }
@@ -109,6 +142,7 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
 
 // attach button handlers for SSF
 fun attachSSFButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
+    attachToggleSequenceAlignmentButtonHandler(parseContent)
     attachEditButtonHandler(parseContent)
     attachFinishButtonHandler(parseContent, bytes, msgIndex)
 }
