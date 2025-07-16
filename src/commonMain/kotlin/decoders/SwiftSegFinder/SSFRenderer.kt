@@ -69,9 +69,9 @@ object SSFRenderer {
             }
         }
 
-        val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
+        val content = "<div class=\"ssffield segmentwise roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
-        val toggleButton = "<div class=\"icon icon-toggle toggle-seqalign-button\" style=\"display:none;\"></div>"
+        val toggleButton = "<div class=\"icon icon-toggle-left toggle-seqalign-button\" style=\"display:none;\"></div>"
         val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
 
         return """
@@ -119,7 +119,7 @@ object SSFRenderer {
 
         val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
-        val toggleButton = "<div class=\"icon icon-toggle toggle-seqalign-button\" style=\"display:none;\"></div>"
+        val toggleButton = "<div class=\"icon icon-toggle-right toggle-seqalign-button\" style=\"display:none;\"></div>"
         val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
 
         return """
@@ -164,6 +164,8 @@ object SSFRenderer {
         }
 
         val finishButton = "<div class=\"icon icon-finish finish-button\"></div>"
-        return "$finishButton<div class='ssffield roundbox'><div><div class='ssfvalue' id=\"byteContainer\">${renderedFieldContents.joinToString("")}</div></div></div>"
+        val iconBar = "<div class=\"icon-bar\">$finishButton</div>"
+
+        return "$iconBar<div class='ssffield roundbox'><div><div class='ssfvalue' id=\"byteContainer\">${renderedFieldContents.joinToString("")}</div></div></div>"
     }
 }
