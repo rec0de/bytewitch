@@ -34,7 +34,22 @@ class TestCustomParser {
     }
 
     @Test
-    fun testSequenceAlignment() {
+    fun testSegmentWiseSequenceAlignment() {
+        for ((index, test) in TrainingMessageSamples.alignmentTests.withIndex()) {
+            val msgA = TrainingMessageSamples.testMessages[test.messageAIndex]
+            val msgB = TrainingMessageSamples.testMessages[test.messageBIndex]
+            val messages = mapOf(
+                test.messageAIndex to SSFParsedMessage(msgA.segments, msgA.message, test.messageAIndex),
+                test.messageBIndex to SSFParsedMessage(msgB.segments, msgB.message, test.messageBIndex)
+            )
+            EvaluationHelper.printByteWiseSequenceAlignmentResult(index, messages, test.expectedAlignments)
+        }
+
+        EvaluationHelper.printFinalScore()
+    }
+
+    @Test
+    fun testByteWiseSequenceAlignment() {
         for ((index, test) in TrainingMessageSamples.alignmentTests.withIndex()) {
             val msgA = TrainingMessageSamples.testMessages[test.messageAIndex]
             val msgB = TrainingMessageSamples.testMessages[test.messageBIndex]
