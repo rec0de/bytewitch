@@ -316,14 +316,13 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 if (type.hasCustomType) {
                     if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + offsetInDatastreamInBits, 0)
+                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
                     } else {
-                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + offsetInDatastreamInBits, offsetInDatastreamInBits)
+                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
                     }
                 } else {
-                    // TODO Something is off here. parsing works, but byteranges are wrong.
-                    val sourceByteRange = Pair((offsetInDatastreamInBits) / 8, (offsetInDatastreamInBits + type.sizeInBits.toInt()) / 8)
-                    val sourceRangeBitOffset = Pair((offsetInDatastreamInBits) % 8, (offsetInDatastreamInBits + type.sizeInBits.toInt()) % 8)
+                    val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
+                    val sourceRangeBitOffset = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8)
 
                     kaitaiElement = if (type.usedDisplayStyle == DisplayStyle.BINARY) {
                         KaitaiBinary(
@@ -383,7 +382,6 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             }
         }
 
-        // TODO Something is off here. parsing works, but byteranges are wrong.
         val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8)
         val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) % 8)
         return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset)
