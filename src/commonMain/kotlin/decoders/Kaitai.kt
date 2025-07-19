@@ -14,7 +14,7 @@ import bitmage.toUTF8String
 @JsModule("js-yaml")
 @JsNonModule
 external object JsYaml {
-    fun load(yaml: String): dynamic
+    fun load(yaml: String): dynamic  // needs to be dynamic, otherwise kotlin thinks all the properties (i.e. completeStruct.meta or completeStruct.seq) don't exist
     fun dump(obj: dynamic): String
 }
 
@@ -49,21 +49,28 @@ class Type(seqElement : dynamic) {
     var terminator: ByteArray? = null
     var type: String? = if (seqElement.type) {seqElement.type.toString()} else {null}
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
-    var subTypes: MutableList<Type> = mutableListOf<Type>()
     var hasCustomType: Boolean = false
 }
 
 // TODO[IMPORTANT]: Move the ByteWitchDecoder into a companion object as the parse methods are static and do not need an instance. See the other decoders for examples
 class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
-    lateinit var completeStruct: JsYaml
+    var completeStruct: dynamic = undefined
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        val kaitaiYaml = JsYaml.load(kaitaiStruct)
-        completeStruct = kaitaiYaml
-        val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
-            processSeq(kaitaiYaml.meta.id, null, kaitaiYaml, kaitaiYaml, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+        completeStruct = try {
+            JsYaml.load(kaitaiStruct)
         } catch (e: dynamic) {
+            throw Exception("Unexpected Error occurred during parsing of Kaitai Yaml File. Is it syntactically correct Yaml?\n$e")
+        }
+        val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
+            val rootID = if (completeStruct.meta != undefined && completeStruct.meta.id != undefined) {
+                completeStruct.meta.id
+            } else {
+                name
+            }
+            processSeq(rootID, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+        } catch (e: dynamic) {  // with dynamic we catch all exceptions however. But that's fine too
             throw Exception("Unexpected Exception has been thrown:\n$e")
         }
         return result
@@ -247,7 +254,26 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return type
     }
 
-    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, completeStruct: dynamic, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+    fun getRepetitionKind(seqElement: dynamic): String {
+        val repetitionKind = if (seqElement.repeat != undefined) {
+            seqElement.repeat
+        } else {
+            null
+        }
+        if (repetitionKind == "expr" && seqElement["repeat-expr"] == undefined) {
+            throw Exception("With repeat type expr, a repeat-expr key is needed")
+        } else if (repetitionKind == "until" && seqElement["repeat-expr"] == undefined) {
+            throw Exception("With repeat type until, a repeat-until key is needed")
+        }
+        if (seqElement["repeat-expr"] != undefined && repetitionKind != "expr") {
+            throw Exception("When repeat-expr key is defined, repetition needs to be set to expr")
+        } else if (seqElement["repeat-until"] != undefined && repetitionKind != "until") {
+            throw Exception("When repeat-until key is defined, repetition needs to be set to until")
+        }
+        return repetitionKind
+    }
+
+    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -274,21 +300,19 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         var dataSizeOfSequenceInBits: Int = 0
 
         for (seqElement in currentScopeStruct.seq) {
-            val repeatType = if (seqElement.repeat != undefined) {seqElement.repeat} else {null}
-
-            var repeatAmount = if (repeatType == "expr") {
+            val repetitionKind = getRepetitionKind(seqElement)
+            var repeatAmount = if (repetitionKind == "expr") {
                 parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
             } else {
                 null
             }
-
-            while (true) {
+            while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
                 val type = parseType(currentScopeStruct, seqElement, bytesListTree)
                 if (type.sizeIsUntilEOS) {
                     type.sizeInBits = (data.size - offsetInDatastreamInBits).toUInt()
                 }
                 if (type.sizeIsUntilTerminator) {
-                    val dataAsByteArray = data.toByteArray()  // technically not ideal as we don't check for bytealignement, but right after we throw away all results if it's not byte aligned
+                    val dataAsByteArray = data.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
                     type.sizeInBits = (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8 .. dataAsByteArray.size-1).indexOfFirstSubsequence(type.terminator).toUInt() + type.terminator!!.size.toUInt()) * 8u
                 }
 
@@ -307,7 +331,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     data
                 }
 
-                // flip bytes in case byteOrder is little and therefore different order than kotlin
+                // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
                 if (!type.hasCustomType // no subtypes
                     && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
                     && type.byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
@@ -316,9 +340,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 if (type.hasCustomType) {
                     if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
+                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
                     } else {
-                        kaitaiElement = processSeq(elementId, bytesListTree, completeStruct, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
+                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
@@ -363,17 +387,18 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 bytesListTree.add(kaitaiElement)
 
-                if (repeatType == "eos") {
-                    if (data.isEmpty()) {
+                if (repetitionKind == "eos") {
+                    if (data.size == dataSizeOfSequenceInBits) {
                         break
                     }
-                } else if (repeatType == "expr") {
+                } else if (repetitionKind == "expr") {
                     repeatAmount = repeatAmount!! - 1u
-                    if (repeatAmount <= 0u) {  // TODO Completely wrong
+                    if (repeatAmount <= 0u) {
                         break
                     }
-                } else if (repeatType == "until") {
-                    if (seqElement["repeat-until"]) {
+                } else if (repetitionKind == "until") {
+                    throw Exception("repeat-until is not supported yet")
+                    if (seqElement["repeat-until"]) {  // TODO Completely wrong, needs expression parsing to work
                         break
                     }
                 } else {
