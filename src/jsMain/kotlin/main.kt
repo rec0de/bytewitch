@@ -72,6 +72,18 @@ fun main() {
             }
         }
 
+        document.onkeydown = {
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+                lastSelectionEvent = null
+                val inputs = document.querySelectorAll("textarea")
+                inputs.asList().forEach {
+                    val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
+                    val selectionLabel = sizeLabel.firstChild!!.nextSibling as HTMLSpanElement
+                    selectionLabel.innerText = ""
+                }
+            }
+        }
+
         decodeBtn.onclick = {
             decode(false)
         }
@@ -115,7 +127,8 @@ fun decode(tryhard: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
 
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
-    (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+    (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})" // recalc payload size
+    (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
     // no point in analyzing empty bytes
     if (bytes.isEmpty()) { return }
@@ -159,6 +172,9 @@ fun setByteFinderContent(bytes: ByteArray) {
 }
 
 fun setByteFinderHighlight(start: Int, end: Int) {
+    if(start < 0 || end < 0)
+        return
+
     val hexview = document.getElementById("hexview")!!
     hexview.innerHTML = hexview.textContent!! // re-set previous highlights
     val range = document.createRange()

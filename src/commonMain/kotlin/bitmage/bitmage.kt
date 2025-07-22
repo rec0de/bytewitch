@@ -262,3 +262,37 @@ fun String.toUnicodeCodepoints(): List<Int> {
     }
     return codepoints
 }
+
+fun decodeBase32(values: List<Int>): ByteArray {
+    var currentByte = 0
+    var missingBits = 8
+    val bytes = mutableListOf<Byte>()
+    values.forEach { v ->
+        val newBits = (v and 0x1F)
+        Logger.log("new bits: ${newBits.toString(2)}, current byte: ${currentByte.toString(2)}, missing bits $missingBits")
+        // decoded character fits entirely into current byte
+        if(missingBits == 5) {
+            currentByte = currentByte or newBits
+            Logger.log("finishing byte: ${currentByte.toString(2)}")
+            bytes.add(currentByte.toByte())
+            currentByte = 0
+            missingBits = 8
+        }
+        else if (missingBits > 5) {
+            currentByte = currentByte or (newBits shl (missingBits-5))
+            missingBits -= 5
+            //Logger.log("adding bits: ${currentByte.toString(2)} now missing $missingBits")
+        }
+        else {
+            val remainingBits = 5 - missingBits
+            currentByte = currentByte or (newBits shr remainingBits)
+            //Logger.log("finishing byte: ${currentByte.toString(2)}")
+            bytes.add(currentByte.toByte())
+            currentByte = newBits shl (8 - remainingBits)
+            missingBits = 8 - remainingBits
+            //Logger.log("adding bits: ${currentByte.toString(2)} now missing $missingBits")
+        }
+    }
+
+    return bytes.toTypedArray().toByteArray()
+}
