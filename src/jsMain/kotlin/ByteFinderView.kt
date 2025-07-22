@@ -2,31 +2,33 @@ import bitmage.hex
 import kotlinx.browser.document
 import org.w3c.dom.*
 
-// set bytes in floatview and textview
+// set bytes in hexview and textview
 fun setByteFinderContent(msgIndex: Int) {
     val bytes = parsedMessages[msgIndex]?.bytes ?: return
 
-    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val hexview = document.getElementById("hexview") as HTMLDivElement
     val textview = document.getElementById("textview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    floatview.innerText = bytes.hex().chunked(16).joinToString(" ")
+    hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
     textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
     bytefinder.style.display = "flex"
 }
 
-// set bytes in floatview and textview and highlight segment
+
+// set bytes in hexview and textview and highlight segment
 fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
-    val floatview = document.getElementById("floatview")!!
+    val hexview = document.getElementById("hexview")!!
 
     // set byte sequence
     setByteFinderContent(msgIndex)
 
-    // apply highlighting in floatview
+    // apply highlighting in hexview
+    hexview.innerHTML = hexview.textContent!! // re-set previous highlights
     val range = document.createRange()
-    val text = floatview.childNodes[0]!!
+    val text = hexview.childNodes[0]!! as Text
     range.setStart(text, start*2 + start/8)
-    range.setEnd(text, end*2 + end/8)
+    range.setEnd(text, minOf(end*2 + end/8, text.length))
     range.surroundContents(document.createElement("span"))
 
     // apply highlighting in textview

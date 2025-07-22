@@ -2,6 +2,7 @@ import org.khronos.webgl.*
 import org.w3c.files.File
 import org.w3c.files.FileReader
 import kotlinx.browser.document
+import org.w3c.dom.HTMLTextAreaElement
 
 fun arrayBufferToHex(buffer: ArrayBuffer): String {
     val byteArray = Uint8Array(buffer) // Create a Uint8Array view for the buffer
@@ -12,6 +13,7 @@ fun arrayBufferToHex(buffer: ArrayBuffer): String {
     }
 }
 
+
 // read binary file and add content to textarea
 fun readBinaryFile(file: File) {
     val reader = FileReader()
@@ -21,7 +23,7 @@ fun readBinaryFile(file: File) {
         if (arrayBuffer != null) {
             val hexContent = arrayBufferToHex(arrayBuffer) // Convert binary data to hex
             // Display hex content in the textarea
-            appendTextareaWithContent(hexContent)
+            appendTextareaForFileUpload(hexContent)
         } else {
             console.error("Failed to read binary file content")
         }
@@ -34,6 +36,7 @@ fun readBinaryFile(file: File) {
     reader.readAsArrayBuffer(file) // Read binary data in the file
 }
 
+
 // read txt file and append to textarea
 fun readFile(file: File) {
     val reader = FileReader()
@@ -42,7 +45,7 @@ fun readFile(file: File) {
         val content = reader.result?.toString() // Safely convert `result` to a string
         if (content != null) {
             // Write the file content to the textarea
-            appendTextareaWithContent(content)
+            appendTextareaForFileUpload(content)
         } else {
             console.error("File content is null")
         }

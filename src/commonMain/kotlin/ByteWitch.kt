@@ -7,21 +7,36 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves,
-        EntropyDetector, HeuristicSignatureDetector
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP,
+        Randomness, HeuristicSignatureDetector
     )
+
+    private var plainHex = false
+    fun isPlainHex() = plainHex
+
+    fun stripCommentsAndFilterHex(data: String): String {
+        // allow use of # as line comment
+        val stripped = data.split("\n").map { line ->
+            val commentMarker = line.indexOfFirst{ it == '#' }
+            val lineEnd = if(commentMarker == -1) line.length else commentMarker
+            line.substring(0, lineEnd)
+        }.joinToString("")
+
+        return stripped.filter { it in "0123456789abcdefABCDEF" }
+    }
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
         val isBase64 = cleanedData.matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
+        plainHex = false
 
         return when {
             isBase64 -> decodeBase64(cleanedData)
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                val filtered = data.filter { it in "0123456789abcdefABCDEF" }
-                Logger.log(filtered)
+                plainHex = true
+                val filtered = stripCommentsAndFilterHex(cleanedData)
                 if (filtered.length % 2 != 0)
                     byteArrayOf()
                 else
@@ -30,6 +45,7 @@ object ByteWitch {
         }
 
     }
+
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
         val allDecoders = decoders
@@ -45,7 +61,7 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = allDecoders.map { Pair(it, it.decodesAsValid(data)) }.filter { it.second.first }
+            val possibleDecoders = decoders.map { Pair(it, it.confidence(data, 0)) }.filter { it.second.first > 0.3 }
 
             return possibleDecoders.mapNotNull {
                 try {
@@ -59,16 +75,20 @@ object ByteWitch {
     }
 
     fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
-        try {
-            return decoders.firstOrNull {
-                val confidence = it.confidence(data)
-                confidence > 0.75
-            }?.decode(data, sourceOffset, inlineDisplay = true)
-        } catch(e: Exception) {
-            Logger.log("Quick decode failed with exception: ${e.message}")
-            e.printStackTrace()
-            return null
+
+        decoders.forEach { decoder ->
+            val confidence = decoder.confidence(data, sourceOffset)
+            if (confidence.first > 0.75) {
+                try {
+                    return confidence.second ?: decoder.decode(data, sourceOffset, inlineDisplay = true)
+                } catch (e: Exception) {
+                    Logger.log("Quick decode failed with exception: '${e.message}' when assuming ${decoder.name} format with confidence ${confidence.first}")
+                    e.printStackTrace()
+                }
+            }
         }
+
+        return null
     }
 
     private fun decodeHexdump(hexdumpData: String): ByteArray {

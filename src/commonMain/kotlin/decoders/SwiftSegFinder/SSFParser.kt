@@ -55,9 +55,9 @@ class SSFParser {
                 val window = bytes.sliceArray(index until end)
 
                 for (decoder in decoders) {
-                    val confidence = decoder.confidence(window)
-                    if (confidence > bestConfidence) {
-                        bestConfidence = confidence
+                    val confidence = decoder.confidence(window, index)
+                    if (confidence.first > bestConfidence) {
+                        bestConfidence = confidence.first
                         bestDecoder = decoder
                         bestWindowSize = windowSize
                     }
@@ -100,9 +100,9 @@ class SSFParser {
                 val window = bytes.sliceArray(index until end)
 
                 for (decoder in decoders) {
-                    val confidence = decoder.confidence(window)
-                    if (confidence > bestConfidence) {
-                        bestConfidence = confidence
+                    val confidence = decoder.confidence(window, index)
+                    if (confidence.first > bestConfidence) {
+                        bestConfidence = confidence.first
                         bestDecoder = decoder
                         bestWindowSize = windowSize
                     }
@@ -172,9 +172,9 @@ class SSFParser {
                     val window = bytes.sliceArray(index until actualEnd)
 
                     for (decoder in decoders) {
-                        val confidence = decoder.confidence(window)
-                        if (confidence > bestConfidence) {
-                            bestConfidence = confidence
+                        val confidence = decoder.confidence(window, index)
+                        if (confidence.first > bestConfidence) {
+                            bestConfidence = confidence.first
                             bestDecoder = decoder
                             bestWindowSize = windowSize
                         }

@@ -15,12 +15,15 @@ fun removeTextArea(dataContainer: Element) {
 
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement
+    val messageOutputs = output.querySelectorAll(".message-output")
+    if (messageOutputs.length > 0) {
+        // remove last child
+        output.removeChild(messageOutputs[messageOutputs.length - 1] as HTMLDivElement)
+    }
 
-    output.removeChild(output.lastElementChild!!)
-
-    // reset floatview
-    val floatview = document.getElementById("floatview") as HTMLDivElement
-    floatview.innerHTML = ""
+    // reset hexview
+    val hexview = document.getElementById("hexview") as HTMLDivElement
+    hexview.innerHTML = ""
 }
 
 
@@ -36,8 +39,43 @@ fun applyLiveDecodeListeners() {
     }
 }
 
-// add content to textarea
-fun appendTextareaWithContent(content: String) {
+fun appendTextArea(content: String) {
+    val container = document.getElementById("data_container")!!
+
+    // create new textareaContainer if no empty one exists
+    val wrapper = document.createElement("div") as HTMLDivElement
+    wrapper.className = "textareaContainer"
+
+    val textarea = document.createElement("textarea") as HTMLTextAreaElement
+    textarea.className = "data input_area"
+    textarea.placeholder = "hex, base64, or hexdump. use # as line comment in hex mode."
+    textarea.value = content
+
+    val bytes = ByteWitch.getBytesFromInputEncoding(content)
+    val byteSizeText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+
+    val sizeText = document.createElement("span") as HTMLSpanElement
+    sizeText.innerText = byteSizeText
+
+    val sizeLabel = document.createElement("div") as HTMLDivElement
+    sizeLabel.className = "sizeLabel"
+    sizeLabel.appendChild(sizeText)
+    sizeLabel.appendChild(document.createElement("span"))
+
+    wrapper.appendChild(textarea)
+    wrapper.appendChild(sizeLabel)
+    container.appendChild(wrapper)
+
+    if (liveDecodeEnabled) {
+        textarea.oninput = {
+            decode(true)
+        }
+    }
+}
+
+
+// add content to textarea if no empty one exits yet
+fun appendTextareaForFileUpload(content: String) {
     val container = document.getElementById("data_container")!!
     val textareas = container.querySelectorAll(".input_area")
 
@@ -45,21 +83,11 @@ fun appendTextareaWithContent(content: String) {
     for (i in 0 until textareas.length) {
         val ta = textareas[i] as HTMLTextAreaElement
         if (ta.value.trim().isEmpty()) {
-            // write content in empty text area
             ta.value = content
+            if (liveDecodeEnabled) decode(true)
             return
         }
     }
 
-    // create new textarea if no empty one exists
-    val textarea = document.createElement("textarea") as HTMLTextAreaElement
-    textarea.className = "data input_area"
-    textarea.value = content
-    container.appendChild(textarea)
-
-    if (liveDecodeEnabled) {
-        textarea.oninput = {
-            decode(true)
-        }
-    }
+    appendTextArea(content)
 }

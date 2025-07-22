@@ -11,6 +11,7 @@ import org.w3c.dom.HTMLTextAreaElement
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 var tryhard = false
+var lastSelectionEvent: Double? = null
 
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
@@ -73,16 +74,7 @@ fun main() {
 
         // to add more text areas for protocols
         addDataBox.onclick = {
-            val newTextarea = document.createElement("textarea") as HTMLTextAreaElement
-            newTextarea.className = "data input_area"
-            dataContainer.appendChild(newTextarea)
-
-            // for live decode
-            if (liveDecodeEnabled) {
-                newTextarea.oninput = {
-                    decode(true)
-                }
-            }
+            appendTextArea("")
         }
 
         // to delete last text area
@@ -145,12 +137,12 @@ fun decodeWithEntropy() { // TODO this can be removed
 fun decodeBytes(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
-    val floatview = document.getElementById("floatview") as HTMLDivElement
+    val hexview = document.getElementById("hexview") as HTMLDivElement
     val textview = document.getElementById("textview") as HTMLDivElement
     val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
     // Reset output
-    floatview.innerHTML = ""
+    hexview.innerHTML = ""
     textview.innerHTML = ""
     bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
@@ -238,9 +230,12 @@ fun decode(isLiveDecoding: Boolean) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
+        Logger.log("Textarea:",textareas[i])
         val textarea = textareas[i] as HTMLTextAreaElement
+        val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         val inputText = textarea.value.trim()
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+        (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
 
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes

@@ -41,10 +41,10 @@ class UbjsonParser : ParseCompanion() {
         }
 
         // single bytes are often false-positive detected as booleans
-        override fun decodesAsValid(data: ByteArray): Pair<Boolean, ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if(data.size < 3)
-                return Pair(false, null)
-            return super.decodesAsValid(data)
+                return Pair(0.0, null)
+            return super.confidence(data, sourceOffset)
         }
     }
 
@@ -76,7 +76,7 @@ class UbjsonParser : ParseCompanion() {
             bytes[parseOffset-1].toUByte().toInt().toChar()
         }
 
-        Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
+        //Logger.log("reading UBJSON type $typeByte / ${bytes[parseOffset-1]}")
 
         return when(typeByte) {
             'Z' -> OPNull(start)
