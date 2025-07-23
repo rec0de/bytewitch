@@ -311,3 +311,52 @@ button:hover {
     background: var(--kaitai-highlight);
 }
 
+.tooltip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.tooltip:hover .tooltip-container {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-container {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: 200px;
+}
+
+.tooltip-content {
+    padding: 10px;
+    background-color: #333333ee;
+    color: white;
+    border-radius: 6px;
+}
+
+.tooltip-arrow {
+    height: 5px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.tooltip-arrow::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #333333ee;
+}

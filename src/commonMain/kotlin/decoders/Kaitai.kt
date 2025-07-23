@@ -9,6 +9,9 @@ import bitmage.toInt
 import bitmage.toMinimalAmountOfBytes
 import bitmage.toUInt
 import bitmage.toUTF8String
+import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
+import org.intellij.markdown.html.HtmlGenerator
+import org.intellij.markdown.parser.MarkdownParser
 
 @JsModule("js-yaml")
 @JsNonModule
@@ -325,6 +328,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             }
             val elementId = seqElement.id
 
+            val doc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
+
             var kaitaiElement : KaitaiElement
             var value = data.sliceArray(currentOffsetInBits .. currentOffsetInBits + type.sizeInBits.toInt() -1)
             // flip bytes in case byteOrder is little and therefore different order than kotlin
@@ -346,7 +351,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         byteOrder,
                         value,
                         sourceByteRange,
-                        sourceRangeBitOffset
+                        sourceRangeBitOffset,
+                        doc
                     )
                 } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
                     KaitaiString(
@@ -354,7 +360,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         byteOrder,
                         value,
                         sourceByteRange,
-                        sourceRangeBitOffset
+                        sourceRangeBitOffset,
+                        doc
                     )
                 } else { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
                     KaitaiBytes(
@@ -362,7 +369,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         byteOrder,
                         value,
                         sourceByteRange,
-                        sourceRangeBitOffset
+                        sourceRangeBitOffset,
+                        doc
                     )
                 }
             }
@@ -379,9 +387,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             currentOffsetInBits += type.sizeInBits.toInt()
         }
 
+        val structDoc = KaitaiDoc(null, null)
+
         val resultSourceByteRange = Pair(sourceOffsetInBits / 8, (data.size + sourceOffsetInBits) / 8)
         val resultSourceRangeBitOffset = Pair(sourceOffsetInBits % 8, (data.size + sourceOffsetInBits) % 8)
-        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset)
+        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, structDoc)
     }
 }
 
@@ -390,11 +400,88 @@ interface KaitaiElement : ByteWitchResult {
     val bytesListTree: MutableListTree<KaitaiElement>? get() = null
     val value: BooleanArray
     var endianness: ByteOrder
+    val doc: KaitaiDoc
+}
+
+class KaitaiDoc(val docstring: String?, val docref: String? ) {
+
+    /*
+    Learnings for 'doc' and 'doc-ref' keys
+
+    'doc'
+    - Can use YAML folded style strings for longer documentation that spans multiple lines.
+        -> automatically converted with newlines by JsYaml parser
+    - Can also be in markdown format
+        -> converted to HTML by JetBrains Markdown library
+
+    'doc-ref'
+    - Can be a link to an external documentation page
+        -> should be rendered as a link in the HTML output
+    - After inspection of existing Kaitai structs, it can also be a list of strings apparently
+        -> should be rendered as a list of links in the HTML output
+     */
+
+    private val urlRegex = Regex("""\b((https?|ftp)://|www\.)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]""")
+
+    fun renderHTML(): String {
+
+        // doc
+        val docstringMarkdown = if (docstring == undefined) {
+            ""
+        } else {
+            docstring as String
+        }
+        val flavour = CommonMarkFlavourDescriptor()
+        val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(docstringMarkdown)
+        val docstringHtml = HtmlGenerator(docstringMarkdown, parsedTree, flavour).generateHtml()
+
+        // doc-ref
+        val docrefList = if (docref != undefined) {
+            if (docref is String) {
+                arrayOf(docref)
+            } else {
+                docref as Array<String>
+            }
+        } else {
+            emptyArray<String>()
+        }
+        val docrefLinkified = docrefList.mapNotNull { ref ->
+            if (urlRegex.containsMatchIn(ref)) {
+                // replace the URL with an HTML link
+                ref.replace(urlRegex) { matchResult ->
+                    "<a href=\"${matchResult.value}\" target=\"_blank\">${matchResult.value}</a>"
+                }
+            } else {
+                ref // return the raw string as is
+            }
+        }
+        val docrefHtml = when (docrefLinkified.size) {
+            0 -> ""
+            1 -> docrefLinkified[0]
+            else -> docrefLinkified.joinToString(separator = "", prefix = "<ul>", postfix = "</ul>") { ref ->
+                "<li>$ref</li>"
+            }
+        }
+
+        if (docstringHtml.isEmpty() && docrefHtml.isEmpty()) {
+            return ""
+        }
+        val renderDivider = docstringHtml.isNotEmpty() && docrefHtml.isNotEmpty()
+
+        return  "<div class=\"tooltip-container\">" +
+                    "<div class=\"tooltip-content roundbox\">" +
+                        docstringHtml +
+                        if (renderDivider) { "<hr/>" } else { "" } +
+                        docrefHtml +
+                    "</div>" +
+                    "<div class=\"tooltip-arrow\"></div>" +
+                "</div>"
+    }
 }
 
 class KaitaiResult(override val id: String, override var endianness: ByteOrder,
                    override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${bytesListTree.joinToString("") { it.renderHTML() }})</div>"
     }
@@ -411,27 +498,31 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
 }
 
 class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                  override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+                  override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().hex()})h</div>"
+        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${value.toByteArray().hex()})h" +
+                    doc.renderHTML() +
+                "</div>"
     }
 }
 
-class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>): KaitaiElement {
+class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
+                    override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(ByteOrder.BIG)})h</div>"
     }
 }
 
 class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.joinToString("") { if (it) "1" else "0" }})b</div>"
     }
 }
 
 class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toUTF8String()})utf8</div>"
     }
