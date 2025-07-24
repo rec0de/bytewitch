@@ -70,7 +70,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 name
             }
             processSeq(rootID, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
-        } catch (e: dynamic) {  // with dynamic we catch all exceptions however. But that's fine too
+        } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
             throw Exception("Unexpected Exception has been thrown:\n$e")
         }
         return result
@@ -325,7 +325,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 val elementId = seqElement.id
 
                 var kaitaiElement : KaitaiElement
-                var value = if (type.sizeInBits != 0u) {
+                var value = if (type.sizeInBits != 0u) {  // slice if we have a substream
                     data.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
                 } else {
                     data
@@ -380,8 +380,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 if ((seqElement.valid != undefined) && !checkValidKey(seqElement, value, bytesListTree, kaitaiElement)) {
                     throw Exception("Value of bytes does not align with expected valid value.")
                 }
-                
-                type.sizeInBits = kaitaiElement.value.size.toUInt()
+
+                if (type.sizeInBits == 0u) {  // only update value if it's still totally unknown. If we overwrite it always, then we would cut off seq that don't use the full datastream
+                    type.sizeInBits = kaitaiElement.value.size.toUInt()
+                }
+
                 offsetInDatastreamInBits = offsetInDatastreamInBits + type.sizeInBits.toInt()
                 dataSizeOfSequenceInBits += type.sizeInBits.toInt()
 
@@ -407,8 +410,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             }
         }
 
-        val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8)
-        val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) % 8)
+        val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
+        val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + data.size) % 8)
         return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset)
     }
 }
