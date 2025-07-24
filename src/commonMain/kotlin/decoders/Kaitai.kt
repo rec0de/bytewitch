@@ -90,6 +90,289 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         )
     }
 
+
+    enum class TokenType (val symbol: String) {
+        INTEGER(""), //
+        FLOAT(""), // floating-point numbers
+        STRING(""), // enclosed by '' or ""
+        IDENTIFIER(""), // starts with a literal
+        BOOLEAN("true/false"),
+        PLUS("+"), // addition and
+        MINUS("-"),
+        MUL("*"),
+        DIV("/"),
+        MODULO("%"),
+        LESS("<"),
+        GREATER(">"),
+        LESSEQUAL("<="),
+        GREATEREQUAL(">="),
+        EQUAL("=="),
+        NOTEQUAL("!="),
+        LSHIFT("<<"),
+        RSHIFT(">>"),
+        BITWISEAND("&"),
+        BITWISEOR("|"),
+        BITWISEXOR("^"),
+        BOOLEANNOT("not"),
+        BOOLEANAND("and"),
+        BOOLEANOR("or"),
+        QUESTIONMARK("?"),
+        COLON(":"),
+        PARENTHESES("()"),
+        BRACKETS("[]"),
+        FUNCTION("f(x)"),
+        DOT("."),
+        DOUBLECOLON("::"),
+        EMPTY(""),
+        CAST("as<>"),
+        REFERENCE(""),
+    }
+
+    val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".")
+    val operators2 = setOf("<=", ">=", "==", "!=", "<<", ">>", "::")
+
+    val operatorMap: Map<String, TokenType> = TokenType.entries.associateBy { it.symbol }
+    val operator2Map: Map<String, TokenType> = TokenType.entries.associateBy { it.symbol }
+
+    fun getOperator(char: Char): TokenType = operatorMap[char.toString()]!!
+    fun getOperator2(string: String): TokenType = operator2Map[string]!!
+
+    val tokensForReference = setOf<TokenType>(TokenType.IDENTIFIER, TokenType.DOT, TokenType.DOUBLECOLON, TokenType.FUNCTION,
+        TokenType.CAST, TokenType.BRACKETS)
+
+    fun tokenizeExpression(expression: String) : MutableList<Pair<TokenType, dynamic>> {
+        var expression: String = expression
+        var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        while (expression != "") {
+            var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(expression)
+            tokens.add(token.first)
+            expression = expression.substring(token.second)
+        }
+
+        var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+
+        for ((index, token: Pair<TokenType, dynamic>) in tokens.withIndex()) { // combining TokenType IDENTIFIER followed by PARENTHESES to TokenType FUNCTION
+            if ((token.first == TokenType.IDENTIFIER && tokens[index+1].first == TokenType.PARENTHESES) || token.first == TokenType.EMPTY)
+                continue
+            else if (token.first == TokenType.PARENTHESES && index > 0 && tokens[index-1].first == TokenType.IDENTIFIER)
+                tokensWithFunctions.add(Pair(TokenType.FUNCTION, Pair(tokens[index-1], token)))
+            else
+                tokensWithFunctions.add(token)
+        }
+
+        var tokensWithReferences: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        var reference: Boolean = false
+
+        for (token: Pair<TokenType, dynamic> in tokensWithFunctions) { // combining tokens of types in val tokensForReference to TokenType REFERENCE
+            if (token.first in tokensForReference) {
+                if (!reference) {
+                    tokensWithReferences.add(Pair(TokenType.REFERENCE, mutableListOf<Pair<TokenType, dynamic>>()))
+                    reference = true
+                }
+                (tokensWithReferences.last().second as MutableList<Pair<TokenType, dynamic>>).add(token)
+            } else {
+                reference = false
+                tokensWithReferences.add(token)
+            }
+        }
+
+        return tokensWithReferences
+    }
+
+    fun isKeyword(char: Char?) : Boolean {
+        return (char == null
+                || (!char.isLetterOrDigit()
+                && char != '_'))
+    }
+
+    fun nextToken(expression: String) : Pair<Pair<TokenType, dynamic>, Int> {
+        val trimmedExpression = expression.trimStart()
+        if (trimmedExpression.isEmpty()) return Pair(Pair(TokenType.EMPTY, null), 0)
+        val trimmed = expression.length - trimmedExpression.length
+
+        if (trimmedExpression.length >= 5 && trimmedExpression.startsWith("false")) // token FALSE
+            if (isKeyword(trimmedExpression.getOrNull(5)))
+                return Pair(Pair(TokenType.BOOLEAN, false), trimmed+5)
+        if (trimmedExpression.length >= 4 && trimmedExpression.startsWith("true")) // token TRUE
+            if (isKeyword(trimmedExpression.getOrNull(4)))
+                return Pair(Pair(TokenType.BOOLEAN, true), trimmed+4)
+        if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("not")) // token NOT
+            if (isKeyword(trimmedExpression.getOrNull(3)))
+                return Pair(Pair(TokenType.BOOLEANNOT, "not"), trimmed+3)
+        if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("and")) // token AND
+            if (isKeyword(trimmedExpression.getOrNull(3)))
+                return Pair(Pair(TokenType.BOOLEANAND, "and"), trimmed+3)
+        if (trimmedExpression.length >= 2 && trimmedExpression.startsWith("or")) // token OR
+            if (isKeyword(trimmedExpression.getOrNull(2)))
+                return Pair(Pair(TokenType.BOOLEANOR, "or"), trimmed+2)
+        if (trimmedExpression.length >= 2 && trimmedExpression.substring(0..1) in operators2) // tokens consisting of two symbols: "<=", ">=", "==", "!=", "<<", ">>", "::"
+            return Pair(Pair(getOperator2(trimmedExpression.substring(0..1)), trimmedExpression.substring(0..1)) ,trimmed+2)
+        if (trimmedExpression[0].toString() in operators) // one symbol tokens: "+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", "."
+            return Pair(Pair(getOperator(trimmedExpression[0]), trimmedExpression[0].toString()), trimmed+1)
+
+        var breakIndex: Int = 0
+
+        if (trimmedExpression.startsWith("as<")) { // token CAST
+            var depth: Int = 0
+            var sqstring: Boolean = false
+            var dqstring: Boolean = false
+            for ((index, char) in trimmedExpression.substring(2).withIndex()) {
+                when (char.toString()) {
+                    "'" -> if (!dqstring) sqstring = !sqstring
+                    "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                    "<" -> if (!(sqstring || dqstring)) depth++
+                    ">" -> {
+                        if (!(sqstring || dqstring)) {
+                            depth--
+                            if (depth == 0) {
+                                breakIndex = index + 1
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+            return Pair(Pair(TokenType.CAST, trimmedExpression.substring(0..breakIndex+1)), trimmed+breakIndex+2)
+        }
+
+        when (trimmedExpression[0]) {
+            '(' -> { // token PARENTHESES
+                var depth: Int = 0
+                var sqstring: Boolean = false
+                var dqstring: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    when (char.toString()) {
+                        "'" -> if (!dqstring) sqstring = !sqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "(" -> if (!(sqstring || dqstring)) depth++
+                        ")" -> {
+                            if (!(sqstring || dqstring)) {
+                                depth--
+                                if (depth == 0) {
+                                    breakIndex = index + 1
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+                return Pair(Pair(TokenType.PARENTHESES, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+            }
+            '[' -> { // token BRACKETS
+                var depth: Int = 0
+                var sqstring: Boolean = false
+                var dqstring: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    when (char.toString()) {
+                        "'" -> if (!dqstring) sqstring = !sqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "[" -> if (!(sqstring || dqstring)) depth++
+                        "]" -> {
+                            if (!(sqstring || dqstring)) {
+                                depth--
+                                if (depth == 0) {
+                                    breakIndex = index + 1
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+                return Pair(Pair(TokenType.BRACKETS, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+            }
+            '\'' -> { // token STRING with single quotation marks
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char == '\'' && index != 0) {
+                        breakIndex = index+1
+                        break
+                    }
+                }
+                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+            }
+            '"' -> { // token STRING with double quotation marks
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char == '"' && index != 0) {
+                        breakIndex = index+1
+                        break
+                    }
+                }
+                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+            }
+        }
+
+        if (trimmedExpression[0].isLowerCase() || trimmedExpression[0] == '_') { // token IDENTIFIER
+            for ((index, char) in trimmedExpression.withIndex()) {
+                if (!char.isLetterOrDigit() && char != '_') {
+                    breakIndex = index
+                    break
+                }
+                breakIndex = index+1
+            }
+            return Pair(Pair(TokenType.IDENTIFIER, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+        } else if (trimmedExpression[0].isDigit()) { // tokens INTEGER and FLOAT
+            val exceptions = setOf<Char>('x', 'X', 'o', 'O', 'b', 'B')
+            if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'x' || trimmedExpression.getOrNull(1) == 'X')) { // token INTEGER in hexadecimal notation
+                val hexadecimalRegex: Regex = Regex("^[a-fA-F0-9_]$")
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!hexadecimalRegex.matches(char.toString()) && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(16)), trimmed+breakIndex)
+            }
+            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'b' || trimmedExpression.getOrNull(1) == 'B')) { // token INTEGER in binary notation
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char != '0' && char != '1' && char != '_' && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(2)), trimmed+breakIndex)
+            }
+            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(1) == 'O')) { // token INTEGER in octal notation
+                val octalRegex: Regex = Regex("^[0-7_]$")
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!octalRegex.matches(char.toString()) && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(8)), trimmed+breakIndex)
+            } else { // tokens INTEGER AND FLOAT in decimal notation
+                var float_point: Boolean = false
+                var exponential: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!float_point && char == '.') { // FLOATS must contain exactly one '.'
+                        float_point = true
+                        continue
+                    }
+                    if (!exponential && (char == 'e' || char == 'E')) {
+                        float_point = true // FLOAT can contain exponential notation, INTEGER cannot
+                        exponential = true
+                        continue
+                    }
+                    if ((char == '+' || char == '-') && (trimmedExpression[index-1] == 'e' || trimmedExpression[index-1] == 'E'))
+                        continue
+                    if (!char.isDigit() && char != '_') {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                if (float_point)
+                    return Pair(Pair(TokenType.FLOAT, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toFloat()), trimmed+breakIndex)
+                else
+                    return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toInt()), trimmed+breakIndex)
+
+            }
+        }
+        return Pair(Pair(TokenType.EMPTY, null), 0)
+    }
+
     fun parseValue(value: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : BooleanArray {
         val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]. // TODO Can someone find an elegant way without javascript?
         var fullyFlatArray = booleanArrayOf()
