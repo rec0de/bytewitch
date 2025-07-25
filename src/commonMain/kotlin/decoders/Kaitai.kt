@@ -458,17 +458,22 @@ class KaitaiDoc(val docstring: String?, val docref: String? ) {
 
     private val urlRegex = Regex("""\b((https?|ftp)://|www\.)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]""")
 
+    val willRender = (docstring != null || docref != null)
+
     fun renderHTML(): String {
+        if (docstring == null && docref == null) {
+            return ""
+        }
 
         // doc
-        val docstringMarkdown = if (docstring == undefined) {
+        val docstringHtml = if (docstring == undefined) {
             ""
         } else {
-            docstring as String
+            val docstringMarkdown = docstring as String
+            val flavour = CommonMarkFlavourDescriptor()
+            val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(docstringMarkdown)
+            HtmlGenerator(docstringMarkdown, parsedTree, flavour).generateHtml()
         }
-        val flavour = CommonMarkFlavourDescriptor()
-        val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(docstringMarkdown)
-        val docstringHtml = HtmlGenerator(docstringMarkdown, parsedTree, flavour).generateHtml()
 
         // doc-ref
         val docrefList = if (docref != undefined) {
