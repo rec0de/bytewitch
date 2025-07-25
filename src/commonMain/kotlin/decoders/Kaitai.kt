@@ -67,13 +67,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             throw Exception("Unexpected Error occurred during parsing of Kaitai Yaml File. Is it syntactically correct Yaml?\n$e")
         }
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
-            val rootID = if (completeStruct.meta != undefined && completeStruct.meta.id != undefined) {
-                completeStruct.meta.id
-            } else {
-                name
-            }
-            processSeq(rootID, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            processSeq(completeStruct, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
+            console.error(e)
             throw Exception("Unexpected Exception has been thrown:\n$e")
         }
         return result
@@ -276,7 +272,19 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return repetitionKind
     }
 
-    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+    fun processSeq(parentSeq: dynamic, parentBytesListTree: MutableListTree<KaitaiElement>?, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+        val parentId = if (parentSeq.id != undefined) {
+            parentSeq.id as String
+        } else if (parentSeq.meta != undefined) {
+            if (parentSeq.meta.id != undefined) {
+                parentSeq.meta.id as String
+            } else {
+                name
+            }
+        } else {
+            console.warn("Parent sequence has no id, this should not happen. How did we get here?")
+            ""
+        }
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -345,9 +353,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 if (type.hasCustomType) {
                     if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
+                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
                     } else {
-                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
+                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
@@ -426,7 +434,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
         val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
         val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + data.size) % 8)
-        return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, structDoc)
+        return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, structDoc)
     }
 }
 
@@ -438,7 +446,7 @@ interface KaitaiElement : ByteWitchResult {
     val doc: KaitaiDoc
 }
 
-class KaitaiDoc(val docstring: String?, val docref: String? ) {
+class KaitaiDoc(val docstring: String?, val docref: String?) {
 
     /*
     Learnings for 'doc' and 'doc-ref' keys
