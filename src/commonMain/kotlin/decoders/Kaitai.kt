@@ -466,10 +466,9 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
 
     private val urlRegex = Regex("""\b((https?|ftp)://|www\.)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]""")
 
-    val willRender = (docstring != null || docref != null)
 
     fun renderHTML(): String {
-        if (docstring == null && docref == null) {
+        if (docstring == undefined && docref == undefined) {
             return ""
         }
 
@@ -531,7 +530,7 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
                    override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
                     doc.renderHTML() +
                 "</div>"
@@ -551,7 +550,7 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
 class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().hex()})h" +
                     doc.renderHTML() +
                 "</div>"
@@ -561,21 +560,30 @@ class KaitaiBytes(override val id: String, override var endianness: ByteOrder, o
 class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
                     override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toInt(ByteOrder.BIG)})s</div>"
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${value.toByteArray().toInt(ByteOrder.BIG)})s" +
+                    doc.renderHTML() +
+                "</div>"
     }
 }
 
 class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.joinToString("") { if (it) "1" else "0" }})b</div>"
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${value.joinToString("") { if (it) "1" else "0" }})b" +
+                    doc.renderHTML() +
+                "</div>"
     }
 }
 
 class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${value.toByteArray().toUTF8String()})utf8</div>"
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${value.toByteArray().toUTF8String()})utf8" +
+                    doc.renderHTML() +
+                "</div>"
     }
 }
 /*
