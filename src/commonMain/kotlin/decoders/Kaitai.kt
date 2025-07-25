@@ -418,7 +418,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             }
         }
 
-        val structDoc = KaitaiDoc(null, null)
+        val structDoc = if (completeStruct.meta != undefined) {
+            KaitaiDoc(completeStruct.meta["doc"], completeStruct.meta["doc-ref"])
+        } else {
+            KaitaiDoc(null, null)
+        }
 
         val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
         val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + data.size) % 8)
@@ -514,7 +518,10 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
                    override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${bytesListTree.joinToString("") { it.renderHTML() }})</div>"
+        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
+                    doc.renderHTML() +
+                "</div>"
     }
 
     // KaitaiResult result does not really have a value itself, but if it's called we want to deliver a reasonable result
