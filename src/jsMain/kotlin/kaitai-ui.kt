@@ -38,6 +38,7 @@ object KaitaiUI {
             liveKaitaiEnabled = liveDecode.checked
             if (liveKaitaiEnabled) {
                 ByteWitch.setKaitaiLiveDecoder(getInputValue())
+                decode(false)
             } else {
                 ByteWitch.setKaitaiLiveDecoder(null)
             }

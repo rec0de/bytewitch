@@ -103,6 +103,17 @@ fun ByteArray.toBinaryString(): String {
     }
 }
 
+fun ByteArray.indexOfFirstSubsequence(subArray: ByteArray?): Int {
+    if (subArray == null || subArray.isEmpty() || subArray.size > this.size) return -1
+
+    for (i in 0 .. this.size - subArray.size) {
+        if (this.sliceArray(i .. i + subArray.size - 1).contentEquals(subArray)) {
+            return i
+        }
+    }
+    return -1
+}
+
 @JsName("TextDecoder")
 external class TextDecoder(encoding: String = definedExternally) {
     fun decode(input: dynamic): String
