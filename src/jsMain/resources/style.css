@@ -319,9 +319,14 @@ button:hover {
     cursor: pointer;
 }
 
-.tooltip:hover .tooltip-container {
+.tooltip:hover > .tooltip-container {
     visibility: visible;
     opacity: 1;
+}
+
+.tooltip > .tooltip:hover ~ .tooltip-container {
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
 .tooltip-container {
