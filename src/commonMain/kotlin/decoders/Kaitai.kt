@@ -335,7 +335,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 val elementId = seqElement.id
 
-                val doc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
+                val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
                 var kaitaiElement : KaitaiElement
                 var value = if (type.sizeInBits != 0u) {  // slice if we have a substream
@@ -368,7 +368,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                             value,
                             sourceByteRange,
                             sourceRangeBitOffset,
-                            doc
+                            elementDoc
                         )
                     } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
                         KaitaiString(
@@ -377,7 +377,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                             value,
                             sourceByteRange,
                             sourceRangeBitOffset,
-                            doc
+                            elementDoc
                         )
                     } else { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
                         KaitaiBytes(
@@ -386,7 +386,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                             value,
                             sourceByteRange,
                             sourceRangeBitOffset,
-                            doc
+                            elementDoc
                         )
                     }
                 }
@@ -425,11 +425,12 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 }
             }
         }
-
-        val structDoc = if (completeStruct.meta != undefined) {
-            KaitaiDoc(completeStruct.meta["doc"], completeStruct.meta["doc-ref"])
+        val structDoc = if (parentSeq["doc"] != undefined || parentSeq["doc-ref"] != undefined) {
+            KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
+        } else if (parentSeq["meta"] != undefined && (parentSeq["meta"]["doc"] != undefined || parentSeq["meta"]["doc-ref"] != undefined)) {
+            KaitaiDoc(parentSeq["meta"]["doc"], parentSeq["meta"]["doc-ref"])
         } else {
-            KaitaiDoc(null, null)
+            KaitaiDoc(undefined, undefined)
         }
 
         val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
