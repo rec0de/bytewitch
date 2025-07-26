@@ -22,17 +22,36 @@ enum class DisplayStyle {
     HEX, BINARY, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING
 }
 
-// acts just like a MutableList except it also has the added features
-class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()) : MutableList<T> by innerList {
+/*
+kaitaiElement.bytesListTree.["repetition"][2].bytesListTree["first"].bytesListTree[.....]   <- Notation with mutable MapTree
+
+kaitaiElement["repetition"][2]["subelement"][1]
+
+kaitaiElement.bytesListTree.findAll { it.id == "repetition" }[2]   <- notation with mutableListTree
+kaitaiElement.bytesListTree.find { it.id == "header" }    /     kaitaiElement.bytesListTree.findAll { it.id == "header" }[0]
+
+element.repetition[2].subelement[1]   <-- notation in kaiatai
+*/
+
+// acts just like a MutableList except it also has the added features specifically for Kaitai stuff
+class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf()) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
 
-    var parent: MutableListTree<T>? = null
+    operator fun get(id : String): KaitaiElement? {
+        return this.find { it.id == id }
+    }
+
+    operator fun set(id: String, element: KaitaiElement) {
+        this[id] = element
+    }
+
+    var parent: MutableKaitaiTree? = null
         get() { return field }
         set(value) {field = value}
 
-    var root: MutableListTree<T>? = null
+    var root: MutableKaitaiTree? = null
         get() {
-            var rootCandidate: MutableListTree<T> = this
+            var rootCandidate: MutableKaitaiTree = this
             while (rootCandidate.parent != null) {
                 rootCandidate = rootCandidate.parent!!
             }
@@ -71,12 +90,13 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             }
             processSeq(rootID, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
+            console.log(e)
             throw Exception("Unexpected Exception has been thrown:\n$e")
         }
         return result
     }
 
-    fun parseReference(reference: String, bytesListTree: MutableListTree<KaitaiElement>): BooleanArray {
+    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): BooleanArray {
         // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
         if (reference.startsWith("_root.")) //_root.magic
             return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
@@ -84,9 +104,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
         else (
             if (reference.contains("."))
-                return parseReference(reference.substringAfter("."), bytesListTree.find { it.id == reference.substringBefore(".") }!!.bytesListTree!!)
+                return parseReference(reference.substringAfter("."), bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!)
             else
-                return bytesListTree.find { it.id == reference }!!.value
+                return bytesListTree[reference]!!.value
         )
     }
 
@@ -652,7 +672,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return parseTokens(tokenizeExpression(expression))
     }
 
-    fun parseValue(value: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : BooleanArray {
+    fun parseValue(value: dynamic, bytesListTree: MutableKaitaiTree) : BooleanArray {
         val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]. // TODO Can someone find an elegant way without javascript?
         var fullyFlatArray = booleanArrayOf()
         for (element in flattenedArray) {
@@ -671,11 +691,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return fullyFlatArray
     }
 
-    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
         return parseValue(seqElement.contents, bytesListTree).contentEquals(dataBytes)
     }
 
-    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
         if (seqElement.valid.min != undefined || seqElement.valid.max != undefined) {
             val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
             val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
@@ -742,7 +762,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
     /*
     parse the byte order/endianness of a sequence element
      */
-    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableListTree<KaitaiElement>): ByteOrder {
+    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree): ByteOrder {
         var byteOrder = bytesListTree.byteOrder // use the byte order of the sequence
 
         if (seqElement.type != undefined) { // if the element has a type
@@ -757,7 +777,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return byteOrder
     }
 
-    fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableListTree<KaitaiElement>, type: Type) : Type {
+    fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableKaitaiTree, type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
         }
@@ -791,7 +811,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return type
     }
 
-    fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : Type {
+    fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree) : Type {
         var type = Type(seqElement)
         type.byteOrder = parseByteOrder(currentScopeStruct, seqElement, bytesListTree)
         if (seqElement.contents != undefined) {
@@ -816,7 +836,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return type
     }
 
-    fun getRepetitionKind(seqElement: dynamic): String {
+    fun getRepetitionKind(seqElement: dynamic): String? {
         val repetitionKind = if (seqElement.repeat != undefined) {
             seqElement.repeat
         } else {
@@ -835,7 +855,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return repetitionKind
     }
 
-    fun processSeq(id: String, parentBytesListTree: MutableListTree<KaitaiElement>?, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+    fun processSeq(id: String, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: dynamic, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -845,7 +865,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         test and 0b00111000 >> 3 = -> 001
         oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
         */
-        val bytesListTree = MutableListTree<KaitaiElement>()
+        val bytesListTree = MutableKaitaiTree()
         bytesListTree.parent = parentBytesListTree
         if (bytesListTree.parent != null) {
             bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
@@ -862,19 +882,31 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         var dataSizeOfSequenceInBits: Int = 0
 
         for (seqElement in currentScopeStruct.seq) {
+            val elementId = seqElement.id
+
             val repetitionKind = getRepetitionKind(seqElement)
-            var repeatAmount = if (repetitionKind == "expr") {
-                parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
+            var repeatAmount = 0
+
+            val bytesListTreeForInnerList = if (repetitionKind != null) {
+                val bytesListTreeForInnerList = MutableKaitaiTree()
+                bytesListTree.parent = parentBytesListTree
+                if (bytesListTree.parent != null) {
+                    bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
+                } else {
+                    bytesListTree.byteOrder = ByteOrder.BIG
+                }
+                bytesListTreeForInnerList
             } else {
                 null
             }
+
             while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
                 val type = parseType(currentScopeStruct, seqElement, bytesListTree)
                 if (type.sizeIsUntilEOS) {
-                    type.sizeInBits = (data.size - offsetInDatastreamInBits).toUInt()
+                    type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
                 }
                 if (type.sizeIsUntilTerminator) {
-                    val dataAsByteArray = data.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
+                    val dataAsByteArray = ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
                     type.sizeInBits = (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8 .. dataAsByteArray.size-1).indexOfFirstSubsequence(type.terminator).toUInt() + type.terminator!!.size.toUInt()) * 8u
                 }
 
@@ -884,27 +916,25 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
                 }
 
-                val elementId = seqElement.id
-
                 var kaitaiElement : KaitaiElement
-                var value = if (type.sizeInBits != 0u) {  // slice if we have a substream
-                    data.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
+                var ioSubStream = if (type.sizeInBits != 0u) {  // slice if we have a substream
+                    ioStream.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
                 } else {
-                    data
+                    ioStream
                 }
 
                 // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
                 if (!type.hasCustomType // no subtypes
                     && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
                     && type.byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
-                    value = value.toByteArray().reversedArray().toBooleanArray()
+                    ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
                 }
 
                 if (type.hasCustomType) {
                     if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
+                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
                     } else {
-                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
+                        kaitaiElement = processSeq(elementId, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
@@ -914,7 +944,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiBinary(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset
                         )
@@ -922,7 +952,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiString(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset
                         )
@@ -930,16 +960,16 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiBytes(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset
                         )
                     }
                 }
-                if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
                     throw Exception("Value of bytes does not align with expected contents value.")
                 }
-                if ((seqElement.valid != undefined) && !checkValidKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                if ((seqElement.valid != undefined) && !checkValidKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
                     throw Exception("Value of bytes does not align with expected valid value.")
                 }
 
@@ -950,15 +980,19 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 offsetInDatastreamInBits = offsetInDatastreamInBits + type.sizeInBits.toInt()
                 dataSizeOfSequenceInBits += type.sizeInBits.toInt()
 
-                bytesListTree.add(kaitaiElement)
+                if (repetitionKind != null) {
+                    bytesListTreeForInnerList!!.add(kaitaiElement)
+                } else {
+                    bytesListTree.add(kaitaiElement)
+                }
 
+                repeatAmount = repeatAmount + 1
                 if (repetitionKind == "eos") {
-                    if (data.size == dataSizeOfSequenceInBits) {
+                    if (ioStream.size == dataSizeOfSequenceInBits) {
                         break
                     }
                 } else if (repetitionKind == "expr") {
-                    repeatAmount = repeatAmount!! - 1u
-                    if (repeatAmount <= 0u) {
+                    if (repeatAmount >= parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
                         break
                     }
                 } else if (repetitionKind == "until") {
@@ -970,29 +1004,53 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     break  // if we have no repeat at all we just do this inner loop once
                 }
             }
+            if (repetitionKind != null) {
+                val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+                val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+                bytesListTree.add(KaitaiList(id, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset))
+            }
         }
 
-        val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
-        val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + data.size) % 8)
+        // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
+        val resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
+        val resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
         return KaitaiResult(id, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset)
     }
 }
 
 interface KaitaiElement : ByteWitchResult {
     val id: String
-    val bytesListTree: MutableListTree<KaitaiElement>? get() = null
+    val bytesListTree: MutableKaitaiTree? get() = null
     val value: BooleanArray
     var endianness: ByteOrder
 }
 
 class KaitaiResult(override val id: String, override var endianness: ByteOrder,
-                   override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
+                   override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${id}(${bytesListTree.joinToString("") { it.renderHTML() }})</div>"
     }
 
-    // KaitaiResult result does not really have a value itself, but if it's called we want to deliver a reasonable result
+    // KaitaiResult does not really have a value itself, but if it's called we want to deliver a reasonable result
+    override val value: BooleanArray
+        get() {
+            var result = booleanArrayOf()
+            for (element in bytesListTree) {
+                result += element.value
+            }
+            return result
+        }
+}
+
+class KaitaiList(override val id: String, override var endianness: ByteOrder,
+                 override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
+                 override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+    override fun renderHTML(): String {
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
+    }
+
+    // KaitaiList does not really have a value itself, but if it's called we want to deliver a reasonable result
     override val value: BooleanArray
         get() {
             var result = booleanArrayOf()
