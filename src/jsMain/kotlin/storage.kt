@@ -1,9 +1,9 @@
 object KaitaiStorage {
-    val keyNameList = "kaitaiStructNames"
-    val keyStructPrefix = "kaitaiStruct-"
+    private const val KEY_NAME_LIST = "kaitaiStructNames"
+    private const val KEY_STRUCT_PREFIX = "kaitaiStruct-"
 
     fun listStructNames(): List<String> {
-        val names = localStorage.getItem(keyNameList)
+        val names = localStorage.getItem(KEY_NAME_LIST)
         if (names != null) {
             return names.split(";").filter { it.isNotBlank() }
         }
@@ -16,8 +16,8 @@ object KaitaiStorage {
         }
         val existingNames = listStructNames().toMutableSet()
         existingNames.add(name)
-        localStorage.setItem(keyStructPrefix + name, struct)
-        localStorage.setItem(keyNameList, existingNames.joinToString(";"))
+        localStorage.setItem(KEY_STRUCT_PREFIX + name, struct)
+        localStorage.setItem(KEY_NAME_LIST, existingNames.joinToString(";"))
         return true
     }
 
@@ -25,17 +25,17 @@ object KaitaiStorage {
         if (name.isBlank()) {
             return null
         }
-        return localStorage.getItem(keyStructPrefix + name)
+        return localStorage.getItem(KEY_STRUCT_PREFIX + name)
     }
 
     fun deleteStruct(name: String): Boolean {
         if (name.isBlank()) {
             return false
         }
-        localStorage.removeItem(keyStructPrefix + name)
+        localStorage.removeItem(KEY_STRUCT_PREFIX + name)
         val existingNames = listStructNames().toMutableSet()
         existingNames.remove(name)
-        localStorage.setItem(keyNameList, existingNames.joinToString(";"))
+        localStorage.setItem(KEY_NAME_LIST, existingNames.joinToString(";"))
         return true
     }
 }

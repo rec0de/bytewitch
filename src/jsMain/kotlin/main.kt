@@ -1,32 +1,28 @@
 import bitmage.hex
 import kotlinx.browser.document
 import kotlinx.browser.window
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.dom.clear
-import org.w3c.dom.*
-import org.w3c.dom.HTMLTextAreaElement
-import org.w3c.files.File
-import org.w3c.files.FileReader
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Uint8Array
+import org.w3c.dom.*
+import org.w3c.files.File
+import org.w3c.files.FileReader
 
 
 var liveDecodeEnabled = true
-var liveKaitaiEnabled = true
 var currentHighlight: Element? = null
 
-/* List of bundled Kaitai Structs that are pre-registered.
-   These are the ones that are available by default without user input.
-   You can add more by putting them in the `kaitai` directory with the file extension `.ksy`.
-   The list must contain the names of the files without the `.ksy` extension.
-*/
-val bundledKaitaiStructs = listOf<String>()
 
 fun main() {
     window.addEventListener("load", {
         // Initialize the Kaitai related UI elements
         KaitaiUI
         // Load Kaitai structs
-        KaitaiUI.loadBundledKaitaiStructs()
+        MainScope().launch {
+            KaitaiUI.loadBundledStructs()
+        }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
         val input = document.getElementById("data") as HTMLTextAreaElement
@@ -74,7 +70,7 @@ fun main() {
 
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
-            if (liveKaitaiEnabled) {
+            if (KaitaiUI.isLiveDecodeEnabled()) {
                 ByteWitch.setKaitaiLiveDecoder(KaitaiUI.getInputValue())
                 if (liveDecodeEnabled)
                     decode(false)
@@ -91,7 +87,7 @@ fun decode(tryhard: Boolean) {
     val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
     val result = ByteWitch.analyze(bytes, tryhard)
 
-    if(result.isNotEmpty()) {
+    if (result.isNotEmpty()) {
         output.clear()
         setByteFinderContent(bytes)
 
@@ -123,7 +119,8 @@ fun setByteFinderContent(bytes: ByteArray) {
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
     hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
-    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    textview.innerHTML = bytes.map { it.toInt().toChar() }
+        .map { if (it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
     bytefinder.style.display = "flex"
 }
 
@@ -143,14 +140,14 @@ fun setByteFinderHighlight(start: Int, end: Int, startBitOffset: Int, endBitOffs
     val txtText = textview.childNodes[0]!!
     val txtRange = document.createRange()
     txtRange.setStart(txtText, start);
-    txtRange.setEnd(txtText, end + (if(endBitOffset > 0) 1 else 0))
+    txtRange.setEnd(txtText, end + (if (endBitOffset > 0) 1 else 0))
     txtRange.surroundContents(document.createElement("span"))
 }
 
 fun attachRangeListeners(element: Element) {
-    if(element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
+    if (element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
         val start = element.getAttribute("data-start")!!.toInt()
-        val end =  element.getAttribute("data-end")!!.toInt()
+        val end = element.getAttribute("data-end")!!.toInt()
         val startBitOffset = element.getAttribute("data-start-bit-offset")?.toInt() ?: 0
         val endBitOffset = element.getAttribute("data-end-bit-offset")?.toInt() ?: 0
 
@@ -161,9 +158,18 @@ fun attachRangeListeners(element: Element) {
         })
 
         // highlightable elements
-        if(listOf("asn1", "protobuf", "generic", "bplist", "nsarchive", "opack", "neutral").any { element.classList.contains(it) }) {
+        if (listOf(
+                "asn1",
+                "protobuf",
+                "generic",
+                "bplist",
+                "nsarchive",
+                "opack",
+                "neutral"
+            ).any { element.classList.contains(it) }
+        ) {
             element.addEventListener("mouseover", { evt ->
-                if(currentHighlight != null)
+                if (currentHighlight != null)
                     currentHighlight!!.classList.remove("highlight")
 
                 element.classList.add("highlight")
