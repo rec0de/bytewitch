@@ -25,17 +25,36 @@ enum class DisplayStyle {
     HEX, BINARY, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING
 }
 
-// acts just like a MutableList except it also has the added features
-class MutableListTree<T>(private val innerList: MutableList<T> = mutableListOf()) : MutableList<T> by innerList {
+/*
+kaitaiElement.bytesListTree.["repetition"][2].bytesListTree["first"].bytesListTree[.....]   <- Notation with mutable MapTree
+
+kaitaiElement["repetition"][2]["subelement"][1]
+
+kaitaiElement.bytesListTree.findAll { it.id == "repetition" }[2]   <- notation with mutableListTree
+kaitaiElement.bytesListTree.find { it.id == "header" }    /     kaitaiElement.bytesListTree.findAll { it.id == "header" }[0]
+
+element.repetition[2].subelement[1]   <-- notation in kaiatai
+*/
+
+// acts just like a MutableList except it also has the added features specifically for Kaitai stuff
+class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf()) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
 
-    var parent: MutableListTree<T>? = null
+    operator fun get(id : String): KaitaiElement? {
+        return this.find { it.id == id }
+    }
+
+    operator fun set(id: String, element: KaitaiElement) {
+        this[id] = element
+    }
+
+    var parent: MutableKaitaiTree? = null
         get() { return field }
         set(value) {field = value}
 
-    var root: MutableListTree<T>? = null
+    var root: MutableKaitaiTree? = null
         get() {
-            var rootCandidate: MutableListTree<T> = this
+            var rootCandidate: MutableKaitaiTree = this
             while (rootCandidate.parent != null) {
                 rootCandidate = rootCandidate.parent!!
             }
@@ -75,7 +94,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return result
     }
 
-    fun parseReference(reference: String, bytesListTree: MutableListTree<KaitaiElement>): BooleanArray {
+    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): BooleanArray {
         // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
         if (reference.startsWith("_root.")) //_root.magic
             return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
@@ -83,13 +102,575 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
         else (
             if (reference.contains("."))
-                return parseReference(reference.substringAfter("."), bytesListTree.find { it.id == reference.substringBefore(".") }!!.bytesListTree!!)
+                return parseReference(reference.substringAfter("."), bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!)
             else
-                return bytesListTree.find { it.id == reference }!!.value
+                return bytesListTree[reference]!!.value
         )
     }
 
-    fun parseValue(value: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : BooleanArray {
+
+    enum class TokenType (val symbol: String) {
+        INTEGER(""),
+        FLOAT(""),
+        STRING(""), // enclosed by '' or ""
+        IDENTIFIER(""), // starts with a lower case literal
+        BOOLEAN("true/false"),
+        PLUS("+"), // addition and string concatenation
+        MINUS("-"),
+        MUL("*"),
+        DIV("/"),
+        MODULO("%"),
+        LESS("<"),
+        GREATER(">"),
+        LESSEQUAL("<="),
+        GREATEREQUAL(">="),
+        EQUAL("=="),
+        NOTEQUAL("!="),
+        LSHIFT("<<"),
+        RSHIFT(">>"),
+        BITWISEAND("&"),
+        BITWISEOR("|"),
+        BITWISEXOR("^"),
+        BOOLEANNOT("not"),
+        BOOLEANAND("and"),
+        BOOLEANOR("or"),
+        QUESTIONMARK("?"),
+        COLON(":"),
+        PARENTHESES("()"),
+        BRACKETS("[]"),
+        FUNCTION("f(x)"),
+        DOT("."),
+        DOUBLECOLON("::"),
+        EMPTY(""),
+        CAST("as<>"),
+        REFERENCE(""),
+    }
+
+    //******************************************************************************************************************
+    //*                                                 operands                                                       *
+    //******************************************************************************************************************
+
+    val operandTokens = mapOf(
+        TokenType.INTEGER to ::parseInteger,
+        TokenType.FLOAT to ::parseFloat,
+        TokenType.STRING to ::parseString,
+        TokenType.BOOLEAN to ::parseBoolean,
+        TokenType.PARENTHESES to ::parseParentheses,
+        TokenType.REFERENCE to ::parseReference2 // TODO
+    )
+
+    fun parseInteger(token: Pair<TokenType, dynamic>) : Int = token.second
+
+    fun parseFloat(token: Pair<TokenType, dynamic>) : Float = token.second
+
+    fun parseString(token: Pair<TokenType, dynamic>) : String = token.second
+
+    fun parseBoolean(token: Pair<TokenType, dynamic>) : Boolean = token.second
+
+    fun parseParentheses(token: Pair<TokenType, dynamic>) : dynamic = parseExpression(token.second)
+
+    fun parseReference2(token: Pair<TokenType, dynamic>) : dynamic = null //TODO
+
+    //******************************************************************************************************************
+    //*                                           unary operators                                                      *
+    //******************************************************************************************************************
+
+    val unaryPrecedence = mapOf( // unary tokens
+        TokenType.PLUS to ::parseUnaryPlus,
+        TokenType.MINUS to ::parseUnaryMinus,
+        TokenType.BOOLEANNOT to ::parseBooleanNot
+    )
+
+    fun parseUnaryPlus(tokens: MutableList<Pair<TokenType, dynamic>>) : Number {
+        val op: dynamic = parseTokens(tokens)
+        return when (op) {
+            is Float -> +op
+            is Int -> +op
+            else -> throw Exception("Cannot apply unary plus to non number")
+        }
+    }
+
+    fun parseUnaryMinus(tokens: MutableList<Pair<TokenType, dynamic>>) : Number {
+        val op: dynamic = parseTokens(tokens)
+        return when (op) {
+            is Float -> -op
+            is Int -> -op
+            else -> throw Exception("Cannot apply unary minus to non number")
+        }
+    }
+
+    fun parseBooleanNot(tokens: MutableList<Pair<TokenType, dynamic>>) : Boolean {
+        val op: dynamic = parseTokens(tokens)
+        return if (op is Boolean)
+                !op
+            else
+                throw Exception("Cannot apply logical or to non boolean")
+    }
+
+    //******************************************************************************************************************
+    //*                                          binary operators                                                      *
+    //******************************************************************************************************************
+
+    val binaryPrecedence = listOf( // binary tokens
+        mapOf(TokenType.MUL to ::parseMul, TokenType.DIV to ::parseDiv, TokenType.MODULO to ::parseModulo),
+        mapOf(TokenType.PLUS to ::parsePlus, TokenType.MINUS to ::parseMinus),
+        mapOf(TokenType.LSHIFT to ::parseLShift, TokenType.RSHIFT to ::parseRShift),
+        mapOf(TokenType.LESS to ::parseLess, TokenType.LESSEQUAL to ::parseLessEqual, TokenType.GREATER to ::parseGreater, TokenType.GREATEREQUAL to ::parseGreaterEqual),
+        mapOf(TokenType.EQUAL to ::parseEqual, TokenType.NOTEQUAL to ::parseNotEqual),
+        mapOf(TokenType.BITWISEAND to ::parseBitwiseAnd),
+        mapOf(TokenType.BITWISEXOR to ::parseBitwiseXor),
+        mapOf(TokenType.BITWISEOR to ::parseBitwiseOr),
+        mapOf(TokenType.BOOLEANAND to ::parseBooleanAnd),
+        mapOf(TokenType.BOOLEANOR to ::parseBooleanOr),
+    )
+
+    fun parseMul(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return if (op1 is Float || op2 is Float)
+            (op1 as Float) * (op2 as Float)
+        else
+            (op1 as Int) * (op2 as Int)
+    }
+
+    fun parseDiv(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return if (op1 is Float || op2 is Float)
+            (op1 as Float )/ (op2 as Float)
+        else
+            (op1 as Int) / (op2 as Int)
+    }
+
+    fun parseModulo(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return if (op1 is Float || op2 is Float)
+            (op1 as Float) % (op2 as Float)
+        else
+            (op1 as Int) % (op2 as Int)
+    }
+
+    fun parsePlus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : dynamic{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return if (op1 is String || op2 is String)
+            (op1 as String) + (op2 as String)
+        else if (op1 is Float || op2 is Float)
+            (op1 as Float) + (op2 as Float)
+        else
+            (op1 as Int) + (op2 as Int)
+
+    }
+
+    fun parseMinus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return if (op1 is Float || op2 is Float)
+            (op1 as Float) - (op2 as Float)
+        else
+            (op1 as Int) - (op2 as Int)
+    }
+
+    fun parseLShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) shl (op2 as Int)
+    }
+
+    fun parseRShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) shr (op2 as Int)
+    }
+
+    fun parseLess(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) < (op2 as Int)
+    }
+
+    fun parseLessEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) <= (op2 as Int)
+    }
+
+    fun parseGreater(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) > (op2 as Int)
+    }
+
+    fun parseGreaterEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) >= (op2 as Int)
+    }
+
+    fun parseEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return op1 == op2
+    }
+
+    fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return op1 != op2
+    }
+
+    fun parseBitwiseAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) and (op2 as Int)
+    }
+
+    fun parseBitwiseXor(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) xor (op2 as Int)
+    }
+
+    fun parseBitwiseOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Int) or (op2 as Int)
+    }
+
+    fun parseBooleanAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Boolean) && (op2 as Boolean)
+    }
+
+    fun parseBooleanOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
+        val op1: dynamic = parseTokens(tokens1)
+        val op2: dynamic = parseTokens(tokens2)
+
+        return (op1 as Boolean) || (op2 as Boolean)
+    }
+
+    //******************************************************************************************************************
+    //*                                         ternary operators                                                      *
+    //******************************************************************************************************************
+
+    fun parseIfElse(condition: MutableList<Pair<TokenType, dynamic>>, tokensTrue: MutableList<Pair<TokenType, dynamic>>, tokensFalse: MutableList<Pair<TokenType, dynamic>>) : dynamic {
+        return if (parseTokens(condition) as Boolean) parseTokens(tokensTrue) else parseTokens(tokensFalse)
+    }
+
+    fun parseTokens (tokens: MutableList<Pair<TokenType, dynamic>>) : dynamic {
+        if (tokens.size == 1 && tokens[0].first in operandTokens){
+            val function = operandTokens.getValue(tokens[0].first)
+            return function.invoke(tokens[0])
+        }
+
+        if (tokens.contains(Pair(TokenType.QUESTIONMARK, "?"))){
+            var depth: Int = 0
+            var posQuestionmark: Int = 0
+            var posColon: Int
+            for ((index,token) in tokens.withIndex()) {
+                if (token == Pair(TokenType.QUESTIONMARK, "?")){
+                    if (depth == 0) posQuestionmark = index
+                    depth++
+                } else if (token == Pair(TokenType.COLON, ":")){
+                    posColon = index
+                    depth--
+                    if(depth == 0)
+                        return parseIfElse(tokens.subList(0, posQuestionmark), tokens.subList(posQuestionmark+1, posColon), tokens.subList(posColon+1, tokens.size))
+                }
+            }
+        }
+
+        for (operatorMap in binaryPrecedence.reversed()) {
+            for ((index, token) in tokens.reversed().withIndex()) {
+                if (index != tokens.size-1 && tokens.reversed()[index+1].first in operandTokens && token.first in operatorMap) {
+                    val op1: MutableList<Pair<TokenType, dynamic>> = tokens.subList(0, tokens.size-index-1)
+                    val op2: MutableList<Pair<TokenType, dynamic>> = tokens.subList(tokens.size-index, tokens.size)
+                    val function = operatorMap.getValue((token.first))
+                    return function.invoke(op1, op2)
+                }
+            }
+        }
+
+        for ((index, token) in tokens.withIndex()){
+            if (token.first in unaryPrecedence) {
+                val op: MutableList<Pair<TokenType, dynamic>> = tokens.subList(index+1, tokens.size)
+                val function = unaryPrecedence.getValue(token.first)
+                return function.invoke(op)
+            }
+        }
+
+        return null
+    }
+
+    val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".")
+    val operators2 = setOf("<=", ">=", "==", "!=", "<<", ">>", "::")
+
+    val operatorMap: Map<String, TokenType> = TokenType.entries.associateBy { it.symbol }
+    val operator2Map: Map<String, TokenType> = TokenType.entries.associateBy { it.symbol }
+
+    fun getOperator(char: Char): TokenType = operatorMap[char.toString()]!!
+    fun getOperator2(string: String): TokenType = operator2Map[string]!!
+
+    fun isKeyword(char: Char?) : Boolean {
+        return (char == null
+                || (!char.isLetterOrDigit()
+                && char != '_'))
+    }
+
+    fun nextToken(expression: String) : Pair<Pair<TokenType, dynamic>, Int> {
+        val trimmedExpression = expression.trimStart()
+        if (trimmedExpression.isEmpty()) return Pair(Pair(TokenType.EMPTY, null), 0)
+        val trimmed = expression.length - trimmedExpression.length
+
+        if (trimmedExpression.length >= 5 && trimmedExpression.startsWith("false")) // token FALSE
+            if (isKeyword(trimmedExpression.getOrNull(5)))
+                return Pair(Pair(TokenType.BOOLEAN, false), trimmed+5)
+        if (trimmedExpression.length >= 4 && trimmedExpression.startsWith("true")) // token TRUE
+            if (isKeyword(trimmedExpression.getOrNull(4)))
+                return Pair(Pair(TokenType.BOOLEAN, true), trimmed+4)
+        if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("not")) // token NOT
+            if (isKeyword(trimmedExpression.getOrNull(3)))
+                return Pair(Pair(TokenType.BOOLEANNOT, "not"), trimmed+3)
+        if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("and")) // token AND
+            if (isKeyword(trimmedExpression.getOrNull(3)))
+                return Pair(Pair(TokenType.BOOLEANAND, "and"), trimmed+3)
+        if (trimmedExpression.length >= 2 && trimmedExpression.startsWith("or")) // token OR
+            if (isKeyword(trimmedExpression.getOrNull(2)))
+                return Pair(Pair(TokenType.BOOLEANOR, "or"), trimmed+2)
+        if (trimmedExpression.length >= 2 && trimmedExpression.substring(0..1) in operators2) // tokens consisting of two symbols: "<=", ">=", "==", "!=", "<<", ">>", "::"
+            return Pair(Pair(getOperator2(trimmedExpression.substring(0..1)), trimmedExpression.substring(0..1)) ,trimmed+2)
+        if (trimmedExpression[0].toString() in operators) // one symbol tokens: "+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", "."
+            return Pair(Pair(getOperator(trimmedExpression[0]), trimmedExpression[0].toString()), trimmed+1)
+
+        var breakIndex: Int = 0
+
+        if (trimmedExpression.startsWith("as<")) { // token CAST
+            var depth: Int = 0
+            var sqstring: Boolean = false
+            var dqstring: Boolean = false
+            for ((index, char) in trimmedExpression.substring(2).withIndex()) {
+                when (char.toString()) {
+                    "'" -> if (!dqstring) sqstring = !sqstring
+                    "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                    "<" -> if (!(sqstring || dqstring)) depth++
+                    ">" -> {
+                        if (!(sqstring || dqstring)) {
+                            depth--
+                            if (depth == 0) {
+                                breakIndex = index + 1
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+            return Pair(Pair(TokenType.CAST, trimmedExpression.substring(0..breakIndex+1)), trimmed+breakIndex+2)
+        }
+
+        when (trimmedExpression[0]) {
+            '(' -> { // token PARENTHESES
+                var depth: Int = 0
+                var sqstring: Boolean = false
+                var dqstring: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    when (char.toString()) {
+                        "'" -> if (!dqstring) sqstring = !sqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "(" -> if (!(sqstring || dqstring)) depth++
+                        ")" -> {
+                            if (!(sqstring || dqstring)) {
+                                depth--
+                                if (depth == 0) {
+                                    breakIndex = index + 1
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+                return Pair(Pair(TokenType.PARENTHESES, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+            }
+            '[' -> { // token BRACKETS
+                var depth: Int = 0
+                var sqstring: Boolean = false
+                var dqstring: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    when (char.toString()) {
+                        "'" -> if (!dqstring) sqstring = !sqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "[" -> if (!(sqstring || dqstring)) depth++
+                        "]" -> {
+                            if (!(sqstring || dqstring)) {
+                                depth--
+                                if (depth == 0) {
+                                    breakIndex = index + 1
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+                return Pair(Pair(TokenType.BRACKETS, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+            }
+            '\'' -> { // token STRING with single quotation marks
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char == '\'' && index != 0) {
+                        breakIndex = index+1
+                        break
+                    }
+                }
+                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+            }
+            '"' -> { // token STRING with double quotation marks
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char == '"' && index != 0) {
+                        breakIndex = index+1
+                        break
+                    }
+                }
+                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+            }
+        }
+
+        if (trimmedExpression[0].isLowerCase() || trimmedExpression[0] == '_') { // token IDENTIFIER
+            for ((index, char) in trimmedExpression.withIndex()) {
+                if (!char.isLetterOrDigit() && char != '_') {
+                    breakIndex = index
+                    break
+                }
+                breakIndex = index+1
+            }
+            return Pair(Pair(TokenType.IDENTIFIER, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+        } else if (trimmedExpression[0].isDigit()) { // tokens INTEGER and FLOAT
+            val exceptions = setOf<Char>('x', 'X', 'o', 'O', 'b', 'B')
+            if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'x' || trimmedExpression.getOrNull(1) == 'X')) { // token INTEGER in hexadecimal notation
+                val hexadecimalRegex: Regex = Regex("^[a-fA-F0-9_]$")
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!hexadecimalRegex.matches(char.toString()) && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(16)), trimmed+breakIndex)
+            }
+            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'b' || trimmedExpression.getOrNull(1) == 'B')) { // token INTEGER in binary notation
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (char != '0' && char != '1' && char != '_' && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(2)), trimmed+breakIndex)
+            }
+            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(1) == 'O')) { // token INTEGER in octal notation
+                val octalRegex: Regex = Regex("^[0-7_]$")
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!octalRegex.matches(char.toString()) && !(index == 1 && char in exceptions)) {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(8)), trimmed+breakIndex)
+            } else { // tokens INTEGER AND FLOAT in decimal notation
+                var float_point: Boolean = false
+                var exponential: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    if (!float_point && char == '.') { // FLOATS must contain exactly one '.'
+                        float_point = true
+                        continue
+                    }
+                    if (!exponential && (char == 'e' || char == 'E')) {
+                        float_point = true // FLOAT can contain exponential notation, INTEGER cannot
+                        exponential = true
+                        continue
+                    }
+                    if ((char == '+' || char == '-') && (trimmedExpression[index-1] == 'e' || trimmedExpression[index-1] == 'E'))
+                        continue
+                    if (!char.isDigit() && char != '_') {
+                        breakIndex = index
+                        break
+                    }
+                    breakIndex = index+1
+                }
+                if (float_point)
+                    return Pair(Pair(TokenType.FLOAT, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toFloat()), trimmed+breakIndex)
+                else
+                    return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toInt()), trimmed+breakIndex)
+
+            }
+        }
+        return Pair(Pair(TokenType.EMPTY, null), 0)
+    }
+
+    val tokensForReference = setOf<TokenType>(TokenType.IDENTIFIER, TokenType.DOT, TokenType.DOUBLECOLON, TokenType.FUNCTION,
+        TokenType.CAST, TokenType.BRACKETS)
+
+    fun tokenizeExpression(expression: String) : MutableList<Pair<TokenType, dynamic>> {
+        var expression: String = expression
+        var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        while (expression != "") {
+            var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(expression)
+            tokens.add(token.first)
+            expression = expression.substring(token.second)
+        }
+
+        var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+
+        for ((index, token: Pair<TokenType, dynamic>) in tokens.withIndex()) { // combining TokenType IDENTIFIER followed by PARENTHESES to TokenType FUNCTION
+            if ((token.first == TokenType.IDENTIFIER && tokens[index+1].first == TokenType.PARENTHESES) || token.first == TokenType.EMPTY)
+                continue
+            else if (token.first == TokenType.PARENTHESES && index > 0 && tokens[index-1].first == TokenType.IDENTIFIER)
+                tokensWithFunctions.add(Pair(TokenType.FUNCTION, Pair(tokens[index-1], token)))
+            else
+                tokensWithFunctions.add(token)
+        }
+
+        var tokensWithReferences: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        var reference: Boolean = false
+
+        for (token: Pair<TokenType, dynamic> in tokensWithFunctions) { // combining tokens of types in val tokensForReference to TokenType REFERENCE
+            if (token.first in tokensForReference) {
+                if (!reference) {
+                    tokensWithReferences.add(Pair(TokenType.REFERENCE, mutableListOf<Pair<TokenType, dynamic>>()))
+                    reference = true
+                }
+                (tokensWithReferences.last().second as MutableList<Pair<TokenType, dynamic>>).add(token)
+            } else {
+                reference = false
+                tokensWithReferences.add(token)
+            }
+        }
+
+        return tokensWithReferences
+    }
+
+    fun parseExpression (expression: String) : dynamic {
+        return parseTokens(tokenizeExpression(expression))
+    }
+
+    fun parseValue(value: dynamic, bytesListTree: MutableKaitaiTree) : BooleanArray {
         val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]. // TODO Can someone find an elegant way without javascript?
         var fullyFlatArray = booleanArrayOf()
         for (element in flattenedArray) {
@@ -108,11 +689,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return fullyFlatArray
     }
 
-    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
         return parseValue(seqElement.contents, bytesListTree).contentEquals(dataBytes)
     }
 
-    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableListTree<KaitaiElement>, kaitaiElement: KaitaiElement): Boolean {
+    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
         if (seqElement.valid.min != undefined || seqElement.valid.max != undefined) {
             val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
             val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
@@ -179,7 +760,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
     /*
     parse the byte order/endianness of a sequence element
      */
-    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableListTree<KaitaiElement>): ByteOrder {
+    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree): ByteOrder {
         var byteOrder = bytesListTree.byteOrder // use the byte order of the sequence
 
         if (seqElement.type != undefined) { // if the element has a type
@@ -194,7 +775,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return byteOrder
     }
 
-    fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableListTree<KaitaiElement>, type: Type) : Type {
+    fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableKaitaiTree, type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
         }
@@ -228,7 +809,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return type
     }
 
-    fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableListTree<KaitaiElement>) : Type {
+    fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree) : Type {
         var type = Type(seqElement)
         type.byteOrder = parseByteOrder(currentScopeStruct, seqElement, bytesListTree)
         if (seqElement.contents != undefined) {
@@ -247,13 +828,13 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             type = parseBuiltinType(seqElement, bytesListTree, type)
         }
         if (seqElement.size != undefined) {
-            val parsedValue = parseValue(seqElement.size, bytesListTree)
+            var parsedValue = parseValue(seqElement.size, bytesListTree)
             type.sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
         }
         return type
     }
 
-    fun getRepetitionKind(seqElement: dynamic): String {
+    fun getRepetitionKind(seqElement: dynamic): String? {
         val repetitionKind = if (seqElement.repeat != undefined) {
             seqElement.repeat
         } else {
@@ -272,7 +853,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return repetitionKind
     }
 
-    fun processSeq(parentSeq: dynamic, parentBytesListTree: MutableListTree<KaitaiElement>?, currentScopeStruct: dynamic, data: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+    fun processSeq(parentSeq: dynamic, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: dynamic, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         val parentId = if (parentSeq.id != undefined) {
             parentSeq.id as String
         } else if (parentSeq.meta != undefined) {
@@ -294,7 +875,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         test and 0b00111000 >> 3 = -> 001
         oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
         */
-        val bytesListTree = MutableListTree<KaitaiElement>()
+        val bytesListTree = MutableKaitaiTree()
         bytesListTree.parent = parentBytesListTree
         if (bytesListTree.parent != null) {
             bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
@@ -311,19 +892,31 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         var dataSizeOfSequenceInBits: Int = 0
 
         for (seqElement in currentScopeStruct.seq) {
+            val elementId = seqElement.id
+
             val repetitionKind = getRepetitionKind(seqElement)
-            var repeatAmount = if (repetitionKind == "expr") {
-                parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
+            var repeatAmount = 0
+
+            val bytesListTreeForInnerList = if (repetitionKind != null) {
+                val bytesListTreeForInnerList = MutableKaitaiTree()
+                bytesListTree.parent = parentBytesListTree
+                if (bytesListTree.parent != null) {
+                    bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
+                } else {
+                    bytesListTree.byteOrder = ByteOrder.BIG
+                }
+                bytesListTreeForInnerList
             } else {
                 null
             }
+
             while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
                 val type = parseType(currentScopeStruct, seqElement, bytesListTree)
                 if (type.sizeIsUntilEOS) {
-                    type.sizeInBits = (data.size - offsetInDatastreamInBits).toUInt()
+                    type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
                 }
                 if (type.sizeIsUntilTerminator) {
-                    val dataAsByteArray = data.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
+                    val dataAsByteArray = ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
                     type.sizeInBits = (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8 .. dataAsByteArray.size-1).indexOfFirstSubsequence(type.terminator).toUInt() + type.terminator!!.size.toUInt()) * 8u
                 }
 
@@ -338,24 +931,24 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
                 var kaitaiElement : KaitaiElement
-                var value = if (type.sizeInBits != 0u) {  // slice if we have a substream
-                    data.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
+                var ioSubStream = if (type.sizeInBits != 0u) {  // slice if we have a substream
+                    ioStream.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
                 } else {
-                    data
+                    ioStream
                 }
 
                 // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
                 if (!type.hasCustomType // no subtypes
                     && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
                     && type.byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
-                    value = value.toByteArray().reversedArray().toBooleanArray()
+                    ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
                 }
 
                 if (type.hasCustomType) {
                     if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
+                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
                     } else {
-                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), value, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
+                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
@@ -365,7 +958,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiBinary(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset,
                             elementDoc
@@ -374,7 +967,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiString(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset,
                             elementDoc
@@ -383,17 +976,17 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         KaitaiBytes(
                             elementId,
                             type.byteOrder,
-                            value,
+                            ioSubStream,
                             sourceByteRange,
                             sourceRangeBitOffset,
                             elementDoc
                         )
                     }
                 }
-                if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
                     throw Exception("Value of bytes does not align with expected contents value.")
                 }
-                if ((seqElement.valid != undefined) && !checkValidKey(seqElement, value, bytesListTree, kaitaiElement)) {
+                if ((seqElement.valid != undefined) && !checkValidKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
                     throw Exception("Value of bytes does not align with expected valid value.")
                 }
 
@@ -404,15 +997,19 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 offsetInDatastreamInBits = offsetInDatastreamInBits + type.sizeInBits.toInt()
                 dataSizeOfSequenceInBits += type.sizeInBits.toInt()
 
-                bytesListTree.add(kaitaiElement)
+                if (repetitionKind != null) {
+                    bytesListTreeForInnerList!!.add(kaitaiElement)
+                } else {
+                    bytesListTree.add(kaitaiElement)
+                }
 
+                repeatAmount = repeatAmount + 1
                 if (repetitionKind == "eos") {
-                    if (data.size == dataSizeOfSequenceInBits) {
+                    if (ioStream.size == dataSizeOfSequenceInBits) {
                         break
                     }
                 } else if (repetitionKind == "expr") {
-                    repeatAmount = repeatAmount!! - 1u
-                    if (repeatAmount <= 0u) {
+                    if (repeatAmount >= parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
                         break
                     }
                 } else if (repetitionKind == "until") {
@@ -424,6 +1021,11 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     break  // if we have no repeat at all we just do this inner loop once
                 }
             }
+            if (repetitionKind != null) {
+                val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+                val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+                bytesListTree.add(KaitaiList(id, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset))
+            }
         }
         val structDoc = if (parentSeq["doc"] != undefined || parentSeq["doc-ref"] != undefined) {
             KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
@@ -433,15 +1035,16 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             KaitaiDoc(undefined, undefined)
         }
 
-        val resultSourceByteRange = Pair((sourceOffsetInBits) / 8, (sourceOffsetInBits + data.size) / 8)
-        val resultSourceRangeBitOffset = Pair((sourceOffsetInBits) % 8, (sourceOffsetInBits + data.size) % 8)
+        // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
+        val resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
+        val resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
         return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, structDoc)
     }
 }
 
 interface KaitaiElement : ByteWitchResult {
     val id: String
-    val bytesListTree: MutableListTree<KaitaiElement>? get() = null
+    val bytesListTree: MutableKaitaiTree? get() = null
     val value: BooleanArray
     var endianness: ByteOrder
     val doc: KaitaiDoc
@@ -528,7 +1131,7 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
 }
 
 class KaitaiResult(override val id: String, override var endianness: ByteOrder,
-                   override val bytesListTree: MutableListTree<KaitaiElement>, override val sourceByteRange: Pair<Int, Int>,
+                   override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
                    override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
@@ -537,7 +1140,25 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
                 "</div>"
     }
 
-    // KaitaiResult result does not really have a value itself, but if it's called we want to deliver a reasonable result
+    // KaitaiResult does not really have a value itself, but if it's called we want to deliver a reasonable result
+    override val value: BooleanArray
+        get() {
+            var result = booleanArrayOf()
+            for (element in bytesListTree) {
+                result += element.value
+            }
+            return result
+        }
+}
+
+class KaitaiList(override val id: String, override var endianness: ByteOrder,
+                 override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
+                 override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+    override fun renderHTML(): String {
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
+    }
+
+    // KaitaiList does not really have a value itself, but if it's called we want to deliver a reasonable result
     override val value: BooleanArray
         get() {
             var result = booleanArrayOf()
