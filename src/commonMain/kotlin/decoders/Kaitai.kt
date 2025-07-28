@@ -925,9 +925,6 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     && !type.hasCustomType) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
                     throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
                 }
-
-                val elementId = seqElement.id
-
                 val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
                 var kaitaiElement : KaitaiElement
@@ -1024,7 +1021,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             if (repetitionKind != null) {
                 val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
                 val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
-                bytesListTree.add(KaitaiList(id, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset))
+                bytesListTree.add(KaitaiList(parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
+                    KaitaiDoc("", "")))
             }
         }
         val structDoc = if (parentSeq["doc"] != undefined || parentSeq["doc-ref"] != undefined) {
@@ -1153,7 +1151,8 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
 
 class KaitaiList(override val id: String, override var endianness: ByteOrder,
                  override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
-                 override val sourceRangeBitOffset: Pair<Int, Int>): KaitaiElement {
+                 override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc
+): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
     }
