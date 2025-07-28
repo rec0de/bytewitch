@@ -925,7 +925,6 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     && !type.hasCustomType) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
                     throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
                 }
-                val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
                 var kaitaiElement : KaitaiElement
                 var ioSubStream = if (type.sizeInBits != 0u) {  // slice if we have a substream
@@ -942,14 +941,16 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 }
 
                 if (type.hasCustomType) {
-                    if (type.sizeInBits != 0u) {
-                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, 0)
-                    } else {
-                        kaitaiElement = processSeq(seqElement, bytesListTree, getCustomType(currentScopeStruct, type.type), ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, offsetInDatastreamInBits)
+                    val typeScopeStruct = getCustomType(currentScopeStruct, type.type)
+                    kaitaiElement = processSeq(seqElement, bytesListTree, typeScopeStruct, ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits )
+                    if (seqElement["doc"] == undefined && seqElement["doc-ref"] == undefined) {
+                        // current sequence element has no doc, so we try to get the doc from the type
+                        kaitaiElement.doc = KaitaiDoc(typeScopeStruct["doc"], typeScopeStruct["doc-ref"])
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
                     val sourceRangeBitOffset = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8)
+                    val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
                     kaitaiElement = if (type.usedDisplayStyle == DisplayStyle.BINARY) {
                         KaitaiBinary(
@@ -1025,18 +1026,12 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     KaitaiDoc("", "")))
             }
         }
-        val structDoc = if (parentSeq["doc"] != undefined || parentSeq["doc-ref"] != undefined) {
-            KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
-        } else if (parentSeq["meta"] != undefined && (parentSeq["meta"]["doc"] != undefined || parentSeq["meta"]["doc-ref"] != undefined)) {
-            KaitaiDoc(parentSeq["meta"]["doc"], parentSeq["meta"]["doc-ref"])
-        } else {
-            KaitaiDoc(undefined, undefined)
-        }
+        val resultDoc = KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
 
         // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
         val resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
         val resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
-        return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, structDoc)
+        return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
     }
 }
 
@@ -1045,7 +1040,7 @@ interface KaitaiElement : ByteWitchResult {
     val bytesListTree: MutableKaitaiTree? get() = null
     val value: BooleanArray
     var endianness: ByteOrder
-    val doc: KaitaiDoc
+    var doc: KaitaiDoc
 }
 
 class KaitaiDoc(val docstring: String?, val docref: String?) {
@@ -1130,7 +1125,7 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
 
 class KaitaiResult(override val id: String, override var endianness: ByteOrder,
                    override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
@@ -1151,7 +1146,7 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
 
 class KaitaiList(override val id: String, override var endianness: ByteOrder,
                  override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
-                 override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc
+                 override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc
 ): KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
@@ -1169,7 +1164,7 @@ class KaitaiList(override val id: String, override var endianness: ByteOrder,
 }
 
 class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                  override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
+                  override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().hex()})h" +
@@ -1179,7 +1174,7 @@ class KaitaiBytes(override val id: String, override var endianness: ByteOrder, o
 }
 
 class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                    override val doc: KaitaiDoc): KaitaiElement {
+                    override var doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().toInt(ByteOrder.BIG)})s" +
@@ -1189,7 +1184,7 @@ class KaitaiInteger(override val id: String, override var endianness: ByteOrder,
 }
 
 class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.joinToString("") { if (it) "1" else "0" }})b" +
@@ -1199,7 +1194,7 @@ class KaitaiBinary(override val id: String, override var endianness: ByteOrder, 
 }
 
 class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override val doc: KaitaiDoc): KaitaiElement {
+                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().toUTF8String()})utf8" +
