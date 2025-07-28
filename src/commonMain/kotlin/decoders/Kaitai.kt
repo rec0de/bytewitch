@@ -855,17 +855,15 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
     fun processSeq(parentSeq: dynamic, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: dynamic, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         val parentId = if (parentSeq.id != undefined) {
-            parentSeq.id as String
-        } else if (parentSeq.meta != undefined) {
-            if (parentSeq.meta.id != undefined) {
-                parentSeq.meta.id as String
+            parentSeq.id
+        } else {  // for the root element
+            if (parentSeq.meta != undefined && parentSeq.meta.id != undefined) {
+                parentSeq.meta.id
             } else {
                 name
             }
-        } else {
-            console.warn("Parent sequence has no id, this should not happen. How did we get here?")
-            ""
         }
+
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
