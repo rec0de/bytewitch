@@ -11,7 +11,6 @@ import org.w3c.dom.HTMLTextAreaElement
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 var tryhard = false
-var lastSelectionEvent: Double? = null
 
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
@@ -91,8 +90,6 @@ fun main() {
         }
     })
 }
-
-
 
 // use entropy decoder and attach output to messageBox
 fun decodeWithEntropy() { // TODO this can be removed
@@ -230,12 +227,12 @@ fun decode(isLiveDecoding: Boolean) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
-        Logger.log("Textarea:",textareas[i])
         val textarea = textareas[i] as HTMLTextAreaElement
         val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         val inputText = textarea.value.trim()
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+        (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
@@ -245,8 +242,7 @@ fun decode(isLiveDecoding: Boolean) {
         }
     }
 
-
-    if (showSSFContent) { // refine ssf fields and rerender html content
+    if (showSSFContent /*&& !isLiveDecoding*/) { // refine ssf fields and rerender html content
         val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
         refined.forEach { msg ->
             parsedMessages[msg.msgIndex] = msg

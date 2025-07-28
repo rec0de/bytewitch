@@ -6,8 +6,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, PGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP,
+        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder,
+        OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32,
         Randomness, HeuristicSignatureDetector
     )
 
@@ -27,12 +28,12 @@ object ByteWitch {
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
-        val isBase64 = cleanedData.matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        val isBase64 = cleanedData.replace("\n", "").matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
         plainHex = false
 
         return when {
-            isBase64 -> decodeBase64(cleanedData)
+            isBase64 -> decodeBase64(cleanedData.replace("\n", ""))
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
                 plainHex = true

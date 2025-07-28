@@ -15,9 +15,11 @@ fun setByteFinderContent(msgIndex: Int) {
     bytefinder.style.display = "flex"
 }
 
-
 // set bytes in hexview and textview and highlight segment
 fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
+    if(start < 0 || end < 0)
+        return
+
     val hexview = document.getElementById("hexview")!!
 
     // set byte sequence

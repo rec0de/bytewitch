@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <title>bytewitch</title>
 
+    <meta name=viewport content="width=device-width, initial-scale=1">
+    <link rel="icon" sizes="300x300" href="icon.png">
+
     <!-- Primary Meta Tags -->
     <meta name="title" content="bytewitch - binary payload analyzer" />
     <meta name="description" content="Instant, in-browser decoding & visualization for bplist, ASN.1, protobuf, opack, msgpack, CBOR and many more." />
@@ -54,6 +57,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            box-sizing: border-box;
+            padding: 5px;
         }
 
         h1, h2, h3 {
@@ -99,6 +104,8 @@
             gap: 0.5rem;
             color: #fff;
             font-size: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .parsebuttons {
@@ -128,13 +135,15 @@
         .textareaContainer {
             position: relative;
             font-family: monospace;
+            width: 100%;
         }
 
         .textareaContainer > textarea {
             max-width: 100%;
-            width: 800px;
             height: 250px;
+            width: 800px;
             max-height: 30vh;
+            box-sizing: border-box;
         }
 
         #data_container {

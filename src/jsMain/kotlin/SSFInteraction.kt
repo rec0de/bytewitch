@@ -117,6 +117,10 @@ fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<SSFSegme
 
 // rerender SwiftSegFinder html view
 fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
+    // return if it is not rendered yet
+    if (document.getElementById("message-output-$msgIndex") == null)
+        return
+
     val messageBox = document.getElementById("message-output-$msgIndex") as HTMLDivElement
     val oldWrapper = messageBox.querySelector(".ssf") as HTMLDivElement
 
