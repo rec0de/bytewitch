@@ -1,6 +1,7 @@
 package decoders
 
 import bitmage.ByteOrder
+import bitmage.fromBytes
 import bitmage.hex
 import bitmage.indexOfFirstSubsequence
 import bitmage.padLeft
@@ -74,7 +75,6 @@ class Type(seqElement : dynamic) {
     var hasCustomType: Boolean = false
 }
 
-// TODO[IMPORTANT]: Move the ByteWitchDecoder into a companion object as the parse methods are static and do not need an instance. See the other decoders for examples
 class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
     var completeStruct: dynamic = undefined
@@ -98,7 +98,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
         if (reference.startsWith("_root.")) //_root.magic
             return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
-        else if (reference.startsWith("_parent.")) 
+        else if (reference.startsWith("_parent."))
             return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
         else (
             if (reference.contains("."))
@@ -757,24 +757,6 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         }
     }
 
-    /*
-    parse the byte order/endianness of a sequence element
-     */
-    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree): ByteOrder {
-        var byteOrder = bytesListTree.byteOrder // use the byte order of the sequence
-
-        if (seqElement.type != undefined) { // if the element has a type
-            if (getCustomType(currentScopeStruct, seqElement.type) == null) { // if the type is not a custom type
-                if (seqElement.type.endsWith("be")) {
-                    byteOrder = ByteOrder.BIG
-                } else if (seqElement.type.endsWith("le")) {
-                    byteOrder = ByteOrder.LITTLE
-                }
-            }
-        }
-        return byteOrder
-    }
-
     fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableKaitaiTree, type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
@@ -790,18 +772,22 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 type.terminator = parseValue(seqElement.terminator, bytesListTree).toByteArray() // TODO: Make proper method out of this. Could probably be a value defined somewhere else aswell :(
             }
         } else {
-            if (Regex("^s\\d+(le|be)?$").matches(type.type!!)) {  // signed int
-                type.sizeInBits = type.type!!.filter { it.isDigit() }.toUInt() * 8u
-                type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
-            } else if (Regex("^u\\d+(le|be)?$").matches(type.type!!)) {  // unsigned int
-                type.sizeInBits = type.type!!.filter { it.isDigit() }.toUInt() * 8u
-                type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
-            } else if (Regex("^f\\d+(le|be)?$").matches(type.type!!)) {  // float
-                type.sizeInBits = type.type!!.filter { it.isDigit() }.toUInt() * 8u
-                type.usedDisplayStyle = DisplayStyle.FLOAT
-            } else if (Regex("^b\\d+(le|be)?$").matches(type.type!!)) {  // binary
-                type.sizeInBits = type.type!!.filter { it.isDigit() }.toUInt()
-                type.usedDisplayStyle = DisplayStyle.BINARY
+            val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type!!)
+            if (match != null) {
+                val typePrefix = match.groupValues[1]
+                val sizeInBytes = match.groupValues[2].toUInt()
+                type.sizeInBits = sizeInBytes * 8u
+                when (typePrefix) {
+                    "s" -> type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
+                    "u" -> type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
+                    "f" -> type.usedDisplayStyle = DisplayStyle.FLOAT
+                    "b" -> type.usedDisplayStyle = DisplayStyle.BINARY
+                }
+                if (match.groupValues[3] == "le") {
+                    type.byteOrder = ByteOrder.LITTLE
+                } else if (match.groupValues[3] == "be") {
+                    type.byteOrder = ByteOrder.BIG
+                }
             } else {
                 throw RuntimeException("Attempted to parse as builtin type ${type.type} but that doesn't seem to be a valid type")
             }
@@ -811,7 +797,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
     fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree) : Type {
         var type = Type(seqElement)
-        type.byteOrder = parseByteOrder(currentScopeStruct, seqElement, bytesListTree)
+        type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != undefined) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()
         }
@@ -946,33 +932,67 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                     val sourceRangeBitOffset = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8)
                     val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
 
-                    kaitaiElement = if (type.usedDisplayStyle == DisplayStyle.BINARY) {
-                        KaitaiBinary(
-                            elementId,
-                            type.byteOrder,
-                            ioSubStream,
-                            sourceByteRange,
-                            sourceRangeBitOffset,
-                            elementDoc
-                        )
-                    } else if (type.usedDisplayStyle == DisplayStyle.STRING) {
-                        KaitaiString(
-                            elementId,
-                            type.byteOrder,
-                            ioSubStream,
-                            sourceByteRange,
-                            sourceRangeBitOffset,
-                            elementDoc
-                        )
-                    } else { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
-                        KaitaiBytes(
-                            elementId,
-                            type.byteOrder,
-                            ioSubStream,
-                            sourceByteRange,
-                            sourceRangeBitOffset,
-                            elementDoc
-                        )
+                    kaitaiElement = when (type.usedDisplayStyle) {
+                        DisplayStyle.BINARY -> {
+                            KaitaiBinary(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
+                        DisplayStyle.STRING -> {
+                            KaitaiString(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
+                        DisplayStyle.SIGNED_INTEGER -> {
+                            KaitaiSignedInteger(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
+                        DisplayStyle.UNSIGNED_INTEGER -> {
+                            KaitaiUnsignedInteger(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
+                        DisplayStyle.FLOAT -> {
+                            KaitaiFloat(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
+                        else -> { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
+                            KaitaiBytes(
+                                elementId,
+                                type.byteOrder,
+                                ioSubStream,
+                                sourceByteRange,
+                                sourceRangeBitOffset,
+                                elementDoc
+                            )
+                        }
                     }
                 }
                 if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
@@ -1167,13 +1187,92 @@ class KaitaiBytes(override val id: String, override var endianness: ByteOrder, o
     }
 }
 
-class KaitaiInteger(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                    override var doc: KaitaiDoc): KaitaiElement {
+// TODO: Currently the endianness is not used, because the value is already flipped in the Kaitai parser.
+//  Therefor, do we even need it here? The conversion here can support both endianness, if the value is not flipped
+abstract class KaitaiNumber(
+    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>,
+    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc
+) : KaitaiElement {
+    abstract val suffix: String
+
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                    "${id}(${value.toByteArray().toInt(ByteOrder.BIG)})s" +
+                    "${id}(${parseValueAsString()})${suffix}" +
                     doc.renderHTML() +
                 "</div>"
+    }
+
+    protected abstract fun parseValueAsString(): String
+
+    // TODO: Could be moved to bitimage.kt and placed as extension function on Short
+    protected fun byteArrayToShort(byteArray: ByteArray, endianness: ByteOrder): Short {
+        return if (endianness == ByteOrder.BIG) {
+            ((byteArray[0].toInt() and 0xFF) shl 8 or
+                    (byteArray[1].toInt() and 0xFF)).toShort()
+        } else {
+            ((byteArray[1].toInt() and 0xFF) shl 8 or
+                    (byteArray[0].toInt() and 0xFF)).toShort()
+        }
+    }
+}
+
+class KaitaiSignedInteger(
+    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>,
+    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc
+) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+    override val suffix: String = "s"
+
+    override fun parseValueAsString(): String {
+        val byteArray = value.toByteArray()
+        return when (byteArray.size) {
+            1 -> byteArray[0].toInt().toString()
+            2 -> byteArrayToShort(byteArray, ByteOrder.BIG).toString()
+            4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toString()
+            8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toString()
+            else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+        }
+    }
+}
+
+class KaitaiUnsignedInteger(
+    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>,
+    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc
+) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+    override val suffix: String = "u"
+
+    override fun parseValueAsString(): String {
+        val byteArray = value.toByteArray()
+        return when (byteArray.size) {
+            1 -> byteArray[0].toUInt().toString()
+            2 -> byteArrayToShort(byteArray, ByteOrder.BIG).toUShort().toString()
+            4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toUInt().toString()
+            8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toULong().toString()
+            else -> throw IllegalArgumentException("Invalid byte array size for unsigned integer: ${byteArray.size}")
+        }
+    }
+}
+
+class KaitaiFloat(
+    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>,
+    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc
+) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+    override val suffix: String = "f"
+
+    override fun parseValueAsString(): String {
+        val byteArray = value.toByteArray()
+        return when (byteArray.size) {
+            4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toString()
+            8 -> Double.fromBytes(byteArray, ByteOrder.BIG).toString()
+            else -> throw IllegalArgumentException("Invalid byte array size for float or double: ${byteArray.size}")
+        }
     }
 }
 

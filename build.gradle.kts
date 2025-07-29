@@ -39,6 +39,35 @@ kotlin {
                 implementation(kotlin("test")) // This brings all the platform dependencies automatically
             }
         }
+        val jsMain by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+            }
+        }
+    }
+
+    tasks.register("generateKaitaiManifest") {
+        val kaitaiDir = file("src/commonMain/resources/kaitai")
+        val outputDir = file("${layout.buildDirectory.get()}/processedResources/js/main")
+        val manifestFile = outputDir.resolve("kaitai-manifest.txt")
+
+        inputs.dir(kaitaiDir)
+        outputs.file(manifestFile)
+
+        doLast {
+            val files = kaitaiDir.listFiles()?.filter { it.extension == "ksy" }?.map { it.nameWithoutExtension } ?: emptyList()
+            val textContent = buildString {
+                files.forEach { fileName ->
+                    appendLine(fileName)
+                }
+            }
+            manifestFile.writeText(textContent)
+            println("Kaitai manifest generated at ${manifestFile.absolutePath}")
+        }
+    }
+
+    tasks.named("jsProcessResources") {
+        dependsOn("generateKaitaiManifest")
     }
 }
 
