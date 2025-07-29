@@ -4,6 +4,7 @@ import bitmage.hex
 import bitmage.toHex
 import decoders.BWAnnotatedData
 import decoders.BWString
+import htmlEscape
 
 object SSFRenderer {
 
@@ -22,14 +23,14 @@ object SSFRenderer {
             val valueLengthTag = " data-start='${start + sourceOffset}' data-end='${end + sourceOffset}'"
             val valueAlignId = " value-align-id='$msgIndex-$index'"
             val hex = segmentBytes.hex()
-            val text = segmentBytes.decodeToString()
+            val text = htmlEscape(segmentBytes.decodeToString())
 
             // differentiate between field types
             when (segment.fieldType) {
                 SSFField.STRING, SSFField.STRING_PAYLOAD -> """
                     <div class="ssffield roundbox data" $valueLengthTag $valueAlignId>
                         <div class="ssfvalue" $valueLengthTag>
-                            $hex <span>→</span> "$text"
+                            "$text"
                         </div>
                     </div>
                 """.trimIndent()
@@ -45,7 +46,7 @@ object SSFRenderer {
                     """
                         <div class="ssffield roundbox data" $valueLengthTag $valueAlignId>
                             <div class="ssfvalue" $valueLengthTag>
-                                Payload length: "$payloadLength"
+                                Length field: ${payloadLength}B
                             </div>
                         </div>
                     """.trimIndent()
