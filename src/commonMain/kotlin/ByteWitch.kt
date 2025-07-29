@@ -5,7 +5,6 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
-
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
@@ -50,6 +49,7 @@ object ByteWitch {
 
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
+        
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
             return decoders.mapNotNull {
