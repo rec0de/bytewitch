@@ -6,10 +6,12 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
+import kotlin.js.Date
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
+var lastSelectionEvent: Double? = null
 var tryhard = false
 
 // save parsed messages for float view and SwiftSegFinder
@@ -29,9 +31,6 @@ fun main() {
 
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
-
-        // input listener for text areas
-        applyLiveDecodeListeners()
 
         decodeBtn.onclick = {
             tryhard = false
@@ -73,7 +72,7 @@ fun main() {
 
         // to add more text areas for protocols
         addDataBox.onclick = {
-            appendTextArea("")
+            appendTextArea()
         }
 
         // to delete last text area
@@ -85,12 +84,39 @@ fun main() {
 
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
-            applyLiveDecodeListeners()
             0.0
         }
+
+        // init first textarea
+        appendTextArea()
+
+        // a click anywhere clears any present selection
+        // (as do specific keystrokes, but we'll see if we want to worry about those)
+        document.onclick = {
+            // avoid immediately clearing selection from click associated with select event
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+                clearSelections()
+            }
+        }
+
+        document.onkeydown = {
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+                clearSelections()
+            }
+        }
+
     })
 }
 
+fun clearSelections() {
+    lastSelectionEvent = null
+    val inputs = document.querySelectorAll("textarea")
+    inputs.asList().forEach {
+        val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
+        val selectionLabel = sizeLabel.firstChild!!.nextSibling as HTMLSpanElement
+        selectionLabel.innerText = ""
+    }
+}
 
 // decode one specific byte sequence
 fun decodeBytes(bytes: ByteArray, taIndex: Int) {
@@ -190,6 +216,9 @@ fun decode(isLiveDecoding: Boolean) {
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
+
+        // remember if this textarea has plain hex input so we can enable selection highlighting
+        textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
 
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes

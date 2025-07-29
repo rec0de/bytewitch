@@ -1,5 +1,8 @@
 import kotlinx.browser.document
 import org.w3c.dom.*
+import kotlin.js.Date
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 // remove text area from view and corresponding listeners
 fun removeTextArea(dataContainer: Element) {
@@ -26,20 +29,7 @@ fun removeTextArea(dataContainer: Element) {
     hexview.innerHTML = ""
 }
 
-
-// input listener for live decode of all text areas
-fun applyLiveDecodeListeners() {
-    val textareas = document.querySelectorAll(".input_area")
-    for (i in 0 until textareas.length) {
-        val ta = textareas[i] as HTMLTextAreaElement
-        ta.oninput = {
-            if (liveDecodeEnabled)
-                decode(true)
-        }
-    }
-}
-
-fun appendTextArea(content: String) {
+fun appendTextArea(content: String = "") {
     val container = document.getElementById("data_container")!!
 
     // create new textareaContainer if no empty one exists
@@ -66,11 +56,36 @@ fun appendTextArea(content: String) {
     wrapper.appendChild(sizeLabel)
     container.appendChild(wrapper)
 
-    if (liveDecodeEnabled) {
-        textarea.oninput = {
+    textarea.oninput = {
+        if(liveDecodeEnabled)
             decode(true)
+    }
+
+    textarea.onselect = {
+        lastSelectionEvent = Date().getTime()
+
+        // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
+        if(textarea.getAttribute("data-plainhex") == "true") {
+            clearSelections()
+            Logger.log("selected ${textarea.selectionStart} to ${textarea.selectionEnd}")
+
+            val prefix = textarea.value.substring(0, textarea.selectionStart!!)
+            val sizeLabel = textarea.nextElementSibling as HTMLDivElement
+
+            val r = Regex("#[^\n]*$")
+            if(r.containsMatchIn(prefix))
+                sizeLabel.innerText = "" // selection starts in a comment
+            else {
+                val selection = textarea.value.substring(textarea.selectionStart!!, textarea.selectionEnd!!)
+                val offset = ByteWitch.stripCommentsAndFilterHex(prefix).length.toDouble()/2
+                val range = ByteWitch.stripCommentsAndFilterHex(selection).length.toDouble()/2
+
+
+                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
+            }
         }
     }
+
 }
 
 
