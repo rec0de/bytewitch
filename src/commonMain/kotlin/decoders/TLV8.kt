@@ -32,7 +32,6 @@ object TLV8 : ByteWitchDecoder {
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         try {
-            // val res = decode(data, 0) as Tlv8Result
             val res = decode(data, sourceOffset) as Tlv8Result
 
             val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
