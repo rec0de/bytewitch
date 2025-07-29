@@ -29,7 +29,7 @@ object SSFRenderer {
                 SSFField.STRING, SSFField.STRING_PAYLOAD -> """
                     <div class="ssffield roundbox data" $valueLengthTag $valueAlignId>
                         <div class="ssfvalue" $valueLengthTag>
-                            $hex <span>→</span> "$text"
+                            "$text"
                         </div>
                     </div>
                 """.trimIndent()
@@ -45,7 +45,7 @@ object SSFRenderer {
                     """
                         <div class="ssffield roundbox data" $valueLengthTag $valueAlignId>
                             <div class="ssfvalue" $valueLengthTag>
-                                Payload length: "$payloadLength"
+                                Length field: ${payloadLength}B
                             </div>
                         </div>
                     """.trimIndent()
