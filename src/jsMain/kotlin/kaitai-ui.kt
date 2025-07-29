@@ -8,10 +8,10 @@ import org.w3c.dom.HTMLInputElement
 object KaitaiUI {
     private val nameInput = document.getElementById("kaitai-name") as HTMLInputElement
     private val addButton = document.getElementById("add-kaitai") as HTMLButtonElement
-    private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput", "kaitai-live-struct")
+    private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput")
     private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
-    private val liveDecode = TwoWayCheckboxBinding("kaitai-live", "kaitai-live-enabled")
+    private val liveDecode = TwoWayCheckboxBinding("kaitai-live")
 
     init {
         addButton.onclick = {

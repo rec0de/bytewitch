@@ -3,6 +3,7 @@ import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.properties.Delegates
 
+// TODO: Convert the storage to a session storage
 class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
     private val inputElement = document.getElementById(elementId) as HTMLTextAreaElement
 
@@ -30,6 +31,7 @@ class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
     }
 }
 
+// TODO: Convert the storage to a session storage
 class TwoWayCheckboxBinding(elementId: String, storageKey: String? = null) {
     private val checkboxElement = document.getElementById(elementId) as HTMLInputElement
 

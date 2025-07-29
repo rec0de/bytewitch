@@ -1216,14 +1216,15 @@ abstract class KaitaiNumber(
     abstract val suffix: String
 
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                "${id}(${parseValueAsString()})${suffix}" +
-                doc.renderHTML() +
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${parseValueAsString()})${suffix}" +
+                    doc.renderHTML() +
                 "</div>"
     }
 
     protected abstract fun parseValueAsString(): String
 
+    // TODO: Could be moved to bitimage.kt and placed as extension function on Short
     protected fun byteArrayToShort(byteArray: ByteArray, endianness: ByteOrder): Short {
         return if (endianness == ByteOrder.BIG) {
             ((byteArray[0].toInt() and 0xFF) shl 8 or
