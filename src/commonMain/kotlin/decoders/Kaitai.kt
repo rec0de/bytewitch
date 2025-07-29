@@ -897,12 +897,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
             val bytesListTreeForInnerList = if (repetitionKind != null) {
                 val bytesListTreeForInnerList = MutableKaitaiTree()
-                bytesListTree.parent = parentBytesListTree
-                if (bytesListTree.parent != null) {
-                    bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
-                } else {
-                    bytesListTree.byteOrder = ByteOrder.BIG
-                }
+                bytesListTreeForInnerList.parent = bytesListTree
+                bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
                 bytesListTreeForInnerList
             } else {
                 null
