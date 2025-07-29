@@ -1017,7 +1017,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
                 val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
                 bytesListTree.add(KaitaiList(parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-                    KaitaiDoc("", "")))
+                    KaitaiDoc(undefined, undefined)))
             }
         }
         val resultDoc = KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
@@ -1143,7 +1143,7 @@ class KaitaiList(override val id: String, override var endianness: ByteOrder,
                  override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc
 ): KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
+        return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "[", "]") { it.renderHTML() }}</div>"
     }
 
     // KaitaiList does not really have a value itself, but if it's called we want to deliver a reasonable result
