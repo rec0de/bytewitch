@@ -106,31 +106,37 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
 
+    /*
+    // return if no data is given or just a half byte
+    if (bytes.isEmpty()) {
+        return
+    }
+    */
+
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
-    if (result.isNotEmpty()) {
-        bytefinder.style.display = "flex"
+    bytefinder.style.display = "flex"
 
-        // check if message-output container already exists
-        val messageId = "message-output-$taIndex"
-        var messageBox = document.getElementById(messageId) as? HTMLDivElement
+    // check if message-output container already exists
+    val messageId = "message-output-$taIndex"
+    var messageBox = document.getElementById(messageId) as? HTMLDivElement
 
-        if (messageBox == null) {
-            messageBox = document.createElement("DIV") as HTMLDivElement
-            messageBox.id = messageId
-            messageBox.classList.add("message-output") // apply layout CSS
-            output.appendChild(messageBox)
-        } else {
-            messageBox.innerHTML = "" // clear old content
-        }
-
-        result.forEach {
-            messageBox.appendChild(renderByteWitchResult(it, taIndex))
-        }
-
-        messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+    if (messageBox == null) {
+        messageBox = document.createElement("DIV") as HTMLDivElement
+        messageBox.id = messageId
+        messageBox.classList.add("message-output") // apply layout CSS
+        output.appendChild(messageBox)
+    } else {
+        messageBox.innerHTML = "" // clear old content
     }
+
+    result.forEach {
+        messageBox.appendChild(renderByteWitchResult(it, taIndex))
+    }
+
+    // for SSF content
+    messageBox.appendChild(decodeWithSSF(bytes, taIndex))
 }
 
 // render result of byte witch decoder

@@ -58,7 +58,7 @@ class SSFParser {
                 val curr = msg.segments[i]
 
                 // don't split if it's a STRING field
-                if (curr.fieldType == SSFField.STRING) {
+                if (curr.fieldType != SSFField.UNKNOWN) {
                     newSegments.add(curr)
                     i++
                     continue
