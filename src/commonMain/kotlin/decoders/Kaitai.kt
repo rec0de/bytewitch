@@ -757,24 +757,6 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         }
     }
 
-    /*
-    parse the byte order/endianness of a sequence element
-     */
-    fun parseByteOrder(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree): ByteOrder {
-        var byteOrder = bytesListTree.byteOrder // use the byte order of the sequence
-
-        if (seqElement.type != undefined) { // if the element has a type
-            if (getCustomType(currentScopeStruct, seqElement.type) == null) { // if the type is not a custom type
-                if (seqElement.type.endsWith("be")) {
-                    byteOrder = ByteOrder.BIG
-                } else if (seqElement.type.endsWith("le")) {
-                    byteOrder = ByteOrder.LITTLE
-                }
-            }
-        }
-        return byteOrder
-    }
-
     fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableKaitaiTree, type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
@@ -815,7 +797,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
     fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree) : Type {
         var type = Type(seqElement)
-        type.byteOrder = parseByteOrder(currentScopeStruct, seqElement, bytesListTree)
+        type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != undefined) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()
         }
