@@ -1,0 +1,367 @@
+:root {
+    --on-accent: #fff;
+    --content-back: #fee5ed;
+    --accent: #c9748f;
+    --accent-highlight: #b9466b;
+    --bplist: #7e74c9;
+    --bplist-highlight: #5547b8;
+    --nsarchive: #74c9c7;
+    --nsarchive-highlight: #46b9b6;
+    --opack: #74c97b;
+    --opack-highlight: #46b951;
+    --asn: #c574c9;
+    --asn-highlight: #b346b9;
+    --generic: #c9a07420;
+    --generic-highlight: #b98346;
+    --neutral: #a0a0a0;
+    --neutral-highlight: #838383;
+    --kaitai: #c9a074;
+    --kaitai-highlight: #b98346;
+    --rowgap: 0.3rem;
+    --sans: Lato, Roboto, Helvetica, sans-serif;
+    --mono: monospace;
+}
+
+html, body {
+    font-family: var(--sans);
+    margin: 0;
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    background: #ccc;
+    background: url("back.jpg") repeat scroll 0% 0%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1, h2, h3 {
+    margin: 0px;
+}
+
+h3 {
+    margin-bottom: var(--rowgap);
+}
+
+button {
+    border-radius: 0.3rem;
+    color: var(--on-accent);
+    background: var(--accent);
+    border: 0px;
+    padding: 0.4rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.1s ease;
+    transition: background 0.1s ease;
+}
+
+button:hover {
+    color: var(--accent);
+    background: var(--on-accent);
+}
+
+.header {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-self: center;
+    align-items: center;
+}
+
+.header > img {
+    height: 4rem;
+}
+
+.legend {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    color: #fff;
+    font-size: 0.75rem;
+}
+
+.parsebuttons, .kaitaibuttons {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.parsebuttons > div, .kaitaibuttons > div {
+    flex-grow: 1;
+}
+
+.container {
+    box-sizing: border-box;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 0.5rem;
+    float: right;
+    display: flex;
+    flex-direction: column;
+    background: var(--content-back);
+    max-width: 100%;
+}
+
+.container > textarea {
+    font-family: monospace;
+    max-width: 100%;
+    width: 800px;
+    height: 250px;
+    resize: both;
+}
+
+.container > span {
+    padding-top:  0.5rem;
+    padding-bottom:  0.5rem;
+}
+
+.container > button {
+    padding-top:  0.25rem;
+    padding-bottom:  0.25rem;
+    margin-top:  0.5rem;
+}
+
+.invisible {
+    display: none;
+}
+
+.parsecontent {
+    display: flex;
+    font-family: var(--mono);
+}
+
+.roundbox, .legend > div {
+    box-sizing: border-box;
+    border-radius: 0.3rem;
+    padding: var(--rowgap);
+}
+
+.protobuf {
+    box-sizing: border-box;
+    background: var(--accent);
+    display: flex;
+    flex-direction: column;
+    gap: var(--rowgap);
+}
+
+.protofield {
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.5);
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+}
+
+.protofield > div {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--rowgap);
+    align-items: start;
+}
+
+.protovalue {
+    box-sizing: border-box;
+    padding: var(--rowgap);
+    border-radius: 0.3rem;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.bplist {
+    background: var(--bplist);
+}
+
+.nsarchive {
+    background: var(--nsarchive);
+}
+
+.opack {
+    background: var(--opack);
+}
+
+.generic {
+    background: var(--generic);
+}
+
+.neutral {
+    background: var(--neutral);
+}
+
+.kaitai {
+    background: var(--kaitai);
+}
+
+.asn1 {
+    background: var(--asn);
+}
+
+.generic, .neutral, .asn1, .flexy {
+    display: flex;
+    gap: var(--rowgap);
+    align-items: start;
+    flex-wrap: wrap;
+}
+
+.bpvalue {
+    padding: var(--rowgap);
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 0.3rem;
+}
+
+.bpdict, .bparray, .bpset, .nsdict, .nsarray, .nsset, .opdict, .oparray {
+    padding: var(--rowgap);
+    border-radius: 0.3rem;
+    background: var(--bplist);
+    display: flex;
+    gap: var(--rowgap);
+    align-items: start;
+}
+
+.bpdict, .nsdict, .opdict, .largecollection {
+    flex-direction: column;
+}
+
+.bpdict > div, .nsdict > div, .opdict > div {
+    display: flex;
+    flex-direction: row;
+    gap: var(--rowgap);
+    align-items: center;
+}
+
+.bpdict > div > span, .nsdict > div > span, .opdict > div > span {
+    font-family: var(--sans);
+}
+
+.nsdict, .nsarray, .nsset {
+    background: var(--nsarchive);
+}
+
+.opdict, .oparray {
+    background: var(--opack);
+}
+
+.asn1sequence {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--rowgap);
+}
+
+.stringlit {
+    font-family: var(--mono);
+    whitespace: pre-wrap;
+}
+
+.data {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
+
+#output {
+    gap: 1rem;
+}
+
+#bytefinder {
+    display: none;
+}
+
+#hexview, #textview {
+    margin-top: var(--rowgap);
+    font-family: var(--mono);
+    overflow-wrap: anywhere;
+}
+
+#hexview > span, #textview > span {
+    background: var(--accent);
+}
+
+.protobuf.highlight {
+    background: var(--accent-highlight);
+}
+
+.asn1.highlight {
+    background: var(--asn-highlight);
+}
+
+.bplist.highlight {
+    background: var(--bplist-highlight);
+}
+
+.opack.highlight {
+    background: var(--opack-highlight);
+}
+
+.nsarchive.highlight {
+    background: var(--nsarchive-highlight);
+}
+
+.generic.highlight {
+    background: var(--generic-highlight);
+}
+
+.neutral.highlight {
+    background: var(--neutral-highlight);
+}
+
+.kaitai.highlight {
+    background: var(--kaitai-highlight);
+}
+
+.tooltip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.tooltip:hover > .tooltip-container {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip > .tooltip:hover ~ .tooltip-container {
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+.tooltip-container {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: 200px;
+}
+
+.tooltip-content {
+    padding: 10px;
+    background-color: #333333ee;
+    color: white;
+    border-radius: 6px;
+}
+
+.tooltip-arrow {
+    height: 5px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.tooltip-arrow::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #333333ee;
+}
