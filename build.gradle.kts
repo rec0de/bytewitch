@@ -31,6 +31,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("com.ionspin.kotlin:bignum:0.3.10")
+                implementation("org.jetbrains:markdown:0.7.3")
             }
         }
         val commonTest by getting {
