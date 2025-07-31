@@ -1,5 +1,4 @@
 import bitmage.fromHex
-import bitmage.hex
 import decoders.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -28,7 +27,8 @@ object ByteWitch {
 
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
-        val isBase64 = cleanedData.replace("\n", "").matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
+        val isBase64 = cleanedData.replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=]+[G-Z+/=\\-_][A-Z0-9+/=\\-_]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
         plainHex = false
 
@@ -44,7 +44,6 @@ object ByteWitch {
                     filtered.fromHex()
             }
         }
-
     }
 
 
@@ -120,8 +119,23 @@ object ByteWitch {
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun decodeBase64(base64Data: String): ByteArray {
+        // transform URL-safe base64 into regular base64
+        val canonicalB64 = base64Data.replace('-', '+').replace('_', '/')
+
+        // b64 string is already padded!
+        val padded = if(canonicalB64.endsWith("="))
+            canonicalB64
+        else {
+            when (canonicalB64.length % 4) {
+                0 -> canonicalB64
+                2 -> "$canonicalB64=="
+                3 -> "$canonicalB64="
+                else -> "" // illegal unpadded b64
+            }
+        }
+
         return try {
-            Base64.Default.decode(base64Data)
+            Base64.Default.decode(padded)
         }
         catch (e: Exception) {
             byteArrayOf()
