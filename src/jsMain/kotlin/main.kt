@@ -125,7 +125,7 @@ fun main() {
 
 fun clearSelections() {
     lastSelectionEvent = null
-    val inputs = document.querySelectorAll("textarea")
+    val inputs = document.querySelectorAll("#data_container .input_area")
     inputs.asList().forEach {
         val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
         val selectionLabel = sizeLabel.firstChild!!.nextSibling as HTMLSpanElement
