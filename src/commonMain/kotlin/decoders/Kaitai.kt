@@ -1075,7 +1075,7 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
         -> should be rendered as a list of links in the HTML output
      */
 
-    private val urlRegex = Regex("""\b((https?|ftp)://|www\.)[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]""")
+    private val urlRegex = Regex("""\bhttps?://[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]""")
 
 
     fun renderHTML(): String {
