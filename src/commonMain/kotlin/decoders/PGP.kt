@@ -3,7 +3,6 @@ package decoders
 import Date
 import ParseCompanion
 import bitmage.ByteOrder
-import bitmage.fromHex
 import bitmage.hex
 import htmlEscape
 import kotlin.math.ceil
@@ -15,26 +14,59 @@ object PGP: ByteWitchDecoder, ParseCompanion() {
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         parseOffset = 0
         val blocks = mutableListOf<ByteWitchResult>()
+        check(data.size > 10) { "unreasonably short PGP message" }
 
         while(parseOffset < data.size) {
             val start = sourceOffset + parseOffset
             val ctb = readInt(data, 1)
             check(ctb and 0x80 != 0) { "expecting CTB to have high bit set" }
 
-            var lengthFieldSize = 1 shl (ctb and 0x03)
-            val type = (ctb and 0x7c) shr 2
+            var lengthFieldSize: Int
+            val type: Int
+            val length: Int
+            val newFormat: Boolean
 
-            val length = if(lengthFieldSize == 8) {
-                lengthFieldSize = 0
-                data.size - parseOffset
+            // old format header
+            if(ctb and 0x40 == 0) {
+                newFormat = false
+                lengthFieldSize = 1 shl (ctb and 0x03)
+                type = (ctb and 0x7c) shr 2
+
+                length = if(lengthFieldSize == 8) {
+                    lengthFieldSize = 0
+                    data.size - parseOffset
+                }
+                else {
+                    readUInt(data, lengthFieldSize, ByteOrder.LITTLE).toInt()
+                }
             }
+            // new format header
             else {
-                readUInt(data, lengthFieldSize, ByteOrder.LITTLE).toInt()
+                newFormat = true
+                type = ctb and 0x3F
+                val firstLenByte = readUInt(data, 1, ByteOrder.LITTLE).toInt()
+                when(firstLenByte) {
+                    in 0..191 -> {
+                        lengthFieldSize = 1
+                        length = firstLenByte
+                    }
+                    in 192..223 -> {
+                        lengthFieldSize = 2
+                        val secondLenByte = readUInt(data, 1, ByteOrder.LITTLE).toInt()
+                        length = ((firstLenByte - 192) shl 8) + secondLenByte + 192
+                    }
+                    255 -> {
+                        lengthFieldSize = 5
+                        length = readUInt(data, 4, ByteOrder.LITTLE).toInt()
+                    }
+                    else -> throw Exception("illegal first length byte value $firstLenByte")
+                }
             }
 
-            Logger.tag("PGP", "reading type $type lengthFieldSize $lengthFieldSize length $length")
+            Logger.tag("PGP", "reading type $type lengthFieldSize $lengthFieldSize length $length new? $newFormat")
 
-            check(data.size -parseOffset >= length) { "incorrect data length in header" }
+            check(type in 1..19) { "undefined packet type $type" }
+            check(data.size - parseOffset >= length) { "incorrect data length in header" }
 
             val block = when(type) {
                 1 -> {
@@ -196,3 +228,4 @@ class PGPunknown(val type: Int, val length: Int, val lengthSize: Int, val data: 
 
     }
 }
+

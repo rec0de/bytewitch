@@ -4,16 +4,19 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
-
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, PGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP,
+        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder,
+        OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32,
         Randomness, HeuristicSignatureDetector
     )
 
     private var bundledKaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
     private var kaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
     private var kaitaiLiveDecoder: ByteWitchDecoder? = null
+
+    private var plainHex = false
+    fun isPlainHex() = plainHex
 
     fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         val decoder = Kaitai(name, kaitaiStruct)
@@ -62,23 +65,30 @@ object ByteWitch {
         return listOfNotNull(kaitaiLiveDecoder) + allDecoders
     }
 
+    fun stripCommentsAndFilterHex(data: String): String {
+        // allow use of # as line comment
+        val stripped = data.split("\n").map { line ->
+            val commentMarker = line.indexOfFirst{ it == '#' }
+            val lineEnd = if(commentMarker == -1) line.length else commentMarker
+            line.substring(0, lineEnd)
+        }.joinToString("")
+
+        return stripped.filter { it in "0123456789abcdefABCDEF" }
+    }
+
     fun getBytesFromInputEncoding(data: String): ByteArray {
         val cleanedData = data.trim()
-        val isBase64 = cleanedData.matches(Regex("^[A-Z0-9+/=]+[G-Z+/=][A-Z0-9+/=]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
+        val isBase64 = cleanedData.replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=]+[G-Z+/=\\-_][A-Z0-9+/=\\-_]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
+        plainHex = false
 
         return when {
-            isBase64 -> decodeBase64(cleanedData)
+            isBase64 -> decodeBase64(cleanedData.replace("\n", ""))
             isHexdump -> decodeHexdump(cleanedData)
             else -> {
-                // allow use of # as line comment
-                val stripped = data.split("\n").map { line ->
-                    val commentMarker = line.indexOfFirst{ it == '#' }
-                    val lineEnd = if(commentMarker == -1) line.length else commentMarker
-                    line.substring(0, lineEnd)
-                }.joinToString("")
-
-                val filtered = stripped.filter { it in "0123456789abcdefABCDEF" }
+                plainHex = true
+                val filtered = stripCommentsAndFilterHex(cleanedData)
                 if (filtered.length % 2 != 0)
                     byteArrayOf()
                 else
@@ -158,9 +168,23 @@ object ByteWitch {
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun decodeBase64(base64Data: String): ByteArray {
-        // Decode Base64 directly into raw bytes
+        // transform URL-safe base64 into regular base64
+        val canonicalB64 = base64Data.replace('-', '+').replace('_', '/')
+
+        // b64 string is already padded!
+        val padded = if(canonicalB64.endsWith("="))
+            canonicalB64
+        else {
+            when (canonicalB64.length % 4) {
+                0 -> canonicalB64
+                2 -> "$canonicalB64=="
+                3 -> "$canonicalB64="
+                else -> "" // illegal unpadded b64
+            }
+        }
+
         return try {
-            Base64.Default.decode(base64Data)
+            Base64.Default.decode(padded)
         }
         catch (e: Exception) {
             byteArrayOf()
