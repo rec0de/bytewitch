@@ -11,7 +11,7 @@ object KaitaiUI {
     private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput")
     private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
-    private val liveDecode = TwoWayCheckboxBinding("kaitai-live")
+    private val includeLiveStruct = TwoWayCheckboxBinding("kaitai-live")
 
     init {
         addButton.onclick = {
@@ -29,17 +29,19 @@ object KaitaiUI {
         }
 
         kaitaiInput.onInput = {
-            if (liveDecode.checked) {
+            if (includeLiveStruct.checked) {
                 ByteWitch.setKaitaiLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
                     decode(false)
             }
         }
 
-        liveDecode.onChange = { enabled ->
-            if (enabled) {
+        includeLiveStruct.onChange = { liveStructEnabled ->
+            if (liveStructEnabled) {
                 ByteWitch.setKaitaiLiveDecoder(getInputValue())
-                decode(false)
+                if (liveDecodeEnabled) {
+                    decode(false)
+                }
             } else {
                 ByteWitch.setKaitaiLiveDecoder(null)
             }
@@ -52,7 +54,7 @@ object KaitaiUI {
     }
 
     fun isLiveDecodeEnabled(): Boolean {
-        return liveDecode.checked
+        return includeLiveStruct.checked
     }
 
     fun loadKaitaiStructsFromStorage() {

@@ -68,19 +68,17 @@ fun main() {
             fileInput.click()
         }
 
-        liveDecode.onchange = {
+        liveDecode.onchange = { enabled ->
             liveDecodeEnabled = liveDecode.checked
-            if (KaitaiUI.isLiveDecodeEnabled()) {
-                ByteWitch.setKaitaiLiveDecoder(KaitaiUI.getInputValue())
-                if (liveDecodeEnabled)
-                    decode(false)
-            }
+            if (liveDecodeEnabled)
+                decode(false)
             0.0
         }
     })
 }
 
 fun decode(tryhard: Boolean) {
+    console.log("decode(tryhard=$tryhard)")
     val input = document.getElementById("data") as HTMLTextAreaElement
     val output = document.getElementById("output") as HTMLDivElement
 
