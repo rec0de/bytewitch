@@ -775,13 +775,24 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type!!)
             if (match != null) {
                 val typePrefix = match.groupValues[1]
-                val sizeInBytes = match.groupValues[2].toUInt()
-                type.sizeInBits = sizeInBytes * 8u
+                val size = match.groupValues[2].toUInt()
                 when (typePrefix) {
-                    "s" -> type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
-                    "u" -> type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
-                    "f" -> type.usedDisplayStyle = DisplayStyle.FLOAT
-                    "b" -> type.usedDisplayStyle = DisplayStyle.BINARY
+                    "s" -> {
+                        type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
+                        type.sizeInBits = size * 8u
+                    }
+                    "u" -> {
+                        type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
+                        type.sizeInBits = size * 8u
+                    }
+                    "f" -> {
+                        type.usedDisplayStyle = DisplayStyle.FLOAT
+                        type.sizeInBits = size * 8u
+                    }
+                    "b" -> {
+                        type.usedDisplayStyle = DisplayStyle.BINARY
+                        type.sizeInBits = size
+                    }
                 }
                 if (match.groupValues[3] == "le") {
                     type.byteOrder = ByteOrder.LITTLE
