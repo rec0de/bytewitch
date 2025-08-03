@@ -1,17 +1,9 @@
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
-
-
-@Serializable
-data class KaitaiManifest(
-    val files: List<String>,
-)
 
 object KaitaiUI {
     private val nameInput = document.getElementById("kaitai-name") as HTMLInputElement
@@ -20,7 +12,6 @@ object KaitaiUI {
     private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
     private val liveDecode = TwoWayCheckboxBinding("kaitai-live")
-    private val popupWindowButton = document.getElementById("kaitai-open-editor-window") as HTMLButtonElement
 
     init {
         addButton.onclick = {
@@ -54,14 +45,6 @@ object KaitaiUI {
             }
             0.0
         }
-
-        popupWindowButton.onclick = {
-            if (KaitaiEditorWindow.isOpen()) {
-                KaitaiEditorWindow.close()
-            } else {
-                KaitaiEditorWindow.open()
-            }
-        }
     }
 
     fun getInputValue(): String {
@@ -93,34 +76,35 @@ object KaitaiUI {
     }
 
     suspend fun loadBundledStructs() {
-        val manifest = loadManifest()
+        val names = loadBundledList()
 
-        for (path in manifest.files) {
+        for (kaitaiName in names) {
             // Load file
-            val response = window.fetch("kaitai/$path").await()
+            val response = window.fetch("kaitai/$kaitaiName.ksy").await()
             if (!response.ok) {
                 throw Error("Failed to load Kaitai Struct: ${response.statusText}")
             }
             val ksyContent = response.text().await()
 
             // Register the Kaitai Struct decoder
-            val name = path.substringBeforeLast(".")
-            val success = ByteWitch.registerBundledKaitaiDecoder(name, ksyContent)
+            val success = ByteWitch.registerBundledKaitaiDecoder(kaitaiName, ksyContent)
             if (!success) {
-                throw Error("Failed to register Kaitai Struct: $name")
+                throw Error("Failed to register Kaitai Struct: $kaitaiName")
             }
 
-            addParserToUI(name, bundled = true)
+            addParserToUI(kaitaiName, bundled = true)
         }
     }
 
-    private suspend fun loadManifest(): KaitaiManifest {
-        val response = window.fetch("kaitai-manifest.json").await()
+    private suspend fun loadBundledList(): List<String> {
+        val response = window.fetch("kaitai-manifest.txt").await()
         if (!response.ok) {
             throw Error("Failed to load Kaitai manifest: ${response.statusText}")
         }
         val manifestContent = response.text().await()
-        return Json.decodeFromString(manifestContent)
+        return manifestContent.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
     }
 
     private fun addParser(name: String, kaitaiStruct: String) {
