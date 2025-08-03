@@ -11,6 +11,11 @@ import bitmage.toInt
 import bitmage.toMinimalAmountOfBytes
 import bitmage.toUInt
 import bitmage.toUTF8String
+import kaitai.KTRepeat
+import kaitai.KTSeq
+import kaitai.KTStruct
+import kaitai.KTValid
+import kaitai.toByteOrder
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
@@ -75,18 +80,14 @@ class Type(seqElement : dynamic) {
     var hasCustomType: Boolean = false
 }
 
-class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecoder {
+class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
     var completeStruct: dynamic = undefined
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        completeStruct = try {
-            JsYaml.load(kaitaiStruct)
-        } catch (e: dynamic) {
-            throw Exception("Unexpected Error occurred during parsing of Kaitai Yaml File. Is it syntactically correct Yaml?\n$e")
-        }
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
-            processSeq(completeStruct, parentBytesListTree = null, completeStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            val id = kaitaiStruct.meta?.id ?: name
+            processSeq(id, null, parentBytesListTree = null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
             console.error(e)
             throw Exception("Unexpected Exception has been thrown:\n$e")
@@ -670,18 +671,21 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return parseTokens(tokenizeExpression(expression))
     }
 
-    fun parseValue(value: dynamic, bytesListTree: MutableKaitaiTree) : BooleanArray {
-        val flattenedArray = js("[value].flat(2)")  // handle both cases of 0x0a as well as [0x0a]. // TODO Can someone find an elegant way without javascript?
+    fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
+        return parseValue(listOf(value), bytesListTree)
+    }
+
+    fun parseValue(value: List<String>, bytesListTree: MutableKaitaiTree) : BooleanArray {
         var fullyFlatArray = booleanArrayOf()
-        for (element in flattenedArray) {
-            if (element is Int) {
-                fullyFlatArray += (element as Int).toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
+        for (element in value) {
+            if (element.toIntOrNull() != null) {
+                fullyFlatArray += element.toInt().toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
             } else {
                 try {
                     fullyFlatArray += parseReference(element, bytesListTree)
                 } catch (e: Exception) {
                     for (i in 0..element.length - 1) {
-                        fullyFlatArray += (element.charCodeAt(i) as Int).toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
+                        fullyFlatArray += element[i].toBooleanArray()
                     }
                 }
             }
@@ -689,40 +693,42 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return fullyFlatArray
     }
 
-    fun checkContentsKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
-        return parseValue(seqElement.contents, bytesListTree).contentEquals(dataBytes)
+    fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree): Boolean {
+        return parseValue(contents, bytesListTree).contentEquals(dataBytes)
     }
 
-    fun checkValidKey(seqElement: dynamic, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree, kaitaiElement: KaitaiElement): Boolean {
-        if (seqElement.valid.min != undefined || seqElement.valid.max != undefined) {
+    // TODO: refactor
+    fun checkValidKey(valid: KTValid, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree): Boolean {
+        if (valid.min != null || valid.max != null) {
             val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
-            val parsedValidMin = parseValue(seqElement.valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-            if ((seqElement.valid.min != undefined) && (parsedValue < parsedValidMin)) {
-                return false
+            if (valid.min != null) {
+                val parsedValidMin = parseValue(valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
+                if (parsedValue < parsedValidMin) {
+                    return false
+                }
             }
-            val parsedValidMax = parseValue(seqElement.valid.max, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-            if ((seqElement.valid.max != undefined) && (parsedValue > parsedValidMax)) {
-                return false
+            if (valid.max != null) {
+                val parsedValidMax = parseValue(valid.max, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
+                if (parsedValue > parsedValidMax) {
+                    return false
+                }
             }
             return true
-        } else if (seqElement.valid["any-of"] != undefined) {
-            for (i in 0..seqElement.valid["any-of"].length-1) {
-                if (parseValue(seqElement.valid["any-of"][i], bytesListTree).contentEquals(dataBytes)) {
+        } else if (valid.anyOf != null) {
+            for (entry in valid.anyOf) {
+                if (parseValue(entry, bytesListTree).contentEquals(dataBytes)) {
                     return true
                 }
             }
             return false
-        } else if (seqElement.valid.expr != undefined) {
+        } else if (valid.expr != null) {
             // TODO parse arbitrary expression
-        } else {
-            val valueToCheckAgainst = if (seqElement.valid.eq != undefined) {
-                parseValue(seqElement.valid.eq, bytesListTree)
-            } else {
-                parseValue(seqElement.valid, bytesListTree)
-            }
+            return true
+        } else if (valid.eq != null) {
+            val valueToCheckAgainst = parseValue(valid.eq, bytesListTree)
             return valueToCheckAgainst.padLeft(dataBytes.size - valueToCheckAgainst.size).contentEquals(dataBytes)
         }
-        return true
+        return false
     }
 
     /*
@@ -757,7 +763,7 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         }
     }
 
-    fun parseBuiltinType(seqElement : dynamic, bytesListTree: MutableKaitaiTree, type: Type) : Type {
+    fun parseBuiltinType(terminator: String?, bytesListTree: MutableKaitaiTree, type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
         }
@@ -767,9 +773,9 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
             type.terminator = byteArrayOf(0x00)
         } else if (type.type == "str") {
             type.usedDisplayStyle = DisplayStyle.STRING
-            if (type.terminator != undefined) {
+            if (terminator != null) {
                 type.sizeIsUntilTerminator = true
-                type.terminator = parseValue(seqElement.terminator, bytesListTree).toByteArray() // TODO: Make proper method out of this. Could probably be a value defined somewhere else aswell :(
+                type.terminator = parseValue(terminator, bytesListTree).toByteArray() // TODO: Make proper method out of this. Could probably be a value defined somewhere else as well :(
             }
         } else {
             val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type!!)
@@ -795,31 +801,33 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return type
     }
 
-    fun parseType(currentScopeStruct: dynamic, seqElement: dynamic, bytesListTree: MutableKaitaiTree) : Type {
+    fun parseType(currentScopeStruct: dynamic, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
         var type = Type(seqElement)
         type.byteOrder = bytesListTree.byteOrder
-        if (seqElement.contents != undefined) {
+        if (seqElement.contents != null) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()
         }
-        if (seqElement["size-eos"] != undefined) {
-            type.sizeIsUntilEOS = seqElement["size-eos"]
+        if (seqElement.sizeEos != null) {
+            type.sizeIsUntilEOS = seqElement.sizeEos
         }
-        if (seqElement.terminator != undefined) {
-            type.terminator = parseValue(seqElement.terminator, bytesListTree).toByteArray()
+        if (seqElement.terminator != null) {
+            type.terminator = parseValue(seqElement.terminator.toString(), bytesListTree).toByteArray()
             type.sizeIsUntilTerminator = true
         }
         if (getCustomType(currentScopeStruct, type.type) != null) {  // parse custom type aka subtypes
             type.hasCustomType = true
         } else if (type.type != null) {  // parse builtin type
-            type = parseBuiltinType(seqElement, bytesListTree, type)
+            type = parseBuiltinType(seqElement.terminator.toString(), bytesListTree, type)
         }
-        if (seqElement.size != undefined) {
-            var parsedValue = parseValue(seqElement.size, bytesListTree)
+        if (seqElement.size != null) {
+            // TODO: if size is an Integer, we can parse it directly
+            val parsedValue = parseValue(seqElement.size.toString(), bytesListTree)
             type.sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
         }
         return type
     }
 
+    // TODO: not needed anymore? Most likely we should refactor the repeat logic
     fun getRepetitionKind(seqElement: dynamic): String? {
         val repetitionKind = if (seqElement.repeat != undefined) {
             seqElement.repeat
@@ -839,17 +847,8 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         return repetitionKind
     }
 
-    fun processSeq(parentSeq: dynamic, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: dynamic, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
-        val parentId = if (parentSeq.id != undefined) {
-            parentSeq.id
-        } else {  // for the root element
-            if (parentSeq.meta != undefined && parentSeq.meta.id != undefined) {
-                parentSeq.meta.id
-            } else {
-                name
-            }
-        }
-
+    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
+                   ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -866,22 +865,21 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
         } else {
             bytesListTree.byteOrder = ByteOrder.BIG
         }
-        if (!(currentScopeStruct.meta == undefined || currentScopeStruct.meta.endian == undefined)) {
-            bytesListTree.byteOrder = if (currentScopeStruct.meta.endian == "be") {
-                ByteOrder.BIG
-            } else {
-                ByteOrder.LITTLE
+        currentScopeStruct.meta?.let { meta ->
+            meta.endian?.let { endian ->
+                bytesListTree.byteOrder = endian.toByteOrder()
             }
         }
+
         var dataSizeOfSequenceInBits: Int = 0
 
         for (seqElement in currentScopeStruct.seq) {
             val elementId = seqElement.id
 
-            val repetitionKind = getRepetitionKind(seqElement)
+            //val repetitionKind = getRepetitionKind(seqElement)
             var repeatAmount = 0
 
-            val bytesListTreeForInnerList = if (repetitionKind != null) {
+            val bytesListTreeForInnerList = if (seqElement.repeat != null) {
                 val bytesListTreeForInnerList = MutableKaitaiTree()
                 bytesListTreeForInnerList.parent = bytesListTree
                 bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
@@ -922,15 +920,15 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
 
                 if (type.hasCustomType) {
                     val typeScopeStruct = getCustomType(currentScopeStruct, type.type)
-                    kaitaiElement = processSeq(seqElement, bytesListTree, typeScopeStruct, ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits )
-                    if (seqElement["doc"] == undefined && seqElement["doc-ref"] == undefined) {
+                    kaitaiElement = processSeq(seqElement.id, seqElement, bytesListTree, typeScopeStruct, ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits )
+                    if (seqElement.doc == null && seqElement.docRef == null) {
                         // current sequence element has no doc, so we try to get the doc from the type
                         kaitaiElement.doc = KaitaiDoc(typeScopeStruct["doc"], typeScopeStruct["doc-ref"])
                     }
                 } else {
                     val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
                     val sourceRangeBitOffset = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8)
-                    val elementDoc = KaitaiDoc(seqElement["doc"], seqElement["doc-ref"])
+                    val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
 
                     kaitaiElement = when (type.usedDisplayStyle) {
                         DisplayStyle.BINARY -> {
@@ -995,10 +993,12 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                         }
                     }
                 }
-                if ((seqElement.contents != undefined) && !checkContentsKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
+
+                if (seqElement.contents != null && !checkContentsKey(seqElement.contents, ioSubStream, bytesListTree)) {
                     throw Exception("Value of bytes does not align with expected contents value.")
                 }
-                if ((seqElement.valid != undefined) && !checkValidKey(seqElement, ioSubStream, bytesListTree, kaitaiElement)) {
+
+                if ((seqElement.valid != null) && !checkValidKey(seqElement.valid, ioSubStream, bytesListTree)) {
                     throw Exception("Value of bytes does not align with expected valid value.")
                 }
 
@@ -1009,38 +1009,39 @@ class Kaitai(val kaitaiName: String, val kaitaiStruct: String) : ByteWitchDecode
                 offsetInDatastreamInBits = offsetInDatastreamInBits + type.sizeInBits.toInt()
                 dataSizeOfSequenceInBits += type.sizeInBits.toInt()
 
-                if (repetitionKind != null) {
+                if (seqElement.repeat != null) {
                     bytesListTreeForInnerList!!.add(kaitaiElement)
                 } else {
                     bytesListTree.add(kaitaiElement)
                 }
 
                 repeatAmount = repeatAmount + 1
-                if (repetitionKind == "eos") {
+                if (seqElement.repeat == KTRepeat.EOS) {
                     if (ioStream.size == dataSizeOfSequenceInBits) {
                         break
                     }
-                } else if (repetitionKind == "expr") {
-                    if (repeatAmount >= parseValue(seqElement["repeat-expr"], bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
+                } else if (seqElement.repeat == KTRepeat.EXPR) {
+                    // TODO: validate that repeat-expr is actually set
+                    if (repeatAmount >= parseValue(seqElement.repeatExpr!!, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
                         break
                     }
-                } else if (repetitionKind == "until") {
+                } else if (seqElement.repeat == KTRepeat.UNTIL) {
                     throw Exception("repeat-until is not supported yet")
-                    if (seqElement["repeat-until"]) {  // TODO Completely wrong, needs expression parsing to work
+                    if (seqElement.repeatUntil != null) {  // TODO Completely wrong, needs expression parsing to work
                         break
                     }
                 } else {
                     break  // if we have no repeat at all we just do this inner loop once
                 }
             }
-            if (repetitionKind != null) {
+            if (seqElement.repeat != null) {
                 val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
                 val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
                 bytesListTree.add(KaitaiList(parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-                    KaitaiDoc(undefined, undefined)))
+                    KaitaiDoc(null, null)))
             }
         }
-        val resultDoc = KaitaiDoc(parentSeq["doc"], parentSeq["doc-ref"])
+        val resultDoc = KaitaiDoc(parentSeq?.doc, parentSeq?.docRef)
 
         // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
         val resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
@@ -1057,7 +1058,7 @@ interface KaitaiElement : ByteWitchResult {
     var doc: KaitaiDoc
 }
 
-class KaitaiDoc(val docstring: String?, val docref: String?) {
+class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
 
     /*
     Learnings for 'doc' and 'doc-ref' keys
@@ -1079,31 +1080,21 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
 
 
     fun renderHTML(): String {
-        if (docstring == undefined && docref == undefined) {
+        if (docstring == null && docRef == null) {
             return ""
         }
 
         // doc
-        val docstringHtml = if (docstring == undefined) {
-            ""
-        } else {
-            val docstringMarkdown = docstring as String
+        val docstringHtml = docstring?.let { docstring ->
+            val docstringMarkdown = docstring
             val flavour = CommonMarkFlavourDescriptor()
             val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(docstringMarkdown)
             HtmlGenerator(docstringMarkdown, parsedTree, flavour).generateHtml()
-        }
+        } ?: ""
 
         // doc-ref
-        val docrefList = if (docref != undefined) {
-            if (docref is String) {
-                arrayOf(docref)
-            } else {
-                docref as Array<String>
-            }
-        } else {
-            emptyArray<String>()
-        }
-        val docrefLinkified = docrefList.mapNotNull { ref ->
+        val docRefList = docRef ?: emptyList()
+        val docRefLinkified = docRefList.map { ref ->
             if (urlRegex.containsMatchIn(ref)) {
                 // replace the URL with an HTML link
                 ref.replace(urlRegex) { matchResult ->
@@ -1113,24 +1104,24 @@ class KaitaiDoc(val docstring: String?, val docref: String?) {
                 ref // return the raw string as is
             }
         }
-        val docrefHtml = when (docrefLinkified.size) {
+        val docRefHtml = when (docRefLinkified.size) {
             0 -> ""
-            1 -> docrefLinkified[0]
-            else -> docrefLinkified.joinToString(separator = "", prefix = "<ul>", postfix = "</ul>") { ref ->
+            1 -> docRefLinkified[0]
+            else -> docRefLinkified.joinToString(separator = "", prefix = "<ul>", postfix = "</ul>") { ref ->
                 "<li>$ref</li>"
             }
         }
 
-        if (docstringHtml.isEmpty() && docrefHtml.isEmpty()) {
+        if (docstringHtml.isEmpty() && docRefHtml.isEmpty()) {
             return ""
         }
-        val renderDivider = docstringHtml.isNotEmpty() && docrefHtml.isNotEmpty()
+        val renderDivider = docstringHtml.isNotEmpty() && docRefHtml.isNotEmpty()
 
         return  "<div class=\"tooltip-container\">" +
                     "<div class=\"tooltip-content roundbox\">" +
                         docstringHtml +
                         if (renderDivider) { "<hr/>" } else { "" } +
-                        docrefHtml +
+                        docRefHtml +
                     "</div>" +
                     "<div class=\"tooltip-arrow\"></div>" +
                 "</div>"

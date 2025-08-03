@@ -1,5 +1,6 @@
 import bitmage.fromHex
 import decoders.*
+import kaitai.KaitaiParser
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -19,7 +20,13 @@ object ByteWitch {
     fun isPlainHex() = plainHex
 
     fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
-        val decoder = Kaitai(name, kaitaiStruct)
+        val struct = KaitaiParser.parseYaml(kaitaiStruct)
+        if (struct == null) {
+            Logger.log("Failed to parse Kaitai struct for $name")
+            return false
+        }
+
+        val decoder = Kaitai(name, struct)
         bundledKaitaiDecoders[name] = decoder
         Logger.log("Registered bundled Kaitai decoder: $name")
         return true
@@ -32,7 +39,12 @@ object ByteWitch {
             return false
         }
 
-        val decoder = Kaitai(name, kaitaiStruct)
+        val struct = KaitaiParser.parseYaml(kaitaiStruct)
+        if (struct == null) {
+            Logger.log("Failed to parse Kaitai struct for $name")
+            return false
+        }
+        val decoder = Kaitai(name, struct)
         kaitaiDecoders[name] = decoder
         Logger.log("Registered Kaitai decoder: $name")
         return true
@@ -53,10 +65,18 @@ object ByteWitch {
         if (kaitaiStruct == null || kaitaiStruct.isBlank()) {
             Logger.log("Kaitai live decoder set to null")
             kaitaiLiveDecoder = null
-        } else {
-            kaitaiLiveDecoder = Kaitai("Live", kaitaiStruct)
-            Logger.log("Set Kaitai live decoder")
+            return true
         }
+
+        val struct = KaitaiParser.parseYaml(kaitaiStruct)
+        if (struct == null) {
+            Logger.log("Failed to parse Kaitai struct for live decoder")
+            kaitaiLiveDecoder = null
+            return false
+        }
+        //console.log(struct)
+        kaitaiLiveDecoder = Kaitai("Live", struct)
+        Logger.log("Set Kaitai live decoder")
         return true
     }
 

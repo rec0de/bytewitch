@@ -1,5 +1,6 @@
 plugins {
     kotlin("multiplatform") version "2.1.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0"
 }
 
 group = "me.user"
@@ -32,6 +33,7 @@ kotlin {
             dependencies {
                 implementation("com.ionspin.kotlin:bignum:0.3.10")
                 implementation("org.jetbrains:markdown:0.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
             }
         }
         val commonTest by getting {
@@ -73,6 +75,6 @@ kotlin {
 
 afterEvaluate {
     rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension> {
-        versions.webpackCli.version="4.10.0"
+        versions.webpackCli.version = "4.10.0"
     }
 }
