@@ -72,12 +72,14 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
 class Type(seqElement : dynamic) {
     var byteOrder: ByteOrder = ByteOrder.BIG
     var sizeInBits: UInt = 0u
+    var sizeIsKnown: Boolean = false
     var sizeIsUntilEOS: Boolean = false
     var sizeIsUntilTerminator: Boolean = false
     var terminator: ByteArray? = null
     var type: String? = if (seqElement.type) {seqElement.type.toString()} else {null}
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var hasCustomType: Boolean = false
+    var customType: dynamic = undefined
 }
 
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
@@ -728,7 +730,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val valueToCheckAgainst = parseValue(valid.eq, bytesListTree)
             return valueToCheckAgainst.padLeft(dataBytes.size - valueToCheckAgainst.size).contentEquals(dataBytes)
         }
-        return false
+        return true
     }
 
     /*
@@ -781,19 +783,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type!!)
             if (match != null) {
                 val typePrefix = match.groupValues[1]
-                val sizeInBytes = match.groupValues[2].toUInt()
-                type.sizeInBits = sizeInBytes * 8u
+                val size = match.groupValues[2].toUInt()
                 when (typePrefix) {
-                    "s" -> type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
-                    "u" -> type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
-                    "f" -> type.usedDisplayStyle = DisplayStyle.FLOAT
-                    "b" -> type.usedDisplayStyle = DisplayStyle.BINARY
+                    "s" -> {
+                        type.usedDisplayStyle = DisplayStyle.SIGNED_INTEGER
+                        type.sizeInBits = size * 8u
+                    }
+                    "u" -> {
+                        type.usedDisplayStyle = DisplayStyle.UNSIGNED_INTEGER
+                        type.sizeInBits = size * 8u
+                    }
+                    "f" -> {
+                        type.usedDisplayStyle = DisplayStyle.FLOAT
+                        type.sizeInBits = size * 8u
+                    }
+                    "b" -> {
+                        type.usedDisplayStyle = DisplayStyle.BINARY
+                        type.sizeInBits = size
+                    }
                 }
                 if (match.groupValues[3] == "le") {
                     type.byteOrder = ByteOrder.LITTLE
                 } else if (match.groupValues[3] == "be") {
                     type.byteOrder = ByteOrder.BIG
                 }
+                type.sizeIsKnown = true
             } else {
                 throw RuntimeException("Attempted to parse as builtin type ${type.type} but that doesn't seem to be a valid type")
             }
@@ -806,6 +820,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()
+            type.sizeIsKnown = true
         }
         if (seqElement.sizeEos != null) {
             type.sizeIsUntilEOS = seqElement.sizeEos
@@ -814,15 +829,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.terminator = parseValue(seqElement.terminator.toString(), bytesListTree).toByteArray()
             type.sizeIsUntilTerminator = true
         }
-        if (getCustomType(currentScopeStruct, type.type) != null) {  // parse custom type aka subtypes
+        val customTypeCandidate = getCustomType(currentScopeStruct, type.type)
+        if (customTypeCandidate != null) {  // parse custom type aka subtypes
             type.hasCustomType = true
+            type.customType = customTypeCandidate
         } else if (type.type != null) {  // parse builtin type
             type = parseBuiltinType(seqElement.terminator.toString(), bytesListTree, type)
         }
-        if (seqElement.size != null) {
+        if (seqElement.size != null) {  // we do this last, because in some cases other sizes can be overwritten
             // TODO: if size is an Integer, we can parse it directly
             val parsedValue = parseValue(seqElement.size.toString(), bytesListTree)
             type.sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
+            type.sizeIsKnown = true
         }
         return type
     }
@@ -872,180 +890,164 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
 
         var dataSizeOfSequenceInBits: Int = 0
+        if (currentScopeStruct.seq.isNotEmpty()) {
+            for (seqElement in currentScopeStruct.seq) {
+                val elementId = seqElement.id
 
-        for (seqElement in currentScopeStruct.seq) {
-            val elementId = seqElement.id
+                //val repetitionKind = getRepetitionKind(seqElement)
+                var repeatAmount = 0
 
-            //val repetitionKind = getRepetitionKind(seqElement)
-            var repeatAmount = 0
-
-            val bytesListTreeForInnerList = if (seqElement.repeat != null) {
-                val bytesListTreeForInnerList = MutableKaitaiTree()
-                bytesListTreeForInnerList.parent = bytesListTree
-                bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
-                bytesListTreeForInnerList
-            } else {
-                null
-            }
-
-            while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
-                val type = parseType(currentScopeStruct, seqElement, bytesListTree)
-                if (type.sizeIsUntilEOS) {
-                    type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
-                }
-                if (type.sizeIsUntilTerminator) {
-                    val dataAsByteArray = ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
-                    type.sizeInBits = (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8 .. dataAsByteArray.size-1).indexOfFirstSubsequence(type.terminator).toUInt() + type.terminator!!.size.toUInt()) * 8u
-                }
-
-                // if we are operating on non byte aligned data, but we don't have a binary data type, something is very wrong
-                if (((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
-                    && !type.hasCustomType) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
-                    throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
-                }
-
-                var kaitaiElement : KaitaiElement
-                var ioSubStream = if (type.sizeInBits != 0u) {  // slice if we have a substream
-                    ioStream.sliceArray(offsetInDatastreamInBits .. offsetInDatastreamInBits + type.sizeInBits.toInt() -1)
+                val bytesListTreeForInnerList = if (seqElement.repeat != null) {
+                    val bytesListTreeForInnerList = MutableKaitaiTree()
+                    bytesListTreeForInnerList.parent = bytesListTree
+                    bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
+                    bytesListTreeForInnerList
                 } else {
-                    ioStream
+                    null
                 }
 
-                // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
-                if (!type.hasCustomType // no subtypes
-                    && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
-                    && type.byteOrder == ByteOrder.LITTLE) { // little needs flipping, big doesn't need it anyways
-                    ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
-                }
-
-                if (type.hasCustomType) {
-                    val typeScopeStruct = getCustomType(currentScopeStruct, type.type)
-                    kaitaiElement = processSeq(seqElement.id, seqElement, bytesListTree, typeScopeStruct, ioSubStream, sourceOffsetInBits + dataSizeOfSequenceInBits, if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits )
-                    if (seqElement.doc == null && seqElement.docRef == null) {
-                        // current sequence element has no doc, so we try to get the doc from the type
-                        kaitaiElement.doc = KaitaiDoc(typeScopeStruct["doc"], typeScopeStruct["doc-ref"])
+                while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
+                    val type = parseType(currentScopeStruct, seqElement, bytesListTree)
+                    if (type.sizeIsUntilEOS) {
+                        type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
+                        type.sizeIsKnown = true
                     }
-                } else {
-                    val sourceByteRange = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8)
-                    val sourceRangeBitOffset = Pair((sourceOffsetInBits + dataSizeOfSequenceInBits) % 8, (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8)
-                    val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
+                    if (type.sizeIsUntilTerminator) {
+                        val dataAsByteArray =
+                            ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
+                        type.sizeInBits =
+                            (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8..dataAsByteArray.size - 1).indexOfFirstSubsequence(type.terminator)
+                                .toUInt() + type.terminator!!.size.toUInt()) * 8u
+                        type.sizeIsKnown = true
+                    }
 
-                    kaitaiElement = when (type.usedDisplayStyle) {
-                        DisplayStyle.BINARY -> {
-                            KaitaiBinary(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
+                    // if we are operating on non byte aligned data, but we don't have a binary data type, something is very wrong
+                    if (((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
+                        && !type.hasCustomType
+                    ) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
+                        throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
+                    }
+
+                    var kaitaiElement: KaitaiElement
+                    var ioSubStream = if (type.sizeIsKnown) {  // slice if we have a substream
+                        ioStream.sliceArray(offsetInDatastreamInBits..offsetInDatastreamInBits + type.sizeInBits.toInt() - 1)
+                    } else {
+                        ioStream
+                    }
+
+                    // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
+                    if (!type.hasCustomType // no subtypes
+                        && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
+                        && type.byteOrder == ByteOrder.LITTLE
+                    ) { // little needs flipping, big doesn't need it anyways
+                        ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
+                    }
+
+                    if (type.hasCustomType) {
+                        kaitaiElement = processSeq(
+                            seqElement.id,
+                            seqElement,
+                            bytesListTree,
+                            type.customType,
+                            ioSubStream,
+                            sourceOffsetInBits + dataSizeOfSequenceInBits,
+                            if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits
+                        )
+
+                        if (seqElement.doc == null && seqElement.docRef == null) {
+                            // current sequence element has no doc, so we try to get the doc from the type
+                            kaitaiElement.doc = KaitaiDoc(type.customType["doc"], type.customType["doc-ref"])
                         }
-                        DisplayStyle.STRING -> {
-                            KaitaiString(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
-                        }
-                        DisplayStyle.SIGNED_INTEGER -> {
-                            KaitaiSignedInteger(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
-                        }
-                        DisplayStyle.UNSIGNED_INTEGER -> {
-                            KaitaiUnsignedInteger(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
-                        }
-                        DisplayStyle.FLOAT -> {
-                            KaitaiFloat(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
-                        }
-                        else -> { // displayStyle.HEX as the fallback (even if it's a known type like int or whatever
-                            KaitaiBytes(
-                                elementId,
-                                type.byteOrder,
-                                ioSubStream,
-                                sourceByteRange,
-                                sourceRangeBitOffset,
-                                elementDoc
-                            )
+                    } else {
+                        val sourceByteRange = Pair(
+                            (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8,
+                            (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8
+                        )
+                        val sourceRangeBitOffset = Pair(
+                            (sourceOffsetInBits + dataSizeOfSequenceInBits) % 8,
+                            (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8
+                        )
+                        val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
+
+                        kaitaiElement = when (type.usedDisplayStyle) {
+                            DisplayStyle.BINARY -> KaitaiBinary(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            // displayStyle.HEX as the fallback (even if it's a known type or whatever)
+                            else -> KaitaiBytes(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                         }
                     }
-                }
 
-                if (seqElement.contents != null && !checkContentsKey(seqElement.contents, ioSubStream, bytesListTree)) {
-                    throw Exception("Value of bytes does not align with expected contents value.")
-                }
+                    if (seqElement.contents != null && !checkContentsKey(seqElement.contents, ioSubStream, bytesListTree)) {
+                        throw Exception("Value of bytes does not align with expected contents value.")
+                    }
 
-                if ((seqElement.valid != null) && !checkValidKey(seqElement.valid, ioSubStream, bytesListTree)) {
-                    throw Exception("Value of bytes does not align with expected valid value.")
-                }
+                    if (seqElement.valid != null && !checkValidKey(seqElement.valid, ioSubStream, bytesListTree)) {
+                        throw Exception("Value of bytes does not align with expected valid value.")
+                    }
 
-                if (type.sizeInBits == 0u) {  // only update value if it's still totally unknown. If we overwrite it always, then we would cut off seq that don't use the full datastream
-                    type.sizeInBits = kaitaiElement.value.size.toUInt()
-                }
+                    if (!type.sizeIsKnown) {  // only update value if it's still totally unknown. If we overwrite it always, then we would cut off seq that don't use the full datastream prematurely
+                        type.sizeInBits = kaitaiElement.value.size.toUInt()
+                        type.sizeIsKnown
+                    }
 
-                offsetInDatastreamInBits = offsetInDatastreamInBits + type.sizeInBits.toInt()
-                dataSizeOfSequenceInBits += type.sizeInBits.toInt()
+                    offsetInDatastreamInBits += type.sizeInBits.toInt()
+                    dataSizeOfSequenceInBits += type.sizeInBits.toInt()
+
+                    if (seqElement.repeat != null) {
+                        bytesListTreeForInnerList!!.add(kaitaiElement)
+                    } else {
+                        bytesListTree.add(kaitaiElement)
+                    }
+
+                    repeatAmount += 1
+                    if (seqElement.repeat == KTRepeat.EOS) {
+                        if (ioStream.size == dataSizeOfSequenceInBits) {
+                            break
+                        }
+                    } else if (seqElement.repeat == KTRepeat.EXPR) {
+                        // TODO: validate that repeat-expr is actually set
+                        if (repeatAmount >= parseValue(seqElement.repeatExpr!!, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
+                            break
+                        }
+                    } else if (seqElement.repeat == KTRepeat.UNTIL) {
+                        throw Exception("repeat-until is not supported yet")
+                        if (seqElement.repeatUntil != null) {  // TODO Completely wrong, needs expression parsing to work
+                            break
+                        }
+                    } else {
+                        break  // if we have no repeat at all we just do this inner loop once
+                    }
+                }
 
                 if (seqElement.repeat != null) {
-                    bytesListTreeForInnerList!!.add(kaitaiElement)
-                } else {
-                    bytesListTree.add(kaitaiElement)
+                    val resultSourceByteRange =
+                        Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+                    val resultSourceRangeBitOffset =
+                        Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+                    bytesListTree.add(
+                        KaitaiList(
+                            parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
+                            KaitaiDoc(undefined, undefined)
+                        )
+                    )
                 }
-
-                repeatAmount = repeatAmount + 1
-                if (seqElement.repeat == KTRepeat.EOS) {
-                    if (ioStream.size == dataSizeOfSequenceInBits) {
-                        break
-                    }
-                } else if (seqElement.repeat == KTRepeat.EXPR) {
-                    // TODO: validate that repeat-expr is actually set
-                    if (repeatAmount >= parseValue(seqElement.repeatExpr!!, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
-                        break
-                    }
-                } else if (seqElement.repeat == KTRepeat.UNTIL) {
-                    throw Exception("repeat-until is not supported yet")
-                    if (seqElement.repeatUntil != null) {  // TODO Completely wrong, needs expression parsing to work
-                        break
-                    }
-                } else {
-                    break  // if we have no repeat at all we just do this inner loop once
-                }
-            }
-            if (seqElement.repeat != null) {
-                val resultSourceByteRange = Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
-                val resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
-                bytesListTree.add(KaitaiList(parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-                    KaitaiDoc(null, null)))
             }
         }
         val resultDoc = KaitaiDoc(parentSeq?.doc, parentSeq?.docRef)
 
         // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
-        val resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
-        val resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
+        val resultSourceByteRange: Pair<Int, Int>
+        val resultSourceRangeBitOffset: Pair<Int, Int>
+        if (currentScopeStruct.seq.isEmpty()) {
+            resultSourceByteRange = Pair(0,0) // is it possible to do the actual start and end value (which are the same) here instead of 0?
+            resultSourceRangeBitOffset = Pair(0,0)
+        } else {
+            resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
+            resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
+        }
         return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
     }
 }
