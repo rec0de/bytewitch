@@ -21,6 +21,7 @@ object KaitaiUI {
     private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
     private val liveDecode = TwoWayCheckboxBinding("kaitai-live")
+    private var changedSinceLastDecode = true
 
     init {
         addButton.onclick = {
@@ -41,17 +42,17 @@ object KaitaiUI {
             if (liveDecode.checked) {
                 updateLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
-                    decode(false)
+                    decode(true)
             }
         }
 
         liveDecode.onChange = { enabled ->
             if (enabled) {
                 updateLiveDecoder(getInputValue())
-                decode(false)
             } else {
                 updateLiveDecoder(null)
             }
+            decode(true)
             0.0
         }
     }
@@ -67,6 +68,15 @@ object KaitaiUI {
     fun updateLiveDecoder(kaitaiStruct: String?) {
         val success = ByteWitch.setKaitaiLiveDecoder(kaitaiStruct)
         kaitaiValid.style.display = if (success) "none" else "block"
+        setChangedSinceLastDecode(true)
+    }
+
+    fun hasChangedSinceLastDecode(): Boolean {
+        return changedSinceLastDecode
+    }
+
+    fun setChangedSinceLastDecode(value: Boolean) {
+        changedSinceLastDecode = value
     }
 
     fun loadKaitaiStructsFromStorage() {

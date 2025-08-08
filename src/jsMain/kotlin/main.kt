@@ -150,12 +150,12 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
+    // check if message-output container already exists
+    val messageId = "message-output-$taIndex"
+    var messageBox = document.getElementById(messageId) as? HTMLDivElement
+
     if (result.isNotEmpty()) {
         bytefinder.style.display = "flex"
-
-        // check if message-output container already exists
-        val messageId = "message-output-$taIndex"
-        var messageBox = document.getElementById(messageId) as? HTMLDivElement
 
         if (messageBox == null) {
             messageBox = document.createElement("DIV") as HTMLDivElement
@@ -171,6 +171,8 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
         }
 
         messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+    } else {
+        messageBox?.remove()
     }
 }
 
@@ -235,13 +237,15 @@ fun decode(isLiveDecoding: Boolean) {
         // remember if this textarea has plain hex input so we can enable selection highlighting
         textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
 
-        // only decode text area if input changed
+        // only decode text area if input changed or the Kaitai struct changed
         val oldBytes = parsedMessages[i]?.bytes
-        if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
+        if (KaitaiUI.hasChangedSinceLastDecode() || oldBytes == null || !oldBytes.contentEquals(bytes)) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
             decodeBytes(bytes, i)
         }
     }
+
+    KaitaiUI.setChangedSinceLastDecode(false)
 
     // refine ssf fields and rerender html content
     val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
