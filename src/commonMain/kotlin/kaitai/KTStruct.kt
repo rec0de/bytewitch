@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
@@ -36,7 +37,7 @@ data class KTStruct(
 
     val types: Map<String, KTStruct> = emptyMap(),
 
-    val instances: Map<String, KTSeq> = emptyMap(),
+    val instances: Map<String, KTInstance> = emptyMap(),
 )
 
 @Serializable
@@ -54,7 +55,9 @@ data class KTMeta(
 @Serializable
 data class KTSeq(
     val id: String,
-    val type: String? = null,
+
+    @Serializable(with = KTTypeSerializer::class)
+    val type: KTType? = null,
 
     @Serializable(with = StringOrIntSerializer::class)
     val size: StringOrInt? = null,
@@ -79,7 +82,58 @@ data class KTSeq(
 
     @Serializable(with = KTValidSerializer::class)
     val valid: KTValid? = null,
+
+    val value: String? = null,
 )
+
+@Serializable
+data class KTInstance(
+    val id: String? = null,
+
+    @Serializable(with = KTTypeSerializer::class)
+    val type: KTType? = null,
+
+    @Serializable(with = StringOrIntSerializer::class)
+    val size: StringOrInt? = null,
+    @SerialName("size-eos")
+    val sizeEos: Boolean? = null,
+
+    @Serializable(with = StringOrArraySerializer::class)
+    val contents: List<String>? = null,
+
+    val doc: String? = null,
+    @Serializable(with = StringOrArraySerializer::class)
+    @SerialName("doc-ref")
+    val docRef: List<String>? = null,
+
+    val repeat: KTRepeat? = null,
+    @SerialName("repeat-expr")
+    val repeatExpr: String? = null,
+    @SerialName("repeat-until")
+    val repeatUntil: String? = null,
+
+    val terminator: Int? = null,
+
+    @Serializable(with = KTValidSerializer::class)
+    val valid: KTValid? = null,
+
+    val value: String? = null,
+)
+
+@Serializable
+sealed class KTType {
+    @Serializable
+    data class Primitive(val type: String) : KTType() {
+        override fun toString(): String = type
+    }
+
+    @Serializable
+    data class Switch(
+        @SerialName("switch-on")
+        val switchOn: String,
+        val cases: Map<String, String>,
+    ) : KTType()
+}
 
 @Serializable
 enum class KTEndian {
@@ -146,6 +200,43 @@ object StringOrArraySerializer : KSerializer<List<String>> {
             encoder.encodeString(value.first())
         } else {
             encoder.encodeSerializableValue(ListSerializer(String.serializer()), value)
+        }
+    }
+}
+
+object KTTypeSerializer : KSerializer<KTType> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("KTType") {
+        element<String>("switch-on", isOptional = true)
+        element<Map<String, String>>("cases", isOptional = true)
+    }
+
+    override fun deserialize(decoder: Decoder): KTType {
+        val jsonDecoder = decoder as JsonDecoder
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> {
+                KTType.Primitive(element.jsonPrimitive.content)
+            }
+
+            is JsonObject -> {
+                val switchOn = element["switch-on"]?.jsonPrimitive?.content
+                val cases = element["cases"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content } ?: emptyMap()
+
+                if (switchOn != null && cases.isNotEmpty()) {
+                    KTType.Switch(switchOn, cases)
+                } else {
+                    throw SerializationException("Invalid KTType format: missing 'switch-on' or 'cases'")
+                }
+            }
+
+            else -> throw SerializationException("Invalid KTType format")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: KTType) {
+        when (value) {
+            is KTType.Primitive -> encoder.encodeString(value.type)
+            is KTType.Switch -> encoder.encodeSerializableValue(KTType.Switch.serializer(), value)
         }
     }
 }

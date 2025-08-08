@@ -14,6 +14,7 @@ import bitmage.toUTF8String
 import kaitai.KTRepeat
 import kaitai.KTSeq
 import kaitai.KTStruct
+import kaitai.KTType
 import kaitai.KTValid
 import kaitai.StringOrInt
 import kaitai.toByteOrder
@@ -684,12 +685,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return fullyFlatArray
     }
 
-    fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree): Boolean {
+    fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
         return parseValue(contents, bytesListTree).contentEquals(dataBytes)
     }
 
     // TODO: refactor
-    fun checkValidKey(valid: KTValid, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree): Boolean {
+    fun checkValidKey(valid: KTValid, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
         if (valid.min != null || valid.max != null) {
             val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
             if (valid.min != null) {
@@ -752,7 +753,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 type.terminator = parseValue(terminator, bytesListTree).toByteArray() // TODO: Make proper method out of this. Could probably be a value defined somewhere else as well :(
             }
         } else {
-            val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type!!)
+            val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type)
             if (match != null) {
                 val typePrefix = match.groupValues[1]
                 val size = match.groupValues[2].toUInt()
@@ -788,7 +789,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     }
 
     fun parseType(currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
-        var type = Type(seqElement.type)
+        if (seqElement.type is KTType.Switch) {
+            throw RuntimeException("Switches are not supported yet")
+        }
+        var type = Type((seqElement.type as KTType.Primitive?)?.type)
+
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()

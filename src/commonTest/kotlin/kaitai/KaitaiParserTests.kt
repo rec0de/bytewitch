@@ -28,10 +28,14 @@ class KaitaiParserTests {
         check(struct.meta.endian == KTEndian.LE) { "Expected endian to be 'le', got '${struct.meta.endian}'" }
 
         check(struct.seq.size == 2) { "Expected 2 sequence items, got ${struct.seq.size}" }
+
         check(struct.seq[0].id == "field1") { "Expected first field id to be 'field1', got '${struct.seq[0].id}'" }
-        check(struct.seq[0].type == "u4") { "Expected first field type to be 'u4', got '${struct.seq[0].type}'" }
+        check(struct.seq[0].type is KTType.Primitive) { "Expected first field type to be primitive" }
+        check((struct.seq[0].type as KTType.Primitive).type == "u4") { "Expected first field type to be 'u4', got '${struct.seq[0].type}'" }
+
         check(struct.seq[1].id == "field2") { "Expected second field id to be 'field2', got '${struct.seq[1].id}'" }
-        check(struct.seq[1].type == "str") { "Expected second field type to be 'str', got '${struct.seq[1].type}'" }
+        check(struct.seq[1].type is KTType.Primitive) { "Expected second field type to be primitive" }
+        check((struct.seq[1].type as KTType.Primitive).type == "str") { "Expected second field type to be 'str', got '${struct.seq[1].type}'" }
     }
 
     @Test
@@ -91,5 +95,46 @@ class KaitaiParserTests {
         check(struct.seq[4].contents == listOf("1", "85", "▒,3", "3")) {
             "Expected field 'magic5' contents to be [1, 85, '▒,3', 3], got '${struct.seq[4].contents}'"
         }
+    }
+
+    @Test
+    fun testType() {
+        val yaml = """
+            meta:
+              id: example
+            seq:
+              - id: field1
+                type: u4
+              - id: field2
+                type:
+                  switch-on: is_core_header
+                  cases:
+                    true: u2
+                    false: u4
+        """.trimIndent()
+
+        val struct = KaitaiParser.parseYaml(yaml)
+
+        checkNotNull(struct) { "Failed to parse Kaitai YAML" }
+
+        check(struct.seq.size == 2) { "Expected 2 sequence items, got ${struct.seq.size}" }
+
+        // Check field1 type
+        check(struct.seq[0].id == "field1") { "Expected first field id to be 'field1', got '${struct.seq[0].id}'" }
+        check(struct.seq[0].type is KTType.Primitive) { "Expected first field type to be primitive" }
+        check((struct.seq[0].type as KTType.Primitive).type == "u4") {
+            "Expected first field type to be 'u4', got '${(struct.seq[0].type as KTType.Primitive).type}'"
+        }
+
+        // Check field2 type
+        check(struct.seq[1].id == "field2") { "Expected second field id to be 'field2', got '${struct.seq[1].id}'" }
+        check(struct.seq[1].type is KTType.Switch) { "Expected second field type to be switch" }
+        val switchType = struct.seq[1].type as KTType.Switch
+        check(switchType.switchOn == "is_core_header") {
+            "Expected switch-on to be 'is_core_header', got '${switchType.switchOn}'"
+        }
+        check(switchType.cases.size == 2) { "Expected 2 cases, got ${switchType.cases.size}" }
+        check(switchType.cases["true"] == "u2") { "Expected case 'true' to be 'u2', got '${switchType.cases["true"]}'" }
+        check(switchType.cases["false"] == "u4") { "Expected case 'false' to be 'u4', got '${switchType.cases["false"]}'" }
     }
 }

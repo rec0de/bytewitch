@@ -18,9 +18,9 @@ class KaitaiDecoderTests {
                 id = "example"
             ),
             seq = listOf(
-                KTSeq(id = "field1", type = "u4"),
-                KTSeq(id = "field2", type = "strz"),
-                KTSeq(id = "field3", type = "s1")
+                KTSeq(id = "field1", type = KTType.Primitive("u4")),
+                KTSeq(id = "field2", type = KTType.Primitive("strz")),
+                KTSeq(id = "field3", type = KTType.Primitive("s1"))
             )
         )
 

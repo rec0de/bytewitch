@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 
 object KaitaiParser {
     private val jsonParser = Json {
-        //ignoreUnknownKeys = true
+        ignoreUnknownKeys = true
     }
 
     fun parseYaml(kaitaiYaml: String): KTStruct? {
