@@ -70,8 +70,7 @@ class Type(val type: String?) {
     var sizeIsUntilTerminator: Boolean = false
     var terminator: ByteArray? = null
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
-    var hasCustomType: Boolean = false
-    var customType: dynamic = undefined
+    var customType: KTStruct? = null
 }
 
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
@@ -678,9 +677,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 try {
                     fullyFlatArray += parseReference(element, bytesListTree)
                 } catch (e: Exception) {
-                    for (i in 0..element.length - 1) {
-                        fullyFlatArray += element[i].toBooleanArray()
-                    }
+                    fullyFlatArray += element.encodeToByteArray().toBooleanArray()
                 }
             }
         }
@@ -725,36 +722,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return true
     }
 
-    /*
-    parse a static path in a given scope recursively
-     */
-    fun parseStaticPath(currentScopeStruct: dynamic, path: String) : dynamic {
-        if (path.split("::").size == 1)
-            return currentScopeStruct.types[path]
-        else {
-            return parseStaticPath(currentScopeStruct.types[path.split("::")[0]], path.substringAfter("::")) // go one scope deeper
-        }
-    }
-
     // TODO: add support for imports
     /**
-     * check if there is a fitting custom type defined in the current or global scope
+     * check if there is a fitting custom type defined in the current scope
      * @param path: might be just a type or prefixed by a path via "::"
      * @return null if type doesn't exist in any scope or appropriate scope if it does
      */
-    fun getCustomType(currentScopeStruct: dynamic, path: String?) : dynamic {
-        if (path == null) {
-            return null
+    fun getCustomType(currentScopeStruct: KTStruct, path: String) : KTStruct? {
+        val elements = path.split("::", limit = 2)
+        val type = currentScopeStruct.types[elements[0]]
+        if (type != null && elements.size == 2) {
+            return getCustomType(type, elements[1]) // go one scope deeper
         }
-        try {
-            return parseStaticPath(currentScopeStruct, path)
-        } catch (e: dynamic) { // catch js exceptions
-            try {
-                return parseStaticPath(completeStruct, path)
-            } catch (e: dynamic) { // catch js exceptions
-                return null
-            }
-        }
+        return type
     }
 
     fun parseBuiltinType(terminator: String?, bytesListTree: MutableKaitaiTree, type: Type) : Type {
@@ -821,12 +801,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.terminator = parseValue(seqElement.terminator.toString(), bytesListTree).toByteArray()
             type.sizeIsUntilTerminator = true
         }
-        val customTypeCandidate = getCustomType(currentScopeStruct, type.type)
-        if (customTypeCandidate != null) {  // parse custom type aka subtypes
-            type.hasCustomType = true
-            type.customType = customTypeCandidate
-        } else if (type.type != null) {  // parse builtin type
-            type = parseBuiltinType(seqElement.terminator.toString(), bytesListTree, type)
+        if (type.type != null) {
+            // Check if we have a custom type defined in the current scope or in the global scope
+            val customTypeCandidate =
+                getCustomType(currentScopeStruct, type.type) ?:
+                getCustomType(kaitaiStruct, type.type)
+            if (customTypeCandidate != null) {  // parse custom type aka subtypes
+                type.customType = customTypeCandidate
+            } else {  // parse builtin type
+                type = parseBuiltinType(seqElement.terminator.toString(), bytesListTree, type)
+            }
         }
         if (seqElement.size != null) {  // we do this last, because in some cases other sizes can be overwritten
             // TODO: if size is an Integer, we can parse it directly
@@ -915,7 +899,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                     // if we are operating on non byte aligned data, but we don't have a binary data type, something is very wrong
                     if (((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
-                        && !type.hasCustomType
+                        && type.customType == null
                     ) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
                         throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
                     }
@@ -928,19 +912,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
 
                     // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
-                    if (!type.hasCustomType // no subtypes
+                    if (type.customType == null // no subtypes
                         && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
                         && type.byteOrder == ByteOrder.LITTLE
                     ) { // little needs flipping, big doesn't need it anyways
                         ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
                     }
 
-                    if (type.hasCustomType) {
+                    if (type.customType != null) {
                         kaitaiElement = processSeq(
                             seqElement.id,
                             seqElement,
                             bytesListTree,
-                            type.customType,
+                            type.customType!!,
                             ioSubStream,
                             sourceOffsetInBits + dataSizeOfSequenceInBits,
                             if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits
@@ -948,7 +932,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                         if (seqElement.doc == null && seqElement.docRef == null) {
                             // current sequence element has no doc, so we try to get the doc from the type
-                            kaitaiElement.doc = KaitaiDoc(type.customType["doc"], type.customType["doc-ref"])
+                            kaitaiElement.doc = KaitaiDoc(type.customType?.doc, type.customType?.docRef)
                         }
                     } else {
                         val sourceByteRange = Pair(

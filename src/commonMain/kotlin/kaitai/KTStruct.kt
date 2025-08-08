@@ -133,9 +133,8 @@ object StringOrArraySerializer : KSerializer<List<String>> {
 
     override fun deserialize(decoder: Decoder): List<String> {
         val jsonDecoder = decoder as JsonDecoder
-        val element = jsonDecoder.decodeJsonElement()
 
-        return when (element) {
+        return when (val element = jsonDecoder.decodeJsonElement()) {
             is JsonArray -> element.map { it.jsonPrimitive.content }
             is JsonPrimitive -> listOf(element.content)
             else -> throw SerializationException("Expected string or array")
@@ -162,8 +161,8 @@ object KTValidSerializer : KSerializer<KTValid> {
 
     override fun deserialize(decoder: Decoder): KTValid {
         val jsonDecoder = decoder as JsonDecoder
-        val element = jsonDecoder.decodeJsonElement()
-        return when (element) {
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
             is JsonObject -> Json.decodeFromJsonElement(element)
             // If it's a primitive, we assume it's a single string value for `eq`
             is JsonPrimitive -> KTValid(eq = element.content)

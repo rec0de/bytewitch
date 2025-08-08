@@ -329,13 +329,6 @@ fun UShortArray.utf16BEToUtf8(): UByteArray {
     return bytes.sliceArray(0 until j)
 }
 
-// TODO: validate
-fun Char.toBooleanArray(): BooleanArray {
-    return BooleanArray(16) { i ->
-        (this.code shr (15 - i) and 1) == 1
-    }
-}
-
 fun String.toUnicodeCodepoints(): List<Int> {
     var i = 0
     var j = 0
