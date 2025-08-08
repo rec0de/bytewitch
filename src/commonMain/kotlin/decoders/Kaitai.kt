@@ -20,13 +20,6 @@ import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
 
-@JsModule("js-yaml")
-@JsNonModule
-external object JsYaml {
-    fun load(yaml: String): dynamic  // needs to be dynamic, otherwise kotlin thinks all the properties (i.e. completeStruct.meta or completeStruct.seq) don't exist
-    fun dump(obj: dynamic): String
-}
-
 enum class DisplayStyle {
     HEX, BINARY, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING
 }
@@ -69,14 +62,13 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
         private set
 }
 
-class Type(seqElement : dynamic) {
+class Type(val type: String?) {
     var byteOrder: ByteOrder = ByteOrder.BIG
     var sizeInBits: UInt = 0u
     var sizeIsKnown: Boolean = false
     var sizeIsUntilEOS: Boolean = false
     var sizeIsUntilTerminator: Boolean = false
     var terminator: ByteArray? = null
-    var type: String? = if (seqElement.type) {seqElement.type.toString()} else {null}
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var hasCustomType: Boolean = false
     var customType: dynamic = undefined
@@ -815,8 +807,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun parseType(currentScopeStruct: dynamic, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
-        var type = Type(seqElement)
+    fun parseType(currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
+        var type = Type(seqElement.type)
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()

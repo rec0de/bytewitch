@@ -1,6 +1,5 @@
 package kaitai
 
-import decoders.JsYaml
 import kotlinx.serialization.json.Json
 
 object KaitaiParser {
@@ -20,4 +19,11 @@ object KaitaiParser {
         }
         return null
     }
+}
+
+@JsModule("js-yaml")
+@JsNonModule
+external object JsYaml {
+    fun load(yaml: String): dynamic  // needs to be dynamic, otherwise kotlin thinks all the properties (i.e. completeStruct.meta or completeStruct.seq) don't exist
+    fun dump(obj: dynamic): String
 }

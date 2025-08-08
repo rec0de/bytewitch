@@ -36,7 +36,7 @@ data class KTStruct(
 
     val types: Map<String, KTStruct> = emptyMap(),
 
-    val instances: Map<String, KTStruct> = emptyMap(),
+    val instances: Map<String, KTSeq> = emptyMap(),
 )
 
 @Serializable
