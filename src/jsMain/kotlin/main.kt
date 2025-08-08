@@ -95,7 +95,7 @@ fun main() {
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
             if (KaitaiUI.isLiveDecodeEnabled()) {
-                ByteWitch.setKaitaiLiveDecoder(KaitaiUI.getInputValue())
+                KaitaiUI.updateLiveDecoder(KaitaiUI.getInputValue())
                 if (liveDecodeEnabled)
                     decode(false)
             }

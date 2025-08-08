@@ -15,6 +15,7 @@ import kaitai.KTRepeat
 import kaitai.KTSeq
 import kaitai.KTStruct
 import kaitai.KTValid
+import kaitai.StringOrInt
 import kaitai.toByteOrder
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
@@ -75,7 +76,6 @@ class Type(val type: String?) {
 
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
-    var completeStruct: dynamic = undefined
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
@@ -813,32 +813,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         }
         if (seqElement.size != null) {  // we do this last, because in some cases other sizes can be overwritten
-            // TODO: if size is an Integer, we can parse it directly
-            val parsedValue = parseValue(seqElement.size.toString(), bytesListTree)
-            type.sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
+            if (seqElement.size is StringOrInt.IntValue) {
+                type.sizeInBits = seqElement.size.value.toUInt() * 8u
+            } else {
+                val parsedValue = parseValue(seqElement.size.toString(), bytesListTree)
+                type.sizeInBits = parsedValue.toByteArray().toUInt(ByteOrder.BIG) * 8u
+            }
             type.sizeIsKnown = true
         }
         return type
-    }
-
-    // TODO: not needed anymore? Most likely we should refactor the repeat logic
-    fun getRepetitionKind(seqElement: dynamic): String? {
-        val repetitionKind = if (seqElement.repeat != undefined) {
-            seqElement.repeat
-        } else {
-            null
-        }
-        if (repetitionKind == "expr" && seqElement["repeat-expr"] == undefined) {
-            throw Exception("With repeat type expr, a repeat-expr key is needed")
-        } else if (repetitionKind == "until" && seqElement["repeat-expr"] == undefined) {
-            throw Exception("With repeat type until, a repeat-until key is needed")
-        }
-        if (seqElement["repeat-expr"] != undefined && repetitionKind != "expr") {
-            throw Exception("When repeat-expr key is defined, repetition needs to be set to expr")
-        } else if (seqElement["repeat-until"] != undefined && repetitionKind != "until") {
-            throw Exception("When repeat-until key is defined, repetition needs to be set to until")
-        }
-        return repetitionKind
     }
 
     fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
@@ -870,9 +853,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             for (seqElement in currentScopeStruct.seq) {
                 val elementId = seqElement.id
 
-                //val repetitionKind = getRepetitionKind(seqElement)
-                var repeatAmount = 0
-
                 val bytesListTreeForInnerList = if (seqElement.repeat != null) {
                     val bytesListTreeForInnerList = MutableKaitaiTree()
                     bytesListTreeForInnerList.parent = bytesListTree
@@ -882,7 +862,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     null
                 }
 
-                while (true) {  // repeat key demands we create many elements possibly. We break at the very end of the loop
+                var repeatAmount = 0
+                while (true) { // repeat key demands we create many elements possibly. We break at the very end of the loop
                     val type = parseType(currentScopeStruct, seqElement, bytesListTree)
                     if (type.sizeIsUntilEOS) {
                         type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
@@ -972,8 +953,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     offsetInDatastreamInBits += type.sizeInBits.toInt()
                     dataSizeOfSequenceInBits += type.sizeInBits.toInt()
 
-                    if (seqElement.repeat != null) {
-                        bytesListTreeForInnerList!!.add(kaitaiElement)
+                    if (bytesListTreeForInnerList != null) {
+                        bytesListTreeForInnerList.add(kaitaiElement)
                     } else {
                         bytesListTree.add(kaitaiElement)
                     }
@@ -984,23 +965,22 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             break
                         }
                     } else if (seqElement.repeat == KTRepeat.EXPR) {
-                        // TODO: validate that repeat-expr is actually set
-                        if (repeatAmount >= parseValue(seqElement.repeatExpr!!, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
+                        checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
+                        if (repeatAmount >= parseValue(seqElement.repeatExpr, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
                             break
                         }
                     } else if (seqElement.repeat == KTRepeat.UNTIL) {
+                        checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
                         throw Exception("repeat-until is not supported yet")
-                        if (seqElement.repeatUntil != null) {  // TODO Completely wrong, needs expression parsing to work
-                            break
-                        }
+                        // TODO: implement repeat until, needs expression parsing to work
                     } else {
                         break  // if we have no repeat at all we just do this inner loop once
                     }
                 }
 
-                if (seqElement.repeat != null) {
+                if (bytesListTreeForInnerList != null) {
                     val resultSourceByteRange =
-                        Pair(bytesListTreeForInnerList!!.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+                        Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
                     val resultSourceRangeBitOffset =
                         Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
                     bytesListTree.add(
