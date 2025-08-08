@@ -51,19 +51,30 @@ kotlin {
     tasks.register("generateKaitaiManifest") {
         val kaitaiDir = file("src/commonMain/resources/kaitai")
         val outputDir = file("${layout.buildDirectory.get()}/processedResources/js/main")
-        val manifestFile = outputDir.resolve("kaitai-manifest.txt")
+        val manifestFile = outputDir.resolve("kaitai-manifest.json")
 
         inputs.dir(kaitaiDir)
         outputs.file(manifestFile)
 
         doLast {
-            val files = kaitaiDir.listFiles()?.filter { it.extension == "ksy" }?.map { it.nameWithoutExtension } ?: emptyList()
-            val textContent = buildString {
-                files.forEach { fileName ->
-                    appendLine(fileName)
-                }
+            val files = kaitaiDir.walk()
+                .filter { it.isFile && it.extension == "ksy" }
+                .map { it.relativeTo(kaitaiDir).path }
+                .toList()
+
+            val jsonFileList = files.joinToString(
+                prefix = "[",
+                postfix = "]",
+                separator = ", "
+            ) { "\"$it\"" }
+
+            val jsonOutput = buildString {
+                append("{\n")
+                append("  \"files\": $jsonFileList\n")
+                append("}\n")
             }
-            manifestFile.writeText(textContent)
+
+            manifestFile.writeText(jsonOutput)
             println("Kaitai manifest generated at ${manifestFile.absolutePath}")
         }
     }
