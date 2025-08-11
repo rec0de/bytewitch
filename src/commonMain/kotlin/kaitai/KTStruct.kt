@@ -62,7 +62,7 @@ data class KTSeq(
     @Serializable(with = StringOrIntSerializer::class)
     val size: StringOrInt? = null,
     @SerialName("size-eos")
-    val sizeEos: Boolean? = null,
+    val sizeEos: Boolean = false,
 
     @Serializable(with = StringOrArraySerializer::class)
     val contents: List<String>? = null,
@@ -79,6 +79,10 @@ data class KTSeq(
     val repeatUntil: String? = null,
 
     val terminator: Int? = null,
+    val consume: Boolean = true,
+    val include: Boolean = false,
+    @SerialName("eos-error")
+    val eosError: Boolean = true,
 
     @Serializable(with = KTValidSerializer::class)
     val valid: KTValid? = null,
@@ -96,7 +100,7 @@ data class KTInstance(
     @Serializable(with = StringOrIntSerializer::class)
     val size: StringOrInt? = null,
     @SerialName("size-eos")
-    val sizeEos: Boolean? = null,
+    val sizeEos: Boolean = false,
 
     @Serializable(with = StringOrArraySerializer::class)
     val contents: List<String>? = null,
@@ -113,6 +117,10 @@ data class KTInstance(
     val repeatUntil: String? = null,
 
     val terminator: Int? = null,
+    val consume: Boolean = true,
+    val include: Boolean = false,
+    @SerialName("eos-error")
+    val eosError: Boolean = true,
 
     @Serializable(with = KTValidSerializer::class)
     val valid: KTValid? = null,

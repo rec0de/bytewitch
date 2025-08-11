@@ -69,8 +69,7 @@ class Type(val type: String?) {
     var sizeInBits: UInt = 0u
     var sizeIsKnown: Boolean = false
     var sizeIsUntilEOS: Boolean = false
-    var sizeIsUntilTerminator: Boolean = false
-    var terminator: ByteArray? = null
+    var terminator: Int? = null
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var customType: KTStruct? = null
 }
@@ -738,20 +737,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun parseBuiltinType(terminator: String?, bytesListTree: MutableKaitaiTree, type: Type) : Type {
+    fun parseBuiltinType(type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
         }
         if (type.type == "strz") {
             type.usedDisplayStyle = DisplayStyle.STRING
-            type.sizeIsUntilTerminator = true
-            type.terminator = byteArrayOf(0x00)
+            type.terminator = 0
         } else if (type.type == "str") {
             type.usedDisplayStyle = DisplayStyle.STRING
-            if (terminator != null) {
-                type.sizeIsUntilTerminator = true
-                type.terminator = parseValue(terminator, bytesListTree).toByteArray() // TODO: Make proper method out of this. Could probably be a value defined somewhere else as well :(
-            }
         } else {
             val match = Regex("^([sufb])(\\d+)(le|be)?$").find(type.type)
             if (match != null) {
@@ -799,13 +793,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size.toUInt()
             type.sizeIsKnown = true
         }
-        if (seqElement.sizeEos != null) {
-            type.sizeIsUntilEOS = seqElement.sizeEos
-        }
-        if (seqElement.terminator != null) {
-            type.terminator = parseValue(seqElement.terminator.toString(), bytesListTree).toByteArray()
-            type.sizeIsUntilTerminator = true
-        }
+
+        type.sizeIsUntilEOS = seqElement.sizeEos
+        type.terminator = seqElement.terminator
+
         if (type.type != null) {
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
@@ -814,7 +805,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type
-                type = parseBuiltinType(seqElement.terminator.toString(), bytesListTree, type)
+                type = parseBuiltinType(type)
             }
         }
         if (seqElement.size != null) {  // we do this last, because in some cases other sizes can be overwritten
@@ -874,12 +865,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
                         type.sizeIsKnown = true
                     }
-                    if (type.sizeIsUntilTerminator) {
+                    if (type.terminator != null) {
                         val dataAsByteArray =
                             ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
                         type.sizeInBits =
-                            (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8..dataAsByteArray.size - 1).indexOfFirstSubsequence(type.terminator)
-                                .toUInt() + type.terminator!!.size.toUInt()) * 8u
+                            (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8..dataAsByteArray.size - 1).indexOf(type.terminator!!.toByte())
+                                .toUInt() + 1u) * 8u
                         type.sizeIsKnown = true
                     }
 
