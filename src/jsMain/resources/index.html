@@ -21,52 +21,94 @@
 <body>
 <script src="bytewitch.js"></script>
 
-<div class="container" style="gap: 1rem; align-items: center;">
-    <div class="header">
-        <img src="icon.png">
-        <h1>bytewitch</h1>
-    </div>
+
+<div class="card" id="header">
+    <img src="icon.png">
+    <h1>bytewitch</h1>
     <div class="legend">
-        <div class="bplist">bplist</div><div class="protobuf">protobuf</div><div class="opack">opack</div><div class="nsarchive">nsarchive</div><div class="asn1">asn.1</div><div class="generic">generic</div>
+        <div class="bplist">bplist</div>
+        <div class="protobuf">protobuf</div>
+        <div class="opack">opack</div>
+        <div class="nsarchive">nsarchive</div>
+        <div class="asn1">asn.1</div>
+        <div class="generic">generic</div>
     </div>
-    <div id="kaitai-bundled-legend" class="legend" style="color: black">
-        <div>Bundled Kaitai parsers:</div>
-    </div>
-    <div id="kaitai-legend" class="legend" style="color: black">
-        <div>Kaitai parsers:</div>
-    </div>
-    <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
-    <div class="kaitaibuttons">
-        <span>
-            <input type="checkbox" id="kaitai-live"/>
-            <label for="kaitai-live">include live struct</label>
-        </span>
-        <div></div>
-        <label for="kaitai-name">Kaitai parser</label><input type="text" id="kaitai-name" placeholder="name" />
-        <button id="add-kaitai">add parser</button>
-    </div>
-    <textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>
-    <div class="parsebuttons">
-        <span>
-            <input type="checkbox" id="livedecode" checked />
-            <label for="livedecode">live decode</label>
-        </span>
-        <div></div>
-        <button id="upload">upload file</button>
-        <button id="decode">decode</button>
-        <button id="tryhard">try harder</button>
+    <div style="display: flex; flex-grow: 1"></div>
+    <div style="display: flex; flex-direction: column; justify-content: space-between; height: 4rem">
+        <button id="settings-btn">show settings</button>
+        <button id="kaitai-btn">show kaitai</button>
     </div>
 </div>
 
-<div class="container" id="output"><i>no valid decode yet</i></div>
+<div id="container" class="container">
+    <div id="editor" class="card">
+        <h2 style="align-self: start">Input</h2>
+        <textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>
+        <div class="parsebuttons">
+          <span>
+              <input type="checkbox" id="livedecode" checked/>
+              <label for="livedecode">live decode</label>
+          </span>
+            <div></div>
+            <button id="upload">upload file</button>
+            <button id="decode">decode</button>
+            <button id="tryhard">try harder</button>
+        </div>
+    </div>
 
-<div class="container" id="bytefinder">
+    <div id="settings" class="card card-hidden">
+        <h2>Settings</h2>
+        <p>Configuration options and preferences.</p>
+        <div class="setting-item">
+            <label>Theme:</label>
+            <select>
+                <option>Light</option>
+                <option>Dark</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label>Font Size:</label>
+            <input type="range" min="12" max="24" value="16">
+        </div>
+        <div class="setting-item">
+            <label>Auto-save:</label>
+            <input type="checkbox" checked>
+        </div>
+    </div>
+
+    <div id="kaitai" class="card card-hidden">
+        <div style="display: flex; align-content: baseline">
+            <h2>Kaitai</h2>
+            <div style="flex-grow: 1"></div>
+            <a href="https://kaitai.io/" target="_blank" rel="noopener noreferrer">Kaitai Struct</a>
+        </div>
+        <div id="kaitai-bundled-legend" class="legend" style="color: black">
+            <div>Bundled Kaitai parsers:</div>
+        </div>
+        <div id="kaitai-legend" class="legend" style="color: black">
+            <div>Kaitai parsers:</div>
+        </div>
+        <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
+        <div class="kaitaibuttons">
+              <span>
+                  <input type="checkbox" id="kaitai-live"/>
+                  <label for="kaitai-live">include live struct</label>
+              </span>
+            <div></div>
+            <label for="kaitai-name">Kaitai parser</label><input type="text" id="kaitai-name" placeholder="name"/>
+            <button id="add-kaitai">add parser</button>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="output"><i>no valid decode yet</i></div>
+
+<div class="card" id="bytefinder">
     <h3>Byte Finder</h3>
     <i>click parsed elements to highlight source bytes below</i>
     <div id="hexview"></div>
     <div id="textview"></div>
 </div>
-
 
 </body>
 </html>
