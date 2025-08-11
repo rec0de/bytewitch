@@ -26,7 +26,6 @@ fun main() {
         KaitaiUI.loadKaitaiStructsFromStorage()
 
         LayoutManager
-        LayoutManager.updateLayout()
 
         val input = document.getElementById("data") as HTMLTextAreaElement
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
