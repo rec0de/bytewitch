@@ -1,19 +1,26 @@
-import bitmage.hex
+import SequenceAlignment.SegmentWiseSequenceAlignment
+import SequenceAlignment.ByteWiseSequenceAlignment
+import decoders.ByteWitchResult
+import decoders.SwiftSegFinder.*
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
-import kotlinx.dom.clear
-import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Uint8Array
 import org.w3c.dom.*
-import org.w3c.files.File
-import org.w3c.files.FileReader
+import org.w3c.dom.HTMLTextAreaElement
+import kotlin.js.Date
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
+var lastSelectionEvent: Double? = null
+var tryhard = false
 
+// save parsed messages for float view and SwiftSegFinder
+var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
+
+// choose between segment- and byte-wise sequence alignment
+var showSegmentWiseAlignment = true
 
 fun main() {
     window.addEventListener("load", {
@@ -25,41 +32,46 @@ fun main() {
         }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
-        val input = document.getElementById("data") as HTMLTextAreaElement
+        val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
         val tryhardBtn = document.getElementById("tryhard") as HTMLButtonElement
         val uploadBtn = document.getElementById("upload") as HTMLButtonElement
+        val addDataBox = document.getElementById("add_data") as HTMLElement
+        val deleteDataBox = document.getElementById("delete_data") as HTMLElement
 
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
 
-        input.oninput = {
-            if (liveDecodeEnabled)
-                decode(false)
-        }
-
         decodeBtn.onclick = {
+            tryhard = false
             decode(false)
         }
 
         tryhardBtn.onclick = {
-            decode(true)
+            tryhard = true
+            decode(false)
         }
 
         uploadBtn.onclick = {
             val fileInput = document.createElement("input") as HTMLInputElement
             fileInput.type = "file"
             fileInput.accept = "*" // Accept any file type
+            fileInput.multiple = true // to upload multiple files
 
             fileInput.onchange = {
-                val file = fileInput.files?.item(0)
-                if (file != null) {
-                    if (file.type == "text/plain") {
-                        // Handle .txt files
-                        readFile(file)
-                    } else {
-                        // Handle binary files
-                        readBinaryFile(file)
+                val files = fileInput.files
+                if (files != null) {
+                    for (i in 0 until files.length) {
+                        val file = files.item(i)
+                        if (file != null) {
+                            if (file.type == "text/plain") {
+                                // Handle .txt files
+                                readFile(file)
+                            } else {
+                                // Handle binary files
+                                readBinaryFile(file)
+                            }
+                        }
                     }
                 }
             }
@@ -68,163 +80,183 @@ fun main() {
             fileInput.click()
         }
 
+        // to add more text areas for protocols
+        addDataBox.onclick = {
+            appendTextArea()
+        }
+
+        // to delete last text area
+        deleteDataBox.onclick = {
+            if (dataContainer.children.length > 1) { // there need to be at least one data container left
+                removeTextArea(dataContainer)
+            }
+        }
+
         liveDecode.onchange = { enabled ->
             liveDecodeEnabled = liveDecode.checked
             if (liveDecodeEnabled)
                 decode(false)
             0.0
         }
+
+        // init first textarea
+        appendTextArea()
+
+        // a click anywhere clears any present selection
+        // (as do specific keystrokes, but we'll see if we want to worry about those)
+        document.onclick = {
+            // avoid immediately clearing selection from click associated with select event
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+                clearSelections()
+            }
+        }
+
+        document.onkeydown = {
+            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+                clearSelections()
+            }
+        }
+
     })
 }
 
-fun decode(tryhard: Boolean) {
+fun clearSelections() {
+    lastSelectionEvent = null
     console.log("decode(tryhard=$tryhard)")
-    val input = document.getElementById("data") as HTMLTextAreaElement
-    val output = document.getElementById("output") as HTMLDivElement
+    val inputs = document.querySelectorAll("#data_container .input_area")
+    inputs.asList().forEach {
+        val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
+        val selectionLabel = sizeLabel.firstChild!!.nextSibling as HTMLSpanElement
+        selectionLabel.innerText = ""
+    }
+}
 
-    val bytes = ByteWitch.getBytesFromInputEncoding(input.value)
+// decode one specific byte sequence
+fun decodeBytes(bytes: ByteArray, taIndex: Int) {
+    val output = document.getElementById("output") as HTMLDivElement
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+    val hexview = document.getElementById("hexview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
+
+    // Reset output
+    hexview.innerHTML = ""
+    textview.innerHTML = ""
+    bytefinder.style.display = "none"
+    noDecodeYet.style.display = "none"
+
+    // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
     if (result.isNotEmpty()) {
-        output.clear()
-        setByteFinderContent(bytes)
+        bytefinder.style.display = "flex"
+
+        // check if message-output container already exists
+        val messageId = "message-output-$taIndex"
+        var messageBox = document.getElementById(messageId) as? HTMLDivElement
+
+        if (messageBox == null) {
+            messageBox = document.createElement("DIV") as HTMLDivElement
+            messageBox.id = messageId
+            messageBox.classList.add("message-output") // apply layout CSS
+            output.appendChild(messageBox)
+        } else {
+            messageBox.innerHTML = "" // clear old content
+        }
 
         result.forEach {
-            val parseResult = document.createElement("DIV") as HTMLDivElement
-
-            val parseName = document.createElement("H3") as HTMLHeadingElement
-            parseName.innerText = it.first
-
-            val parseContent = document.createElement("DIV") as HTMLDivElement
-            parseContent.classList.add("parsecontent")
-            parseContent.innerHTML = it.second.renderHTML()
-
-            parseContent.children.asList().forEach { child ->
-                attachRangeListeners(child)
-            }
-
-            parseResult.appendChild(parseName)
-            parseResult.appendChild(parseContent)
-
-            output.appendChild(parseResult)
+            messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
+
+        messageBox.appendChild(decodeWithSSF(bytes, taIndex))
     }
 }
 
-fun setByteFinderContent(bytes: ByteArray) {
-    val hexview = document.getElementById("hexview") as HTMLDivElement
-    val textview = document.getElementById("textview") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+// render result of byte witch decoder
+private fun renderByteWitchResult(it: Pair<String, ByteWitchResult>, taIndex: Int): HTMLDivElement {
+    val parseResult = document.createElement("DIV") as HTMLDivElement
 
-    hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
-    textview.innerHTML = bytes.map { it.toInt().toChar() }
-        .map { if (it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
-    bytefinder.style.display = "flex"
+    val parseName = document.createElement("H3") as HTMLHeadingElement
+    parseName.innerText = it.first
+
+    val parseContent = document.createElement("DIV") as HTMLDivElement
+    parseContent.classList.add("parsecontent")
+    parseContent.innerHTML = it.second.renderHTML()
+
+    attachRangeListeners(parseContent, taIndex)
+
+    parseResult.appendChild(parseName)
+    parseResult.appendChild(parseContent)
+
+    return parseResult
 }
 
-fun setByteFinderHighlight(start: Int, end: Int, startBitOffset: Int, endBitOffset: Int) {
-    val hexview = document.getElementById("hexview")!!
-    hexview.innerHTML = hexview.textContent!! // re-set previous highlights
-    val range = document.createRange()
-    val text = hexview.childNodes[0]!! as Text
-    val startHex = start * 2 + start / 8 + if (startBitOffset > 3) 1 else 0
-    val endHex = end * 2 + end / 8 + if (endBitOffset > 4) 2 else if (endBitOffset > 0) 1 else 0
-    range.setStart(text, startHex)
-    range.setEnd(text, minOf(endHex, text.length))
-    range.surroundContents(document.createElement("span"))
+// decode bytes with SwiftSegFinder and return HTML content
+private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
+    val ssfParsed = SSFParser().parse(bytes, taIndex)
+    parsedMessages[taIndex] = ssfParsed
 
-    val textview = document.getElementById("textview")!!
-    textview.innerHTML = textview.textContent!! // re-set previous highlights
-    val txtText = textview.childNodes[0]!!
-    val txtRange = document.createRange()
-    txtRange.setStart(txtText, start);
-    txtRange.setEnd(txtText, end + (if (endBitOffset > 0) 1 else 0))
-    txtRange.surroundContents(document.createElement("span"))
+    val ssfResult = document.createElement("DIV") as HTMLDivElement
+    val ssfName = document.createElement("H3") as HTMLHeadingElement
+    ssfName.innerText = "SwiftSegFinder"
+
+    val ssfContent = document.createElement("DIV") as HTMLDivElement
+    ssfContent.classList.add("parsecontent")
+    ssfContent.innerHTML = if (showSegmentWiseAlignment) {
+        SSFRenderer.renderSegmentWiseHTML(ssfParsed)
+    } else {
+        SSFRenderer.renderByteWiseHTML(ssfParsed)
+    }
+
+
+    attachRangeListeners(ssfContent, taIndex)
+    attachSSFButtons(ssfContent, bytes, taIndex)
+
+    ssfResult.appendChild(ssfName)
+    ssfResult.appendChild(ssfContent)
+
+    return ssfResult
 }
 
-fun attachRangeListeners(element: Element) {
-    if (element.hasAttribute("data-start") && element.hasAttribute("data-end")) {
-        val start = element.getAttribute("data-start")!!.toInt()
-        val end = element.getAttribute("data-end")!!.toInt()
-        val startBitOffset = element.getAttribute("data-start-bit-offset")?.toInt() ?: 0
-        val endBitOffset = element.getAttribute("data-end-bit-offset")?.toInt() ?: 0
+// decode all text areas
+fun decode(isLiveDecoding: Boolean) {
+    val textareas = document.querySelectorAll(".input_area")
+    for (i in 0 until textareas.length) {
+        // get bytes from textarea
+        val textarea = textareas[i] as HTMLTextAreaElement
+        val sizeLabel = textarea.nextElementSibling as HTMLDivElement
+        val inputText = textarea.value.trim()
+        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+        (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+        (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
-        element.addEventListener("click", { evt ->
-            console.log("$start (+ $startBitOffset bits) to $end (+ $endBitOffset bits)")
-            setByteFinderHighlight(start, end, startBitOffset, endBitOffset)
-            evt.stopPropagation()
-        })
+        // remember if this textarea has plain hex input so we can enable selection highlighting
+        textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
 
-        // highlightable elements
-        if (listOf(
-                "asn1",
-                "protobuf",
-                "generic",
-                "bplist",
-                "nsarchive",
-                "opack",
-                "neutral"
-            ).any { element.classList.contains(it) }
-        ) {
-            element.addEventListener("mouseover", { evt ->
-                if (currentHighlight != null)
-                    currentHighlight!!.classList.remove("highlight")
-
-                element.classList.add("highlight")
-                currentHighlight = element
-                evt.stopPropagation()
-            })
+        // only decode text area if input changed
+        val oldBytes = parsedMessages[i]?.bytes
+        if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
+            parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+            decodeBytes(bytes, i)
         }
     }
-    element.children.asList().forEach { attachRangeListeners(it) }
-}
 
-fun readBinaryFile(file: File) {
-    val input = document.getElementById("data") as HTMLTextAreaElement
-    val reader = FileReader()
+    // refine ssf fields and rerender html content
+    val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+    refined.forEach { msg ->
+        parsedMessages[msg.msgIndex] = msg
+        rerenderSSF(msg.msgIndex, msg)
+    }
 
-    reader.onload = {
-        val arrayBuffer = reader.result as? ArrayBuffer
-        if (arrayBuffer != null) {
-            val hexContent = arrayBufferToHex(arrayBuffer) // Convert binary data to hex
-            input.value = hexContent // Display hex content in the textarea
+    // for sequence alignment
+    if (tryhard && !isLiveDecoding) {
+        if (showSegmentWiseAlignment) {
+            val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
+            attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
         } else {
-            console.error("Failed to read binary file content")
+            val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+            attachByteWiseSequenceAlignmentListeners(alignedSegment)
         }
-    }
 
-    reader.onerror = {
-        console.error("Failed to read the file: ${reader.error?.message}")
-    }
-
-    reader.readAsArrayBuffer(file) // Read binary data in the file
-}
-
-fun readFile(file: File) {
-    val input = document.getElementById("data") as HTMLTextAreaElement
-    val reader = FileReader()
-
-    reader.onload = {
-        val content = reader.result?.toString() // Safely convert `result` to a string
-        if (content != null) {
-            input.value = content // Write the file content to the textarea
-        } else {
-            console.error("File content is null")
-        }
-    }
-
-    reader.onerror = {
-        console.error("Failed to read the file: ${reader.error?.message}")
-    }
-
-    reader.readAsText(file) // Read the file content as text
-}
-
-fun arrayBufferToHex(buffer: ArrayBuffer): String {
-    val byteArray = Uint8Array(buffer) // Create a Uint8Array view for the buffer
-    val dynamic = byteArray.asDynamic()
-    return (0 until byteArray.length).joinToString("") { index ->
-        val b16string = dynamic[index].toString(16) as String
-        b16string.padStart(2, '0')
     }
 }
