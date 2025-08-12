@@ -37,7 +37,7 @@ data class KTStruct(
 
     val types: Map<String, KTStruct> = emptyMap(),
 
-    val instances: Map<String, KTInstance> = emptyMap(),
+    val instances: Map<String, KTSeq> = emptyMap(),
 )
 
 @Serializable
@@ -54,44 +54,6 @@ data class KTMeta(
 
 @Serializable
 data class KTSeq(
-    val id: String,
-
-    @Serializable(with = KTTypeSerializer::class)
-    val type: KTType? = null,
-
-    @Serializable(with = StringOrIntSerializer::class)
-    val size: StringOrInt? = null,
-    @SerialName("size-eos")
-    val sizeEos: Boolean = false,
-
-    @Serializable(with = StringOrArraySerializer::class)
-    val contents: List<String>? = null,
-
-    val doc: String? = null,
-    @Serializable(with = StringOrArraySerializer::class)
-    @SerialName("doc-ref")
-    val docRef: List<String>? = null,
-
-    val repeat: KTRepeat? = null,
-    @SerialName("repeat-expr")
-    val repeatExpr: String? = null,
-    @SerialName("repeat-until")
-    val repeatUntil: String? = null,
-
-    val terminator: Int? = null,
-    val consume: Boolean = true,
-    val include: Boolean = false,
-    @SerialName("eos-error")
-    val eosError: Boolean = true,
-
-    @Serializable(with = KTValidSerializer::class)
-    val valid: KTValid? = null,
-
-    val value: String? = null,
-)
-
-@Serializable
-data class KTInstance(
     val id: String? = null,
 
     @Serializable(with = KTTypeSerializer::class)
