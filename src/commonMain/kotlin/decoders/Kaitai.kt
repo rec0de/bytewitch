@@ -1150,17 +1150,6 @@ abstract class KaitaiNumber(
     }
 
     protected abstract fun parseValueAsString(): String
-
-    // TODO: Could be moved to bitimage.kt and placed as extension function on Short
-    protected fun byteArrayToShort(byteArray: ByteArray, endianness: ByteOrder): Short {
-        return if (endianness == ByteOrder.BIG) {
-            ((byteArray[0].toInt() and 0xFF) shl 8 or
-                    (byteArray[1].toInt() and 0xFF)).toShort()
-        } else {
-            ((byteArray[1].toInt() and 0xFF) shl 8 or
-                    (byteArray[0].toInt() and 0xFF)).toShort()
-        }
-    }
 }
 
 class KaitaiSignedInteger(
@@ -1175,7 +1164,7 @@ class KaitaiSignedInteger(
         val byteArray = value.toByteArray()
         return when (byteArray.size) {
             1 -> byteArray[0].toInt().toString()
-            2 -> byteArrayToShort(byteArray, ByteOrder.BIG).toString()
+            2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toString()
             4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toString()
             8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toString()
             else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
@@ -1194,8 +1183,8 @@ class KaitaiUnsignedInteger(
     override fun parseValueAsString(): String {
         val byteArray = value.toByteArray()
         return when (byteArray.size) {
-            1 -> byteArray[0].toUInt().toString()
-            2 -> byteArrayToShort(byteArray, ByteOrder.BIG).toUShort().toString()
+            1 -> byteArray[0].toUByte().toString()
+            2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toUShort().toString()
             4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toUInt().toString()
             8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toULong().toString()
             else -> throw IllegalArgumentException("Invalid byte array size for unsigned integer: ${byteArray.size}")

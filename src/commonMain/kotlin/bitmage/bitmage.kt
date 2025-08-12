@@ -156,6 +156,16 @@ fun Byte.toBooleanArray(): BooleanArray {
 
 // Integers
 
+fun Short.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Short {
+    return if (byteOrder == ByteOrder.BIG) {
+        ((bytes[0].toInt() and 0xFF) shl 8 or
+                (bytes[1].toInt() and 0xFF)).toShort()
+    } else {
+        ((bytes[1].toInt() and 0xFF) shl 8 or
+                (bytes[0].toInt() and 0xFF)).toShort()
+    }
+}
+
 fun ULong.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): ULong {
     check(bytes.size <= 8) { "trying to parse oversized bytearray ${bytes.hex()} as ULong" }
     val orderedBytes = if(byteOrder == ByteOrder.BIG) bytes.reversed() else bytes.toList()
