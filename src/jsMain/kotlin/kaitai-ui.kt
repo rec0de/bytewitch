@@ -1,17 +1,27 @@
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
+
+
+@Serializable
+data class KaitaiManifest(
+    val files: List<String>,
+)
 
 object KaitaiUI {
     private val nameInput = document.getElementById("kaitai-name") as HTMLInputElement
     private val addButton = document.getElementById("add-kaitai") as HTMLButtonElement
     private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput")
+    private val kaitaiValid = document.getElementById("kaitai-valid") as HTMLDivElement
     private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
     private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
     private val includeLiveStruct = TwoWayCheckboxBinding("kaitai-live")
+    private var changedSinceLastDecode = true
 
     init {
         addButton.onclick = {
@@ -25,25 +35,25 @@ object KaitaiUI {
         }
 
         if (getInputValue().isNotEmpty()) {
-            ByteWitch.setKaitaiLiveDecoder(getInputValue())
+            updateLiveDecoder(getInputValue())
         }
 
         kaitaiInput.onInput = {
             if (includeLiveStruct.checked) {
-                ByteWitch.setKaitaiLiveDecoder(getInputValue())
+                updateLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
-                    decode(false)
+                    decode(true)
             }
         }
 
         includeLiveStruct.onChange = { liveStructEnabled ->
             if (liveStructEnabled) {
-                ByteWitch.setKaitaiLiveDecoder(getInputValue())
-                if (liveDecodeEnabled) {
-                    decode(false)
-                }
+                updateLiveDecoder(getInputValue())
             } else {
-                ByteWitch.setKaitaiLiveDecoder(null)
+                updateLiveDecoder(null)
+            }
+            if (liveDecodeEnabled) {
+                decode(true)
             }
             0.0
         }
@@ -55,6 +65,20 @@ object KaitaiUI {
 
     fun isLiveDecodeEnabled(): Boolean {
         return includeLiveStruct.checked
+    }
+
+    fun updateLiveDecoder(kaitaiStruct: String?) {
+        val success = ByteWitch.setKaitaiLiveDecoder(kaitaiStruct)
+        kaitaiValid.style.display = if (success) "none" else "block"
+        setChangedSinceLastDecode(true)
+    }
+
+    fun hasChangedSinceLastDecode(): Boolean {
+        return changedSinceLastDecode
+    }
+
+    fun setChangedSinceLastDecode(value: Boolean) {
+        changedSinceLastDecode = value
     }
 
     fun loadKaitaiStructsFromStorage() {
@@ -78,35 +102,34 @@ object KaitaiUI {
     }
 
     suspend fun loadBundledStructs() {
-        val names = loadBundledList()
+        val manifest = loadManifest()
 
-        for (kaitaiName in names) {
+        for (path in manifest.files) {
             // Load file
-            val response = window.fetch("kaitai/$kaitaiName.ksy").await()
+            val response = window.fetch("kaitai/$path").await()
             if (!response.ok) {
                 throw Error("Failed to load Kaitai Struct: ${response.statusText}")
             }
             val ksyContent = response.text().await()
 
             // Register the Kaitai Struct decoder
-            val success = ByteWitch.registerBundledKaitaiDecoder(kaitaiName, ksyContent)
+            val name = path.substringBeforeLast(".")
+            val success = ByteWitch.registerBundledKaitaiDecoder(name, ksyContent)
             if (!success) {
-                throw Error("Failed to register Kaitai Struct: $kaitaiName")
+                throw Error("Failed to register Kaitai Struct: $name")
             }
 
-            addParserToUI(kaitaiName, bundled = true)
+            addParserToUI(name, bundled = true)
         }
     }
 
-    private suspend fun loadBundledList(): List<String> {
-        val response = window.fetch("kaitai-manifest.txt").await()
+    private suspend fun loadManifest(): KaitaiManifest {
+        val response = window.fetch("kaitai-manifest.json").await()
         if (!response.ok) {
             throw Error("Failed to load Kaitai manifest: ${response.statusText}")
         }
         val manifestContent = response.text().await()
-        return manifestContent.lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        return Json.decodeFromString(manifestContent)
     }
 
     private fun addParser(name: String, kaitaiStruct: String) {

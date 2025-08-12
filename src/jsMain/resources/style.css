@@ -150,7 +150,7 @@ button:hover {
     margin-top:  0.5rem;
 }
 
-.textareaContainer > .sizeLabel {
+.textareaContainer > .sizeLabel, .annotationLabel {
     position: absolute;
     bottom: 0.5rem;
     left: .25rem;
@@ -160,6 +160,11 @@ button:hover {
     font-size: 0.85em;
     font-family: var(--mono);
     font-weight: bold;
+}
+
+.textareaContainer > .annotationLabel {
+    left: unset;
+    right: .25rem;
 }
 
 .invisible {

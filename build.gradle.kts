@@ -1,5 +1,6 @@
 plugins {
     kotlin("multiplatform") version "2.1.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0"
 }
 
 group = "me.user"
@@ -32,6 +33,7 @@ kotlin {
             dependencies {
                 implementation("com.ionspin.kotlin:bignum:0.3.10")
                 implementation("org.jetbrains:markdown:0.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
             }
         }
         val commonTest by getting {
@@ -49,19 +51,30 @@ kotlin {
     tasks.register("generateKaitaiManifest") {
         val kaitaiDir = file("src/commonMain/resources/kaitai")
         val outputDir = file("${layout.buildDirectory.get()}/processedResources/js/main")
-        val manifestFile = outputDir.resolve("kaitai-manifest.txt")
+        val manifestFile = outputDir.resolve("kaitai-manifest.json")
 
         inputs.dir(kaitaiDir)
         outputs.file(manifestFile)
 
         doLast {
-            val files = kaitaiDir.listFiles()?.filter { it.extension == "ksy" }?.map { it.nameWithoutExtension } ?: emptyList()
-            val textContent = buildString {
-                files.forEach { fileName ->
-                    appendLine(fileName)
-                }
+            val files = kaitaiDir.walk()
+                .filter { it.isFile && it.extension == "ksy" }
+                .map { it.relativeTo(kaitaiDir).path }
+                .toList()
+
+            val jsonFileList = files.joinToString(
+                prefix = "[",
+                postfix = "]",
+                separator = ", "
+            ) { "\"$it\"" }
+
+            val jsonOutput = buildString {
+                append("{\n")
+                append("  \"files\": $jsonFileList\n")
+                append("}\n")
             }
-            manifestFile.writeText(textContent)
+
+            manifestFile.writeText(jsonOutput)
             println("Kaitai manifest generated at ${manifestFile.absolutePath}")
         }
     }
@@ -73,6 +86,6 @@ kotlin {
 
 afterEvaluate {
     rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension> {
-        versions.webpackCli.version="4.10.0"
+        versions.webpackCli.version = "4.10.0"
     }
 }
