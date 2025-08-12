@@ -94,11 +94,8 @@ fun main() {
 
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
-            if (KaitaiUI.isLiveDecodeEnabled()) {
-                KaitaiUI.updateLiveDecoder(KaitaiUI.getInputValue())
-                if (liveDecodeEnabled)
-                    decode(false)
-            }
+            if (liveDecodeEnabled)
+                decode(false)
             0.0
         }
 
@@ -125,6 +122,7 @@ fun main() {
 
 fun clearSelections() {
     lastSelectionEvent = null
+    console.log("decode(tryhard=$tryhard)")
     val inputs = document.querySelectorAll("#data_container .input_area")
     inputs.asList().forEach {
         val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
