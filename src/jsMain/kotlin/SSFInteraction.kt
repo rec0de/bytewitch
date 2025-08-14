@@ -6,6 +6,29 @@ import org.w3c.dom.*
 import org.w3c.dom.events.MouseEvent
 import decoders.SwiftSegFinder.*
 
+// to start sequence alignment
+fun attachStartSequenceAlignmentButtonHandler(container: Element) {
+    container.querySelectorAll(".alignment-button").asList().forEach { btnElement ->
+        val button = btnElement as HTMLElement
+        button.addEventListener("click", {
+            // rerender SwiftSegFinder view
+            val eligibleMsgs = getEligibleMsgsForSSF()
+            eligibleMsgs.forEach { (msgIndex, parsed) ->
+                rerenderSSF(msgIndex, parsed)
+            }
+
+            // align sequence
+            if (showSegmentWiseAlignment) {
+                val aligned = SegmentWiseSequenceAlignment.align(eligibleMsgs)
+                attachSegmentWiseSequenceAlignmentListeners(aligned)
+            } else {
+                val aligned = ByteWiseSequenceAlignment.align(eligibleMsgs)
+                attachByteWiseSequenceAlignmentListeners(aligned)
+            }
+        })
+    }
+}
+
 // to toggle between sequence and segment wise sequence alignment
 fun attachToggleSequenceAlignmentButtonHandler(container: Element) {
     container.querySelectorAll(".toggle-seqalign-button").asList().forEach { btnElement ->
@@ -13,20 +36,19 @@ fun attachToggleSequenceAlignmentButtonHandler(container: Element) {
         button.addEventListener("click", {
             showSegmentWiseAlignment = !showSegmentWiseAlignment
 
-            // rerender all SwiftSegFinder
-            parsedMessages.forEach { (msgIndex, parsed) ->
+            // rerender SwiftSegFinder view
+            val eligibleMsgs = getEligibleMsgsForSSF()
+            eligibleMsgs.forEach { (msgIndex, parsed) ->
                 rerenderSSF(msgIndex, parsed)
             }
 
             // realign sequence
-            if (tryhard) {
-                if (showSegmentWiseAlignment) {
-                    val aligned = SegmentWiseSequenceAlignment.align(parsedMessages)
-                    attachSegmentWiseSequenceAlignmentListeners(aligned)
-                } else {
-                    val aligned = ByteWiseSequenceAlignment.align(parsedMessages)
-                    attachByteWiseSequenceAlignmentListeners(aligned)
-                }
+            if (showSegmentWiseAlignment) {
+                val aligned = SegmentWiseSequenceAlignment.align(eligibleMsgs)
+                attachSegmentWiseSequenceAlignmentListeners(aligned)
+            } else {
+                val aligned = ByteWiseSequenceAlignment.align(eligibleMsgs)
+                attachByteWiseSequenceAlignmentListeners(aligned)
             }
         })
     }
@@ -45,27 +67,100 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             val dataEnd = oldWrapper.getAttribute("data-end")?.toIntOrNull() ?: originalBytes.size
             val slicedBytes = originalBytes.sliceArray(dataStart until dataEnd)
 
-            // read out new segment structure based on separators
-            val newSegments = rebuildSegmentsFromDOM(byteContainer, msgIndex)
+            // get new segment boundaries
+            val newOffsets = rebuildSegmentsFromDOM(byteContainer, msgIndex)
 
-            val newParsed = SSFParsedMessage(newSegments, slicedBytes, msgIndex)
+            val prevGlobal = parsedMessages[msgIndex]?.segments.orEmpty()
+            val prevInSlice = prevGlobal
+                .filter { it.offset in dataStart until dataEnd }
+                .map { SSFSegment(it.offset - dataStart, it.fieldType) }
+
+            // re-tag segments
+            val retagged = retagSegments(prevInSlice, newOffsets, slicedBytes.size)
+
+            val newParsed = SSFParsedMessage(retagged, slicedBytes, msgIndex)
             parsedMessages[msgIndex] = newParsed
 
             // render new html content
             rerenderSSF(msgIndex, newParsed)
 
-            // rerun sequence alignment
-            if (tryhard) {
-                if (showSegmentWiseAlignment) {
-                    val alignedSequence = SegmentWiseSequenceAlignment.align(parsedMessages)
-                    attachSegmentWiseSequenceAlignmentListeners(alignedSequence)
+            // show sequence alignment buttons
+            val eligibleMsgs = getEligibleMsgsForSSF()
+            if (autoRunSeqAlign(eligibleMsgs)) { // check if auto run of sequence alignment is allowed
+                if (showSegmentWiseAlignment) { // check if we were in bytewise or segmentwise view
+                    val alignedSegment = SegmentWiseSequenceAlignment.align(eligibleMsgs)
+                    attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
                 } else {
-                    val alignedSequence = ByteWiseSequenceAlignment.align(parsedMessages)
-                    attachByteWiseSequenceAlignmentListeners(alignedSequence)
+                    val alignedSegment = ByteWiseSequenceAlignment.align(eligibleMsgs)
+                    attachByteWiseSequenceAlignmentListeners(alignedSegment)
                 }
+            } else if(eligibleMsgs.size >= 2) {
+                showStartSequenceAlignmentButton() // show start button for sequence alignment
             }
+
         })
     }
+}
+
+// re-tag segments if the boundaries didn't change
+fun retagSegments(
+    prev: List<SSFSegment>?,
+    newOffsetsRaw: List<Int>,
+    totalSize: Int
+): List<SSFSegment> {
+    val newOffsets = newOffsetsRaw.distinct().sorted()
+    if (newOffsets.isEmpty()) return listOf(SSFSegment(0, SSFField.UNKNOWN))
+
+    val prevSegs = (prev ?: emptyList()).sortedBy { it.offset }
+
+    fun endAtOffsets(i: Int, offsets: List<Int>, total: Int) =
+        if (i + 1 < offsets.size) offsets[i + 1] else total
+
+    fun endAtPrev(i: Int, segs: List<SSFSegment>, total: Int) =
+        if (i + 1 < segs.size) segs[i + 1].offset else total
+
+    fun isPayloadLen(t: SSFField) =
+        t == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN || t == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN
+
+    val result = ArrayList<SSFSegment>(newOffsets.size)
+
+    // go through new segments
+    for (i in newOffsets.indices) {
+        val start = newOffsets[i]
+        val end = endAtOffsets(i, newOffsets, totalSize)
+
+        // find segment with same boundaries
+        val idx = prevSegs.indexOfFirst { it.offset == start }
+        val typ = if (idx >= 0 && endAtPrev(idx, prevSegs, totalSize) == end) {
+            prevSegs[idx].fieldType // set old segment type again
+        } else {
+            SSFField.UNKNOWN
+        }
+
+        result.add(SSFSegment(start, typ))
+    }
+
+    // PAYLOAD_LENGTH and STRING_PAYLOAD can only appear as a pair. If one doesn't exist set both to unknown
+
+    // 1. check if a string payload always follow after a payload field if not set payload length to unkown
+    for (i in result.indices) {
+        if (isPayloadLen(result[i].fieldType)) {
+            if (i + 1 >= result.size || result[i + 1].fieldType != SSFField.STRING_PAYLOAD) {
+                result[i] = SSFSegment(result[i].offset, SSFField.UNKNOWN)
+            }
+        }
+    }
+
+    // 2. check if payload_length field is set before a string field
+    for (i in result.indices) {
+        if (result[i].fieldType == SSFField.STRING_PAYLOAD) {
+            if (i == 0 || !isPayloadLen(result[i - 1].fieldType)) {
+                result[i] = SSFSegment(result[i].offset, SSFField.STRING) // just set to String not to unkown
+            }
+        }
+    }
+
+    return result
 }
 
 // if edit button is pressed show editableView and hide prettyView
@@ -89,7 +184,7 @@ fun attachEditButtonHandler(container: Element) {
 }
 
 // read out SwiftSegFinder segments based on separators set by the user
-fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<SSFSegment> {
+fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<Int> {
     val byteElements = container.querySelectorAll(".bytegroup + .field-separator, .bytegroup")
     var byteOffset = 0
     val segmentOffsets = mutableListOf(0)
@@ -106,13 +201,7 @@ fun rebuildSegmentsFromDOM(container: HTMLElement, msgIndex: Int): List<SSFSegme
         }
     }
 
-
-    // an alternative would be to check the offset of the previous message. Based on this decide if we want to keep the field type or set it to unknown
-    // In my opinion this behaves a bit weird and isn't the best solution.
-    // Another way would be to just rerun a field type detection. This also behaves weird
-    return segmentOffsets.map { offset ->
-        SSFSegment(offset, SSFField.UNKNOWN)
-    }
+    return segmentOffsets
 }
 
 // rerender SwiftSegFinder html view
@@ -137,15 +226,14 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
     oldWrapper.replaceWith(newWrapper)
 
     // attach javascript handlers
-    attachRangeListeners(newWrapper, msgIndex)
-    attachToggleSequenceAlignmentButtonHandler(newWrapper)
-    attachEditButtonHandler(newWrapper)
-    attachFinishButtonHandler(newWrapper, parsed.bytes, msgIndex)
+    attachSSFButtons(newWrapper, parsed.bytes, msgIndex)
 }
 
 
 // attach button handlers for SSF
 fun attachSSFButtons(parseContent: Element, bytes: ByteArray, msgIndex: Int) {
+    attachRangeListeners(parseContent, msgIndex)
+    attachStartSequenceAlignmentButtonHandler(parseContent)
     attachToggleSequenceAlignmentButtonHandler(parseContent)
     attachEditButtonHandler(parseContent)
     attachFinishButtonHandler(parseContent, bytes, msgIndex)
