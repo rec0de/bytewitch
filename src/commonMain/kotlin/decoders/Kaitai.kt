@@ -153,15 +153,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         TokenType.REFERENCE to ::parseReference2 // TODO
     )
 
-    fun parseInteger(token: Pair<TokenType, dynamic>) : Int = token.second
+    fun parseInteger(token: Pair<TokenType, Int>) : Pair<TokenType, Int> = token
 
-    fun parseFloat(token: Pair<TokenType, dynamic>) : Float = token.second
+    fun parseFloat(token: Pair<TokenType, Float>) : Pair<TokenType, Float> = token
 
-    fun parseString(token: Pair<TokenType, dynamic>) : String = token.second
+    fun parseString(token: Pair<TokenType, String>) : Pair<TokenType, String> = token
 
-    fun parseBoolean(token: Pair<TokenType, dynamic>) : Boolean = token.second
+    fun parseBoolean(token: Pair<TokenType, Boolean>) : Pair<TokenType, Boolean> = token
 
-    fun parseParentheses(token: Pair<TokenType, dynamic>) : dynamic = parseExpression(token.second)
+    fun parseParentheses(token: Pair<TokenType, dynamic>) : Pair<TokenType, dynamic> = parseExpressionInner(token.second)
 
     fun parseReference2(token: Pair<TokenType, dynamic>) : dynamic = null //TODO
 
@@ -175,28 +175,32 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         TokenType.BOOLEANNOT to ::parseBooleanNot
     )
 
-    fun parseUnaryPlus(tokens: MutableList<Pair<TokenType, dynamic>>) : Number {
-        val op: dynamic = parseTokens(tokens)
-        return when (op) {
-            is Float -> +op
-            is Int -> +op
-            else -> throw Exception("Cannot apply unary plus to non number")
-        }
+    fun parseUnaryPlus(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        return parseTokens(tokens)
     }
 
-    fun parseUnaryMinus(tokens: MutableList<Pair<TokenType, dynamic>>) : Number {
-        val op: dynamic = parseTokens(tokens)
-        return when (op) {
-            is Float -> -op
-            is Int -> -op
-            else -> throw Exception("Cannot apply unary minus to non number")
-        }
+    fun parseUnaryMinus(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        val op: Pair<TokenType, Number> = parseTokens(tokens)
+
+        return if (op.first == TokenType.INTEGER)
+            Pair(
+                TokenType.INTEGER,
+                -(op.second as Int)
+            )
+        else
+            Pair(
+                TokenType.FLOAT,
+                -(op.second as Float)
+            )
     }
 
-    fun parseBooleanNot(tokens: MutableList<Pair<TokenType, dynamic>>) : Boolean {
-        val op: dynamic = parseTokens(tokens)
-        return if (op is Boolean)
-                !op
+    fun parseBooleanNot(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op: Pair<TokenType, dynamic> = parseTokens(tokens)
+        return if (op.first == TokenType.BOOLEAN)
+                Pair(
+                    TokenType.BOOLEAN,
+                    !op.second
+                )
             else
                 throw Exception("Cannot apply logical or to non boolean")
     }
@@ -218,159 +222,267 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         mapOf(TokenType.BOOLEANOR to ::parseBooleanOr),
     )
 
-    fun parseMul(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseMul(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        return if (op1 is Float || op2 is Float)
-            (op1 as Float) * (op2 as Float)
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Float) * (op2.second as Float)
+            )
         else
-            (op1 as Int) * (op2 as Int)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Int) * (op2.second as Int)
+            )
+
+        return result
     }
 
-    fun parseDiv(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseDiv(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        return if (op1 is Float || op2 is Float)
-            (op1 as Float )/ (op2 as Float)
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Float) / (op2.second as Float)
+            )
         else
-            (op1 as Int) / (op2 as Int)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Int) / (op2.second as Int)
+            )
+
+        return result
     }
 
-    fun parseModulo(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseModulo(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        return if (op1 is Float || op2 is Float)
-            (op1 as Float) % (op2 as Float)
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Float) % (op2.second as Float)
+            )
         else
-            (op1 as Int) % (op2 as Int)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Int) % (op2.second as Int)
+            )
+
+        return result
     }
 
-    fun parsePlus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : dynamic{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parsePlus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return if (op1 is String || op2 is String)
-            (op1 as String) + (op2 as String)
-        else if (op1 is Float || op2 is Float)
-            (op1 as Float) + (op2 as Float)
+        val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING)
+            Pair(
+                TokenType.STRING,
+                (op1.second as String) + (op2.second as String)
+            )
+        else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Float) + (op2.second as Float)
+            )
         else
-            (op1 as Int) + (op2 as Int)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Int) + (op2.second as Int)
+            )
 
+        return result
     }
 
-    fun parseMinus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Number{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseMinus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        return if (op1 is Float || op2 is Float)
-            (op1 as Float) - (op2 as Float)
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Float) - (op2.second as Float)
+            )
         else
-            (op1 as Int) - (op2 as Int)
+            Pair(
+                TokenType.FLOAT,
+                (op1.second as Int) - (op2.second as Int)
+            )
+
+        return result
     }
 
-    fun parseLShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseLShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
 
-        return (op1 as Int) shl (op2 as Int)
+        val result: Pair<TokenType, Int> = Pair(
+            TokenType.INTEGER,
+            op1.second shl op2.second
+        )
+
+        return result
     }
 
-    fun parseRShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseRShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
 
-        return (op1 as Int) shr (op2 as Int)
+        val result: Pair<TokenType, Int> = Pair(
+            TokenType.INTEGER,
+            op1.second shr op2.second
+        )
+
+        return result
     }
 
-    fun parseLess(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseLess(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Int) < (op2 as Int)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second < op2.second
+        )
+
+        return result
     }
 
-    fun parseLessEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseLessEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Int) <= (op2 as Int)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second <= op2.second
+        )
+
+        return result
     }
 
-    fun parseGreater(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseGreater(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Int) > (op2 as Int)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second > op2.second
+        )
+
+        return result
     }
 
-    fun parseGreaterEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseGreaterEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Int) >= (op2 as Int)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second >= op2.second
+        )
+
+        return result
     }
 
-    fun parseEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return op1 == op2
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second == op2.second
+        )
+
+        return result
     }
 
-    fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return op1 != op2
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            op1.second != op2.second
+        )
+
+        return result
     }
 
-    fun parseBitwiseAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseBitwiseAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
 
-        return (op1 as Int) and (op2 as Int)
+        val result: Pair<TokenType, Int> = Pair(
+            TokenType.INTEGER,
+            op1.second and op2.second
+        )
+
+        return result
     }
 
-    fun parseBitwiseXor(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseBitwiseXor(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
 
-        return (op1 as Int) xor (op2 as Int)
+        val result: Pair<TokenType, Int> = Pair(
+            TokenType.INTEGER,
+            op1.second xor op2.second
+        )
+
+        return result
     }
 
-    fun parseBitwiseOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Int{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseBitwiseOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
+        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
 
-        return (op1 as Int) or (op2 as Int)
+        val result: Pair<TokenType, Int> = Pair(
+            TokenType.INTEGER,
+            op1.second or op2.second
+        )
+
+        return result
     }
 
-    fun parseBooleanAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseBooleanAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Boolean) && (op2 as Boolean)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            (op1.second as Boolean) && (op2.second as Boolean)
+        )
+
+        return result
     }
 
-    fun parseBooleanOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Boolean{
-        val op1: dynamic = parseTokens(tokens1)
-        val op2: dynamic = parseTokens(tokens2)
+    fun parseBooleanOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
+        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        return (op1 as Boolean) || (op2 as Boolean)
+        val result: Pair<TokenType, Boolean> = Pair(
+            TokenType.BOOLEAN,
+            (op1.second as Boolean) || (op2.second as Boolean)
+        )
+
+        return result
     }
 
     //******************************************************************************************************************
     //*                                         ternary operators                                                      *
     //******************************************************************************************************************
 
-    fun parseIfElse(condition: MutableList<Pair<TokenType, dynamic>>, tokensTrue: MutableList<Pair<TokenType, dynamic>>, tokensFalse: MutableList<Pair<TokenType, dynamic>>) : dynamic {
-        return if (parseTokens(condition) as Boolean) parseTokens(tokensTrue) else parseTokens(tokensFalse)
+    fun parseIfElse(condition: MutableList<Pair<TokenType, dynamic>>, tokensTrue: MutableList<Pair<TokenType, dynamic>>, tokensFalse: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
+        return if (parseTokens(condition).second as Boolean) parseTokens(tokensTrue) else parseTokens(tokensFalse)
     }
 
-    fun parseTokens (tokens: MutableList<Pair<TokenType, dynamic>>) : dynamic {
+
+    fun parseTokens (tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
         if (tokens.size == 1 && tokens[0].first in operandTokens){
             val function = operandTokens.getValue(tokens[0].first)
             return function.invoke(tokens[0])
@@ -412,7 +524,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         }
 
-        return null
+        return Pair(TokenType.EMPTY, null)
     }
 
     val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".")
@@ -644,7 +756,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var tokensWithReferences: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
         var reference: Boolean = false
 
-        for (token: Pair<TokenType, dynamic> in tokensWithFunctions) { // combining tokens of types in val tokensForReference to TokenType REFERENCE
+        /*for (token: Pair<TokenType, dynamic> in tokensWithFunctions) { // combining tokens of types in val tokensForReference to TokenType REFERENCE
             if (token.first in tokensForReference) {
                 if (!reference) {
                     tokensWithReferences.add(Pair(TokenType.REFERENCE, mutableListOf<Pair<TokenType, dynamic>>()))
@@ -655,13 +767,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 reference = false
                 tokensWithReferences.add(token)
             }
-        }
+        }*/
 
-        return tokensWithReferences
+        return tokensWithFunctions
+    }
+
+    fun parseExpressionInner (expression: String) : Pair<TokenType, dynamic> {
+        return parseTokens(tokenizeExpression(expression))
     }
 
     fun parseExpression (expression: String) : dynamic {
-        return parseTokens(tokenizeExpression(expression))
+        return parseExpressionInner(expression).second
     }
 
     fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
