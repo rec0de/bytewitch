@@ -6,12 +6,14 @@ import bitmage.toBooleanArray
 import decoders.Kaitai
 import decoders.KaitaiBinary
 import decoders.KaitaiBytes
+import decoders.KaitaiList
 import decoders.KaitaiResult
 import decoders.KaitaiSignedInteger
 import decoders.KaitaiString
 import decoders.KaitaiUnsignedInteger
 import kaitai.KaitaiTestUtils.checkElement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.test.Test
 
 class KaitaiDecoderTests {
@@ -350,6 +352,132 @@ class KaitaiDecoderTests {
         val c = result.bytesListTree["c"]
         check(c is KaitaiBinary) { "Expected c to be KaitaiBinary, got ${c::class.simpleName}" }
         checkElement(c, "c", Pair(1, 2), Pair(1, 0))
+    }
+
+    @Test
+    fun testRepeatKey() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "repeat_by_expr", size = StringOrInt.IntValue(1), repeat = KTRepeat.EXPR, repeatExpr = "3"),
+                KTSeq(id = "set_size", size = StringOrInt.IntValue(4), type = KTType.Primitive("repeating_sub")),
+                KTSeq(id = "simple_eos", type = KTType.Primitive("simple_sub"), repeat = KTRepeat.EOS)
+            ),
+            types = mapOf(
+                Pair(
+                    "simple_sub",
+                    KTStruct(
+                        seq = listOf(
+                            KTSeq(id = "a", size = StringOrInt.IntValue(1))
+                        )
+                    )
+                ),
+                Pair(
+                    "repeating_sub",
+                    KTStruct(
+                        seq = listOf(
+                            KTSeq(id = "x", size = StringOrInt.IntValue(2), repeat = KTRepeat.EOS),
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0xaa, 0xbb, 0xcc,
+            0x11, 0x22, 0x33, 0x44,
+            0x12, 0x34
+        )
+
+        val decoder = Kaitai("bitwise_offsets", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        // Validate the main result element
+        check(result.bytesListTree.size == struct.seq.size) {
+            "Expected bytesListTree to have ${struct.seq.size} elements, got ${result.bytesListTree.size}"
+        }
+
+        val repeat_by_expr = result.bytesListTree["repeat_by_expr"]
+        check(repeat_by_expr is KaitaiList) { "Expected repeat_by_expr to be KaitaiList, got ${repeat_by_expr::class.simpleName}" }
+        checkElement(repeat_by_expr, "repeat_by_expr", Pair(0,3), Pair(0, 0))
+        check(repeat_by_expr.value.contentEquals(byteArrayOfInts(0xaa, 0xaa, 0xaa).toBooleanArray())) {
+            "Expected repeat_by_expr to be exactly 0xaa, 0xaa, 0xaa and not ${repeat_by_expr.value}"
+        }
+        val aa0 = repeat_by_expr.bytesListTree[0]
+        check(aa0 is KaitaiBytes) { "Expected repeat_by_expr.0 to be KaitaiBytes, got ${aa0::class.simpleName}" }
+        checkElement(repeat_by_expr, "repeat_by_expr", Pair(0,1), Pair(0, 0))
+        check(repeat_by_expr.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
+            "Expected repeat_by_expr.0 to be exactly 0xaa and not ${aa0.value}"
+        }
+        val aa1 = repeat_by_expr.bytesListTree[1]
+        check(aa1 is KaitaiBytes) { "Expected repeat_by_expr.1 to be KaitaiBytes, got ${aa1::class.simpleName}" }
+        checkElement(aa1, "repeat_by_expr", Pair(1,2), Pair(0, 0))
+        check(aa1.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
+            "Expected repeat_by_expr.1 to be exactly 0xaa and not ${aa1.value}"
+        }
+        val aa2 = repeat_by_expr.bytesListTree[1]
+        check(aa2 is KaitaiBytes) { "Expected repeat_by_expr.2 to be KaitaiBytes, got ${aa2::class.simpleName}" }
+        checkElement(aa2, "repeat_by_expr", Pair(2,3), Pair(0, 0))
+        check(aa2.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
+            "Expected aa.2 to be exactly 0xaa and not ${aa2.value}"
+        }
+
+        val set_size = result.bytesListTree["set_size"]
+        check(set_size is KaitaiResult) { "Expected set_size to be KaitaiList, got ${set_size::class.simpleName}" }
+        checkElement(set_size, "set_size", Pair(3,7), Pair(0, 0))
+        check(set_size.value.contentEquals(byteArrayOfInts(0x11, 0x22, 0x33, 0x44).toBooleanArray())) {
+            "Expected set_size to be exactly 0x11, 0x22, 0x33, 0x44 and not ${set_size.value}"
+        }
+        val set_size_x = set_size.bytesListTree["x"]
+        check(set_size_x is KaitaiList) { "Expected set_size.x to be KaitaiList, got ${set_size_x::class.simpleName}" }
+        checkElement(set_size_x, "x", Pair(3,7), Pair(0, 0))
+        check(set_size_x.value.contentEquals(byteArrayOfInts(0x11, 0x22, 0x33, 0x44).toBooleanArray())) {
+            "Expected set_size.x to be exactly 0x11, 0x22 and not ${set_size_x.value}"
+        }
+        val set_size_x_0 = set_size.bytesListTree["x"]
+        check(set_size_x_0 is KaitaiBytes) { "Expected set_size.x.0 to be KaitaiBytes, got ${set_size_x_0::class.simpleName}" }
+        checkElement(set_size_x_0, "x", Pair(3,5), Pair(0, 0))
+        check(set_size_x_0.value.contentEquals(byteArrayOfInts(0x11, 0x22).toBooleanArray())) {
+            "Expected set_size.x.0 to be exactly 0x11, 0x22 and not ${set_size_x_0.value}"
+        }
+        val set_size_x_1 = set_size.bytesListTree["x"]
+        check(set_size_x_1 is KaitaiBytes) { "Expected set_size.x.1 to be KaitaiBytes, got ${set_size_x_1::class.simpleName}" }
+        checkElement(set_size_x_1, "x", Pair(5,7), Pair(0, 0))
+        check(set_size_x_1.value.contentEquals(byteArrayOfInts(0x33, 0x44).toBooleanArray())) {
+            "Expected set_size.x.1 to be exactly 0x33, 0x44 and not ${set_size_x_1.value}"
+        }
+
+        val simple_eos = result.bytesListTree["simple_eos"]
+        check(simple_eos is KaitaiList) { "Expected simple_eos to be KaitaiList, got ${simple_eos::class.simpleName}" }
+        checkElement(simple_eos, "simple_eos", Pair(7,9), Pair(0, 0))
+        check(simple_eos.value.contentEquals(byteArrayOfInts(0x12, 0x34).toBooleanArray())) {
+            "Expected simple_eos to be exactly 0x12, 0x34 and not ${simple_eos.value}"
+        }
+        val simple_eos_0 = simple_eos.bytesListTree[0]
+        check(simple_eos_0 is KaitaiResult) { "Expected simple_eos.0 to be KaitaiResult, got ${simple_eos_0::class.simpleName}" }
+        checkElement(simple_eos_0, "simple_eos", Pair(7,8), Pair(0, 0))
+        check(simple_eos_0.value.contentEquals(byteArrayOfInts(0x12).toBooleanArray())) {
+            "Expected simple_eos.0 to be exactly 0x12 and not ${simple_eos_0.value}"
+        }
+        val simple_eos_0_a = simple_eos_0.bytesListTree["a"]
+        check(simple_eos_0_a is KaitaiBytes) { "Expected simple_eos.0.a to be KaitaiBytes, got ${simple_eos_0_a::class.simpleName}" }
+        checkElement(simple_eos_0_a, "simple_eos", Pair(7,8), Pair(0, 0))
+        check(simple_eos_0_a.value.contentEquals(byteArrayOfInts(0x12).toBooleanArray())) {
+            "Expected simple_eos.0.a to be exactly 0x12 and not ${simple_eos_0_a.value}"
+        }
+        val simple_eos_1 = simple_eos.bytesListTree[0]
+        check(simple_eos_1 is KaitaiResult) { "Expected simple_eos.1 to be KaitaiResult, got ${simple_eos_1::class.simpleName}" }
+        checkElement(simple_eos_1, "simple_eos", Pair(8,9), Pair(0, 0))
+        check(simple_eos_1.value.contentEquals(byteArrayOfInts(0x34).toBooleanArray())) {
+            "Expected simple_eos.1 to be exactly 0x34 and not ${simple_eos_1.value}"
+        }
+        val simple_eos_1_a = simple_eos_0.bytesListTree["a"]
+        check(simple_eos_1_a is KaitaiBytes) { "Expected simple_eos.1.a to be KaitaiBytes, got ${simple_eos_1_a::class.simpleName}" }
+        checkElement(simple_eos_1_a, "simple_eos", Pair(8,9), Pair(0, 0))
+        check(simple_eos_1_a.value.contentEquals(byteArrayOfInts(0x34).toBooleanArray())) {
+            "Expected simple_eos.1.a to be exactly 0x34 and not ${simple_eos_1_a.value}"
+        }
     }
 
     @Test
