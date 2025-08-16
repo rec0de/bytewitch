@@ -401,27 +401,31 @@ class KaitaiDecoderTests {
         val repeat_by_expr = result.bytesListTree["repeat_by_expr"]
         check(repeat_by_expr is KaitaiList) { "Expected repeat_by_expr to be KaitaiList, got ${repeat_by_expr::class.simpleName}" }
         checkElement(repeat_by_expr, "repeat_by_expr", Pair(0,3), Pair(0, 0))
-        check(repeat_by_expr.value.contentEquals(byteArrayOfInts(0xaa, 0xaa, 0xaa).toBooleanArray())) {
-            "Expected repeat_by_expr to be exactly 0xaa, 0xaa, 0xaa and not ${repeat_by_expr.value}"
+        check(repeat_by_expr.value.contentEquals(byteArrayOfInts(0xaa, 0xbb, 0xcc).toBooleanArray())) {
+            "Expected repeat_by_expr to be exactly 0xaa, 0xbb, 0xcc and not ${repeat_by_expr.value}"
         }
+        console.log("a")
         val aa0 = repeat_by_expr.bytesListTree[0]
         check(aa0 is KaitaiBytes) { "Expected repeat_by_expr.0 to be KaitaiBytes, got ${aa0::class.simpleName}" }
-        checkElement(repeat_by_expr, "repeat_by_expr", Pair(0,1), Pair(0, 0))
-        check(repeat_by_expr.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
+        checkElement(aa0, "repeat_by_expr", Pair(0,1), Pair(0, 0))
+        check(aa0.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
             "Expected repeat_by_expr.0 to be exactly 0xaa and not ${aa0.value}"
         }
+        console.log("b")
         val aa1 = repeat_by_expr.bytesListTree[1]
         check(aa1 is KaitaiBytes) { "Expected repeat_by_expr.1 to be KaitaiBytes, got ${aa1::class.simpleName}" }
         checkElement(aa1, "repeat_by_expr", Pair(1,2), Pair(0, 0))
-        check(aa1.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
-            "Expected repeat_by_expr.1 to be exactly 0xaa and not ${aa1.value}"
+        check(aa1.value.contentEquals(byteArrayOfInts(0xbb).toBooleanArray())) {
+            "Expected repeat_by_expr.1 to be exactly 0xbb and not ${aa1.value}"
         }
-        val aa2 = repeat_by_expr.bytesListTree[1]
+        console.log("c")
+        val aa2 = repeat_by_expr.bytesListTree[2]
         check(aa2 is KaitaiBytes) { "Expected repeat_by_expr.2 to be KaitaiBytes, got ${aa2::class.simpleName}" }
         checkElement(aa2, "repeat_by_expr", Pair(2,3), Pair(0, 0))
-        check(aa2.value.contentEquals(byteArrayOfInts(0xaa).toBooleanArray())) {
-            "Expected aa.2 to be exactly 0xaa and not ${aa2.value}"
+        check(aa2.value.contentEquals(byteArrayOfInts(0xcc).toBooleanArray())) {
+            "Expected aa.2 to be exactly 0xcc and not ${aa2.value}"
         }
+        console.log("d")
 
         val set_size = result.bytesListTree["set_size"]
         check(set_size is KaitaiResult) { "Expected set_size to be KaitaiList, got ${set_size::class.simpleName}" }
@@ -433,15 +437,15 @@ class KaitaiDecoderTests {
         check(set_size_x is KaitaiList) { "Expected set_size.x to be KaitaiList, got ${set_size_x::class.simpleName}" }
         checkElement(set_size_x, "x", Pair(3,7), Pair(0, 0))
         check(set_size_x.value.contentEquals(byteArrayOfInts(0x11, 0x22, 0x33, 0x44).toBooleanArray())) {
-            "Expected set_size.x to be exactly 0x11, 0x22 and not ${set_size_x.value}"
+            "Expected set_size.x to be exactly 0x11, 0x22, 0x33, 0x44 and not ${set_size_x.value}"
         }
-        val set_size_x_0 = set_size.bytesListTree["x"]
+        val set_size_x_0 = set_size_x.bytesListTree[0]
         check(set_size_x_0 is KaitaiBytes) { "Expected set_size.x.0 to be KaitaiBytes, got ${set_size_x_0::class.simpleName}" }
         checkElement(set_size_x_0, "x", Pair(3,5), Pair(0, 0))
         check(set_size_x_0.value.contentEquals(byteArrayOfInts(0x11, 0x22).toBooleanArray())) {
             "Expected set_size.x.0 to be exactly 0x11, 0x22 and not ${set_size_x_0.value}"
         }
-        val set_size_x_1 = set_size.bytesListTree["x"]
+        val set_size_x_1 = set_size_x.bytesListTree[1]
         check(set_size_x_1 is KaitaiBytes) { "Expected set_size.x.1 to be KaitaiBytes, got ${set_size_x_1::class.simpleName}" }
         checkElement(set_size_x_1, "x", Pair(5,7), Pair(0, 0))
         check(set_size_x_1.value.contentEquals(byteArrayOfInts(0x33, 0x44).toBooleanArray())) {
@@ -462,19 +466,19 @@ class KaitaiDecoderTests {
         }
         val simple_eos_0_a = simple_eos_0.bytesListTree["a"]
         check(simple_eos_0_a is KaitaiBytes) { "Expected simple_eos.0.a to be KaitaiBytes, got ${simple_eos_0_a::class.simpleName}" }
-        checkElement(simple_eos_0_a, "simple_eos", Pair(7,8), Pair(0, 0))
+        checkElement(simple_eos_0_a, "a", Pair(7,8), Pair(0, 0))
         check(simple_eos_0_a.value.contentEquals(byteArrayOfInts(0x12).toBooleanArray())) {
             "Expected simple_eos.0.a to be exactly 0x12 and not ${simple_eos_0_a.value}"
         }
-        val simple_eos_1 = simple_eos.bytesListTree[0]
+        val simple_eos_1 = simple_eos.bytesListTree[1]
         check(simple_eos_1 is KaitaiResult) { "Expected simple_eos.1 to be KaitaiResult, got ${simple_eos_1::class.simpleName}" }
         checkElement(simple_eos_1, "simple_eos", Pair(8,9), Pair(0, 0))
         check(simple_eos_1.value.contentEquals(byteArrayOfInts(0x34).toBooleanArray())) {
             "Expected simple_eos.1 to be exactly 0x34 and not ${simple_eos_1.value}"
         }
-        val simple_eos_1_a = simple_eos_0.bytesListTree["a"]
+        val simple_eos_1_a = simple_eos_1.bytesListTree["a"]
         check(simple_eos_1_a is KaitaiBytes) { "Expected simple_eos.1.a to be KaitaiBytes, got ${simple_eos_1_a::class.simpleName}" }
-        checkElement(simple_eos_1_a, "simple_eos", Pair(8,9), Pair(0, 0))
+        checkElement(simple_eos_1_a, "a", Pair(8,9), Pair(0, 0))
         check(simple_eos_1_a.value.contentEquals(byteArrayOfInts(0x34).toBooleanArray())) {
             "Expected simple_eos.1.a to be exactly 0x34 and not ${simple_eos_1_a.value}"
         }
