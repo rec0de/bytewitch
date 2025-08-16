@@ -7,6 +7,7 @@ enum class ByteOrder {
 }
 
 fun byteArrayOfInts(vararg ints: Int) = ByteArray(ints.size) { pos -> ints[pos].toByte() }
+fun booleanArrayOfInts(vararg ints: Int): BooleanArray { return byteArrayOfInts(*ints).toBooleanArray() }
 
 @OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.hex() = asUByteArray().joinToString("") { it.toString(16).padStart(2, '0') }
