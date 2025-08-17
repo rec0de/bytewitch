@@ -6,6 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -19,8 +20,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -38,6 +41,8 @@ data class KTStruct(
     val types: Map<String, KTStruct> = emptyMap(),
 
     val instances: Map<String, KTSeq> = emptyMap(),
+
+    val enums: Map<String, KTEnum> = emptyMap(),
 )
 
 @Serializable
@@ -56,10 +61,9 @@ data class KTMeta(
 data class KTSeq(
     val id: String? = null,
 
-    @Serializable(with = KTTypeSerializer::class)
     val type: KTType? = null,
+    val enum: String? = null,
 
-    @Serializable(with = StringOrIntSerializer::class)
     val size: StringOrInt? = null,
     @SerialName("size-eos")
     val sizeEos: Boolean = false,
@@ -84,13 +88,12 @@ data class KTSeq(
     @SerialName("eos-error")
     val eosError: Boolean = true,
 
-    @Serializable(with = KTValidSerializer::class)
     val valid: KTValid? = null,
 
     val value: String? = null,
 )
 
-@Serializable
+@Serializable(with = KTTypeSerializer::class)
 sealed class KTType {
     @Serializable
     data class Primitive(val type: String) : KTType() {
@@ -126,7 +129,7 @@ enum class KTRepeat {
     UNTIL,
 }
 
-@Serializable
+@Serializable(with = KTValidSerializer::class)
 data class KTValid(
     val eq: String? = null,
     val min: String? = null,
@@ -134,9 +137,47 @@ data class KTValid(
     @SerialName("any-of")
     val anyOf: List<String>? = null,
     val expr: String? = null,
-)
+) {
+    fun hasEqOnly(): Boolean {
+        return min == null && max == null && anyOf.isNullOrEmpty() && expr == null
+    }
+}
 
-@Serializable
+@Serializable(with = KTEnumSerializer::class)
+data class KTEnum(
+    val values: Map<Int, KTEnumValue>,
+) {
+    operator fun get(key: Int) = values[key]
+}
+
+@Serializable(with = KTEnumValueSerializer::class)
+data class KTEnumValue(
+    val id: StringOrBoolean,
+
+    val doc: String? = null,
+    @Serializable(with = StringOrArraySerializer::class)
+    @SerialName("doc-ref")
+    val docRef: List<String>? = null,
+) {
+    fun hasIdOnly(): Boolean {
+        return doc == null && docRef.isNullOrEmpty()
+    }
+}
+
+@Serializable(with = StringOrBooleanSerializer::class)
+sealed class StringOrBoolean {
+    @Serializable
+    data class StringValue(val value: String) : StringOrBoolean() {
+        override fun toString(): String = value
+    }
+
+    @Serializable
+    data class BooleanValue(val value: Boolean) : StringOrBoolean() {
+        override fun toString(): String = value.toString()
+    }
+}
+
+@Serializable(with = StringOrIntSerializer::class)
 sealed class StringOrInt {
     @Serializable
     data class StringValue(val value: String) : StringOrInt() {
@@ -224,7 +265,15 @@ object KTValidSerializer : KSerializer<KTValid> {
         val jsonDecoder = decoder as JsonDecoder
 
         return when (val element = jsonDecoder.decodeJsonElement()) {
-            is JsonObject -> Json.decodeFromJsonElement(element)
+            is JsonObject -> {
+                val eq = element["eq"]?.jsonPrimitive?.content
+                val min = element["min"]?.jsonPrimitive?.content
+                val max = element["max"]?.jsonPrimitive?.content
+                val anyOf = element["any-of"]?.jsonArray?.map { it.jsonPrimitive.content }
+                val expr = element["expr"]?.jsonPrimitive?.content
+
+                KTValid(eq, min, max, anyOf, expr)
+            }
             // If it's a primitive, we assume it's a single string value for `eq`
             is JsonPrimitive -> KTValid(eq = element.content)
             else -> throw SerializationException("Expected object or primitive for KTValid")
@@ -232,7 +281,105 @@ object KTValidSerializer : KSerializer<KTValid> {
     }
 
     override fun serialize(encoder: Encoder, value: KTValid) {
-        encoder.encodeSerializableValue(KTValid.serializer(), value)
+        if (value.hasEqOnly() && value.eq != null) {
+            encoder.encodeString(value.eq)
+        } else {
+            encoder.encodeSerializableValue(KTValid.serializer(), value)
+        }
+    }
+}
+
+object KTEnumSerializer : KSerializer<KTEnum> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("KTEnum") {
+        element<Map<String, KTEnumValue>>("values")
+    }
+
+    override fun deserialize(decoder: Decoder): KTEnum {
+        val jsonDecoder = decoder as JsonDecoder
+
+        return KTEnum(
+            values = jsonDecoder.decodeSerializableValue(
+                MapSerializer(Int.serializer(), KTEnumValue.serializer())
+            ),
+        )
+    }
+
+    override fun serialize(encoder: Encoder, value: KTEnum) {
+        encoder.encodeSerializableValue(MapSerializer(Int.serializer(), KTEnumValue.serializer()), value.values)
+    }
+}
+
+object KTEnumValueSerializer : KSerializer<KTEnumValue> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("KTEnumValue") {
+        element<StringOrBoolean>("id")
+        element<String>("doc", isOptional = true)
+        element<List<String>>("doc-ref", isOptional = true)
+    }
+
+    override fun deserialize(decoder: Decoder): KTEnumValue {
+        val jsonDecoder = decoder as JsonDecoder
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonObject -> {
+                val id = element["id"]?.let { jsonDecoder.json.decodeFromJsonElement(StringOrBoolean.serializer(), it) }
+                    ?: throw SerializationException("Missing 'id' field in KTEnumValue")
+
+                val doc = element["doc"]?.jsonPrimitive?.content
+                val docRef = element["doc-ref"]?.let {
+                    jsonDecoder.json.decodeFromJsonElement(StringOrArraySerializer, it)
+                }
+
+                KTEnumValue(
+                    id = id,
+                    doc = doc,
+                    docRef = docRef,
+                )
+            }
+
+            is JsonPrimitive ->
+                KTEnumValue(
+                    id = Json.decodeFromJsonElement(StringOrBoolean.serializer(), element),
+                )
+
+            else -> throw SerializationException("Expected object or primitive for KTEnumValue")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: KTEnumValue) {
+        if (value.hasIdOnly()) {
+            // If the value has only an ID, we can serialize it as a primitive
+            encoder.encodeString(value.id.toString())
+        } else {
+            // Otherwise, we serialize it as a full object
+            encoder.encodeSerializableValue(KTEnumValue.serializer(), value)
+        }
+    }
+}
+
+object StringOrBooleanSerializer : KSerializer<StringOrBoolean> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("StringOrBoolean", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): StringOrBoolean {
+        val jsonDecoder = decoder as JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+
+        return when {
+            element is JsonPrimitive && element.isString ->
+                StringOrBoolean.StringValue(element.content)
+
+            element is JsonPrimitive && element.booleanOrNull != null ->
+                StringOrBoolean.BooleanValue(element.boolean)
+
+            else -> throw SerializationException("Expected string or boolean")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: StringOrBoolean) {
+        when (value) {
+            is StringOrBoolean.StringValue -> encoder.encodeString(value.value)
+            is StringOrBoolean.BooleanValue -> encoder.encodeBoolean(value.value)
+        }
     }
 }
 
