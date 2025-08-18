@@ -921,26 +921,39 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
                                             getEnum(kaitaiStruct, seqElement.enum) // TODO: add possibility to use parent scope
                         if (path != null) {
-                            if (path[Int.fromBytes(ioStream.toByteArray(), ByteOrder.BIG)] == null) {
-                                throw RuntimeException("The enum has no key-value pair with the given key")
-                            }else {
-                                if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
-                                    //enum = Pair(
-                                    //    path,
-                                    //    path[Int.fromBytes(ioStream.toByteArray(), ByteOrder.BIG).toUInt()]!!.id.toString()
-                                    //)
-                                } else {
+                            if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
+                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                }else {
                                     enum = Pair(
                                         path,
-                                        path[Int.fromBytes(ioStream.toByteArray(), ByteOrder.BIG)]!!.id.toString()
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString() // TODO change to UInt
                                     )
                                 }
-                                type.usedDisplayStyle = DisplayStyle.ENUM
+                            } else if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) {
+                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                }else {
+                                    enum = Pair(
+                                        path,
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString()
+                                    )
+                                }
+                            } else {
+                                if (path[if (ioSubStream[0]) 1 else 0] == null) {
+                                    val temp = if (ioSubStream[0]) 1 else 0
+                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                }else {
+                                    enum = Pair(
+                                        path,
+                                        path[if (ioSubStream[0]) 1 else 0]!!.id.toString()
+                                    )
+                                }
                             }
+                            type.usedDisplayStyle = DisplayStyle.ENUM
                         } else {
                             throw RuntimeException("The given enum does not exist.")
                         }
-
                     }
 
                     if (type.customType != null) {
@@ -1288,10 +1301,9 @@ class KaitaiEnum(
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        console.log(enum.second)
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                "${id}(${(enum.second)})enum" +
-                doc.renderHTML() +
+                    "${id}(${enum.second})enum" +
+                    doc.renderHTML() +
                 "</div>"
     }
 
