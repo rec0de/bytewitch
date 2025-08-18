@@ -852,7 +852,7 @@ class SSFParserTests {
 
         actual.forEachIndexed { index, msg ->
             val segments = msg.segments.sortedBy { it.offset }
-            val lengthField = segments.find { it.fieldType.name.startsWith("PAYLOAD_LENGTH") }
+            val lengthField = segments.find { it.fieldType.name.startsWith("MESSAGE_LENGTH") }
             val unknownAfterLength = segments.find { it.offset > (lengthField?.offset ?: -1) }
 
             assertNotNull(lengthField, "Length field missing in msg[$index]")

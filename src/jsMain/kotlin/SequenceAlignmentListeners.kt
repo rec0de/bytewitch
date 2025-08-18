@@ -1,4 +1,5 @@
 import SequenceAlignment.AlignedSequence
+import SequenceAlignment.SegmentWiseSequenceAlignment
 import org.w3c.dom.*
 import org.w3c.dom.events.Event
 import kotlinx.browser.document
@@ -183,9 +184,27 @@ fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequen
 
 // show toggle button to switch to segment wise sequence alignment
 fun showSequenceAlignmentToggleButton() {
+    hideStartSequenceAlignmentButton()
+
     val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
     for (i in 0 until toggleButtons.length) {
         (toggleButtons[i] as HTMLElement).style.display = "block"
+    }
+}
+
+// hide button to start sequence alignment
+fun hideStartSequenceAlignmentButton() {
+    val alignmentButtons = document.querySelectorAll(".alignment-button")
+    for (i in 0 until alignmentButtons.length) {
+        (alignmentButtons[i] as HTMLElement).style.display = "none"
+    }
+}
+
+// show button to start sequence alignment
+fun showStartSequenceAlignmentButton() {
+    val alignmentButtons = document.querySelectorAll(".alignment-button")
+    for (i in 0 until alignmentButtons.length) {
+        (alignmentButtons[i] as HTMLElement).style.display = "block"
     }
 }
 

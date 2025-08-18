@@ -9,7 +9,7 @@ object ByteWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
     // main function for sequence alignment
     override fun align(messages: Map<Int, SSFParsedMessage>): List<AlignedSequence> {
         val alignments = mutableListOf<AlignedSequence>()
-        val tresholdAlignedSegment = 0.17
+        val thresholdSimilarity = 0.83
 
         for ((i, msgA) in messages) {
             for ((j, msgB) in messages) {
@@ -31,7 +31,7 @@ object ByteWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
 
                     val sim = 1.0 - byteCanberra(bytesA[x - 1], bytesB[y - 1])
                     if (score == diag + sim) {
-                        if (1 - sim < tresholdAlignedSegment) {
+                        if (sim >= thresholdSimilarity) {
                             alignments.add(AlignedSequence(i, j, x - 1, y - 1, 1.0 - sim))
                         }
                         x--

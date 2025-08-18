@@ -18,15 +18,25 @@ fun removeTextArea(dataContainer: Element) {
 
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement
-    val messageOutputs = output.querySelectorAll(".message-output")
-    if (messageOutputs.length > 0) {
-        // remove last child
-        output.removeChild(messageOutputs[messageOutputs.length - 1] as HTMLDivElement)
+    val target = document.getElementById("message-output-$lastIndex") as? HTMLDivElement
+    if (target != null) {
+        output.removeChild(target)
     }
 
-    // reset hexview
-    val hexview = document.getElementById("hexview") as HTMLDivElement
-    hexview.innerHTML = ""
+    // reset hexview to the bytes of the first textarea
+    setByteFinderContent(0)
+}
+
+// input listener for live decode of all text areas
+fun applyLiveDecodeListeners() {
+    val textareas = document.querySelectorAll(".input_area")
+    for (i in 0 until textareas.length) {
+        val ta = textareas[i] as HTMLTextAreaElement
+        ta.oninput = {
+            if (liveDecodeEnabled)
+                mainDecode(true)
+        }
+    }
 }
 
 fun appendTextArea(content: String = "") {
@@ -58,7 +68,7 @@ fun appendTextArea(content: String = "") {
 
     textarea.oninput = {
         if(liveDecodeEnabled)
-            decode(true)
+            mainDecode(true)
     }
 
     textarea.onselect = {
@@ -85,7 +95,6 @@ fun appendTextArea(content: String = "") {
             }
         }
     }
-
 }
 
 
@@ -99,7 +108,7 @@ fun appendTextareaForFileUpload(content: String) {
         val ta = textareas[i] as HTMLTextAreaElement
         if (ta.value.trim().isEmpty()) {
             ta.value = content
-            if (liveDecodeEnabled) decode(true)
+            if (liveDecodeEnabled) mainDecode(true)
             return
         }
     }

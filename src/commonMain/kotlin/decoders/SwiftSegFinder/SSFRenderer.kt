@@ -35,7 +35,8 @@ object SSFRenderer {
                     </div>
                 """.trimIndent()
 
-                SSFField.PAYLOAD_LENGTH_BIG_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN -> {
+                SSFField.PAYLOAD_LENGTH_BIG_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN,
+                SSFField.MESSAGE_LENGTH_BIG_ENDIAN, SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN -> {
                     val payloadLength = SSFUtil.tryParseLength(
                         bytes = bytes,
                         offset = start + sourceOffset,
@@ -72,8 +73,9 @@ object SSFRenderer {
 
         val content = "<div class=\"ssffield segmentwise roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+        val alignmentButton = "<div class=\"icon icon-alignment alignment-button\" style=\"display:none;\"></div>"
         val toggleButton = "<div class=\"icon icon-toggle-left toggle-seqalign-button\" style=\"display:none;\"></div>"
-        val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
+        val iconBar = "<div class=\"icon-bar\">$editButton$alignmentButton$toggleButton</div>"
 
         return """
             <div class="ssf roundbox">
@@ -97,38 +99,41 @@ object SSFRenderer {
             val groupedHex = segmentBytes.mapIndexed { i, byte ->
                 val offset = start + i
                 val char = byte.toInt().toChar().let { c ->
-                    if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c else '.'
+                    if (c.code == 0x20) '.'// replace space character with a dot
+                    else if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c
+                    else '.'
                 }
 
                 val valueAlignId = " value-align-id='$msgIndex-$offset'"
                 """
-                <div class='bytegroup' data-start='$offset' data-end='${offset + 1}' $valueAlignId>
-                    <div class="byte-hex">${byte.toHex()}</div>
-                    <div class='ascii-char'>$char</div>
-                </div>
-            """.trimIndent()
+                    <div class='bytegroup' data-start='$offset' data-end='${offset + 1}' $valueAlignId>
+                        <div class="byte-hex">${byte.toHex()}</div>
+                        <div class='ascii-char'>$char</div>
+                    </div>
+                """.trimIndent()
             }.joinToString("")
 
             val valueLengthTag = " data-start='$start' data-end='$end'"
 
             """
-            <div class="ssffield roundbox data bytewise" $valueLengthTag>
-                $groupedHex
-            </div>
-        """.trimIndent()
+                <div class="ssffield roundbox data bytewise" $valueLengthTag>
+                    $groupedHex
+                </div>
+            """.trimIndent()
         }
 
         val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+        val alignmentButton = "<div class=\"icon icon-alignment alignment-button\" style=\"display:none;\"></div>"
         val toggleButton = "<div class=\"icon icon-toggle-right toggle-seqalign-button\" style=\"display:none;\"></div>"
-        val iconBar = "<div class=\"icon-bar\">$editButton$toggleButton</div>"
+        val iconBar = "<div class=\"icon-bar\">$editButton$alignmentButton$toggleButton</div>"
 
         return """
-        <div class="ssf roundbox">
-            <div class="view-default">$iconBar$content</div>
-            <div class="view-editable" style="display:none;">${renderEditableHTML(parsed)}</div>
-        </div>
-    """.trimIndent()
+            <div class="ssf roundbox">
+                <div class="view-default">$iconBar$content</div>
+                <div class="view-editable" style="display:none;">${renderEditableHTML(parsed)}</div>
+            </div>
+        """.trimIndent()
     }
 
 
@@ -146,7 +151,9 @@ object SSFRenderer {
             val groupedHex = segmentBytes.mapIndexed { i, byte ->
                 val offset = start + i
                 val char = byte.toInt().toChar().let { c ->
-                    if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c else '.'
+                    if (c.code == 0x20) '.'// replace space character with a dot
+                    else if (c.code in 32..59 || c.code in 64..90 || c.code in 97..122) c
+                    else '.'
                 }
                 """
                     <div class='bytegroup' data-start='$offset' data-end='${offset + 1}'>

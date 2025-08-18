@@ -143,9 +143,9 @@ class SSFParser {
                 SSFSegment(
                     lengthFieldOffset,
                     if (chosenEndian)
-                        SSFField.PAYLOAD_LENGTH_BIG_ENDIAN
+                        SSFField.MESSAGE_LENGTH_BIG_ENDIAN
                     else
-                        SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN
+                        SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN
                 )
             )
 
@@ -184,9 +184,11 @@ class SSFParser {
             // payloadEnd must be message size
             if (payloadEnd != bytes.size) continue
 
-            // length field must be of type UNKNOWN
+            // length field must be of type UNKNOWN or already by a message length field because only one is allowed to exists
             val currentSegment = findSegmentForOffset(segments, offset)
-            if (currentSegment?.fieldType != SSFField.UNKNOWN) continue
+            if (currentSegment?.fieldType != SSFField.UNKNOWN
+                && currentSegment?.fieldType != SSFField.MESSAGE_LENGTH_BIG_ENDIAN
+                && currentSegment?.fieldType != SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN) continue
 
             return offset to length
         }

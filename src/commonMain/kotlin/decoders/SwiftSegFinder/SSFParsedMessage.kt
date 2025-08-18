@@ -16,5 +16,7 @@ enum class SSFField {
     STRING,
     PAYLOAD_LENGTH_LITTLE_ENDIAN,
     PAYLOAD_LENGTH_BIG_ENDIAN,
+    MESSAGE_LENGTH_LITTLE_ENDIAN,
+    MESSAGE_LENGTH_BIG_ENDIAN,
     STRING_PAYLOAD // currently the payload after a payload_length field can only be a string
 }

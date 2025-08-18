@@ -8,6 +8,13 @@ import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.js.Date
 
+const val byteLimitSSFContent = 1000 // only show SwiftSegFinder for messages with a length below the defined threshold
+const val maxLimitSequenceAlignment = 5000 // max total bytes across all eligible messages for auto sequence alignment
+val ssfEligible = mutableSetOf<Int>() // msgIndex for protocol messages that show SwiftSegFinder output
+private val HIGH_END_DECODERS = setOf( // set of confident decoders when SSF is not allowed to show up
+    "bplist17", "bplist15", "bplist", // TODO maybe use enum to not write the name of it twice.
+)
+
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
@@ -34,12 +41,12 @@ fun main() {
 
         decodeBtn.onclick = {
             tryhard = false
-            decode(false)
+            mainDecode(false)
         }
 
         tryhardBtn.onclick = {
             tryhard = true
-            decode(false)
+            mainDecode(false)
         }
 
         uploadBtn.onclick = {
@@ -94,19 +101,25 @@ fun main() {
         // (as do specific keystrokes, but we'll see if we want to worry about those)
         document.onclick = {
             // avoid immediately clearing selection from click associated with select event
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+            if (lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
                 clearSelections()
             }
         }
 
         document.onkeydown = {
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+            if (lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(
+                    16,
+                    17,
+                    20
+                )
+            ) {
                 clearSelections()
             }
         }
 
     })
 }
+
 
 fun clearSelections() {
     lastSelectionEvent = null
@@ -119,7 +132,7 @@ fun clearSelections() {
 }
 
 // decode one specific byte sequence
-fun decodeBytes(bytes: ByteArray, taIndex: Int) {
+fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean) {
     val output = document.getElementById("output") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val hexview = document.getElementById("hexview") as HTMLDivElement
@@ -127,35 +140,50 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
 
     // Reset output
-    hexview.innerHTML = ""
-    textview.innerHTML = ""
-    bytefinder.style.display = "none"
+    //hexview.innerHTML = ""
+    //textview.innerHTML = ""
+    //bytefinder.style.display = "none"
     noDecodeYet.style.display = "none"
+
+    /*
+    // return if no data is given or just a half byte
+    if (bytes.isEmpty()) {
+        return
+    }
+    */
 
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
-    if (result.isNotEmpty()) {
-        bytefinder.style.display = "flex"
+    bytefinder.style.display = "flex"
 
-        // check if message-output container already exists
-        val messageId = "message-output-$taIndex"
-        var messageBox = document.getElementById(messageId) as? HTMLDivElement
+    // check if message-output container already exists
+    val messageId = "message-output-$taIndex"
+    var messageBox = document.getElementById(messageId) as? HTMLDivElement
 
-        if (messageBox == null) {
-            messageBox = document.createElement("DIV") as HTMLDivElement
-            messageBox.id = messageId
-            messageBox.classList.add("message-output") // apply layout CSS
-            output.appendChild(messageBox)
-        } else {
-            messageBox.innerHTML = "" // clear old content
-        }
+    if (messageBox == null) {
+        messageBox = document.createElement("DIV") as HTMLDivElement
+        messageBox.id = messageId
+        messageBox.classList.add("message-output") // apply layout CSS
+        output.appendChild(messageBox)
+    } else {
+        messageBox.innerHTML = "" // clear old content
+    }
 
-        result.forEach {
-            messageBox.appendChild(renderByteWitchResult(it, taIndex))
-        }
+    result.forEach {
+        messageBox.appendChild(renderByteWitchResult(it, taIndex))
+    }
 
+    // check if result needs a SwiftSegFinder decoding
+    val allowSSF = showSSFContent && !hasHighEndHit(result)
+
+    if (allowSSF) {
+        // show SwiftSegFinder view
+        ssfEligible.add(taIndex)
         messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+    } else {
+        ssfEligible.remove(taIndex)
+        (messageBox.querySelector(".ssf") as? HTMLElement)?.remove()
     }
 }
 
@@ -195,10 +223,6 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
         SSFRenderer.renderByteWiseHTML(ssfParsed)
     }
 
-
-    attachRangeListeners(ssfContent, taIndex)
-    attachSSFButtons(ssfContent, bytes, taIndex)
-
     ssfResult.appendChild(ssfName)
     ssfResult.appendChild(ssfContent)
 
@@ -206,7 +230,7 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 }
 
 // decode all text areas
-fun decode(isLiveDecoding: Boolean) {
+fun mainDecode(isLiveDecoding: Boolean) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -224,26 +248,50 @@ fun decode(isLiveDecoding: Boolean) {
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
-            decodeBytes(bytes, i)
+            decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
         }
     }
 
-    // refine ssf fields and rerender html content
-    val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
-    refined.forEach { msg ->
-        parsedMessages[msg.msgIndex] = msg
-        rerenderSSF(msg.msgIndex, msg)
+    // show the bytes of the first text area in the byte finder view
+    setByteFinderContent(0)
+
+    val eligibleMsgs = getEligibleMsgsForSSF()
+    if (eligibleMsgs.isNotEmpty()) {
+        // refine ssf fields and rerender html content
+        val refined = SSFParser().refineSegmentsAcrossMessages(eligibleMsgs.values.toList())
+        refined.forEach { msg ->
+            parsedMessages[msg.msgIndex] = msg
+            if (msg.msgIndex in ssfEligible) { // only rerender SwiftSegFinder view if its eligible
+                rerenderSSF(msg.msgIndex, msg)
+            }
+        }
     }
 
-    // for sequence alignment
-    if (tryhard && !isLiveDecoding) {
+    if (!isLiveDecoding && autoRunSeqAlign(eligibleMsgs)) {
         if (showSegmentWiseAlignment) {
-            val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
+            val alignedSegment = SegmentWiseSequenceAlignment.align(eligibleMsgs)
             attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
         } else {
-            val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+            val alignedSegment = ByteWiseSequenceAlignment.align(eligibleMsgs)
             attachByteWiseSequenceAlignmentListeners(alignedSegment)
         }
-
+    } else if(eligibleMsgs.size >= 2) {
+        showStartSequenceAlignmentButton()
     }
+}
+
+// check if decoder is confident to not show SwiftSegFinder
+fun hasHighEndHit(results: List<Pair<String, ByteWitchResult>>): Boolean =
+    results.any { (name, _) -> name in HIGH_END_DECODERS }
+
+// only show Messages that are allowed for SwiftSegFinder view
+fun getEligibleMsgsForSSF(): Map<Int, SSFParsedMessage> =
+    parsedMessages
+        .filter { (idx, msg) -> idx in ssfEligible && msg.bytes.size <= byteLimitSSFContent }
+
+// check if the messages are too long for auto sequence alignment
+fun autoRunSeqAlign(msgs: Map<Int, SSFParsedMessage>): Boolean {
+    if (msgs.size < 2) return false
+    val totalBytes = msgs.values.sumOf { it.bytes.size }
+    return totalBytes <= maxLimitSequenceAlignment
 }
