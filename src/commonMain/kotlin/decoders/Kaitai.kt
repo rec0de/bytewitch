@@ -41,8 +41,13 @@ element.repetition[2].subelement[1]   <-- notation in kaiatai
 class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf()) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
 
-    operator fun get(id : String): KaitaiElement? {
-        return this.find { it.id == id }
+    // getter and setters for integer ids already implemented, now we do them for strings aswell, as ids are unique
+    operator fun get(id : String): KaitaiElement {
+        val element = this.find { it.id == id }
+        if (element == null) {
+            throw Exception("Could not find element with id $id")
+        }
+        return element
     }
 
     operator fun set(id: String, element: KaitaiElement) {
@@ -954,10 +959,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         } else {
             bytesListTree.byteOrder = ByteOrder.BIG
         }
-        currentScopeStruct.meta?.let { meta ->
-            meta.endian?.let { endian ->
-                bytesListTree.byteOrder = endian.toByteOrder()
-            }
+        currentScopeStruct.meta?.endian?.let { endian ->
+            bytesListTree.byteOrder = endian.toByteOrder()
         }
 
         var dataSizeOfSequenceInBits: Int = 0
@@ -1098,7 +1101,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
                     bytesListTree.add(
                         KaitaiList(
-                            parentId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
+                            elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
                             KaitaiDoc(undefined, undefined)
                         )
                     )
