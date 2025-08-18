@@ -923,7 +923,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         if (path != null) {
                             if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
                                 if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
-                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
                                 }else {
                                     enum = Pair(
                                         path,
@@ -932,7 +932,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                                 }
                             } else if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
                                 if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) {
-                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
                                 }else {
                                     enum = Pair(
                                         path,
@@ -942,7 +942,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             } else {
                                 if (path[if (ioSubStream[0]) 1 else 0] == null) {
                                     val temp = if (ioSubStream[0]) 1 else 0
-                                    throw RuntimeException("The enum has no key-value pair with the given key")
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
                                 }else {
                                     enum = Pair(
                                         path,
@@ -952,7 +952,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             }
                             type.usedDisplayStyle = DisplayStyle.ENUM
                         } else {
-                            throw RuntimeException("The given enum does not exist.")
+                            throw RuntimeException("The given enum ${seqElement.enum} does not exist.")
                         }
                     }
 
