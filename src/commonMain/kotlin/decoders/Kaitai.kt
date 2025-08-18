@@ -18,12 +18,14 @@ import kaitai.KTType
 import kaitai.KTValid
 import kaitai.StringOrInt
 import kaitai.toByteOrder
+import kaitai.KTEnum
+import kaitai.KTEnumValue
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
 
 enum class DisplayStyle {
-    HEX, BINARY, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING
+    HEX, BINARY, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING, ENUM
 }
 
 /*
@@ -922,7 +924,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(kaitaiStruct, type.type)
+                getCustomType(kaitaiStruct, type.type) // TODO: add possibility to use parent scope
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type
@@ -939,6 +941,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.sizeIsKnown = true
         }
         return type
+    }
+
+    fun getEnum(currentScopeStruct: KTStruct, path: String) : KTEnum? {
+        val elements = path.split("::")
+        if (elements.size > 1) {
+            val type = currentScopeStruct.types[elements[0]]
+            if (type != null) return getEnum(type, elements[0])
+        }
+
+        return currentScopeStruct.enums[elements[0]]
     }
 
     fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
@@ -1016,6 +1028,50 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
                     }
 
+                    // get the enum value
+                    var enum: Pair<KTEnum?, String> = Pair(null, "")
+                    if (seqElement.enum != null &&
+                        (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER ||
+                                type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
+                                (type.usedDisplayStyle == DisplayStyle.BINARY && type.sizeInBits == 1u))) {
+                        val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
+                                            getEnum(kaitaiStruct, seqElement.enum) // TODO: add possibility to use parent scope
+                        if (path != null) {
+                            if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                }else {
+                                    enum = Pair(
+                                        path,
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString() // TODO change to UInt
+                                    )
+                                }
+                            } else if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) {
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                }else {
+                                    enum = Pair(
+                                        path,
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString()
+                                    )
+                                }
+                            } else {
+                                if (path[if (ioSubStream[0]) 1 else 0] == null) {
+                                    val temp = if (ioSubStream[0]) 1 else 0
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                }else {
+                                    enum = Pair(
+                                        path,
+                                        path[if (ioSubStream[0]) 1 else 0]!!.id.toString()
+                                    )
+                                }
+                            }
+                            type.usedDisplayStyle = DisplayStyle.ENUM
+                        } else {
+                            throw RuntimeException("The given enum ${seqElement.enum} does not exist.")
+                        }
+                    }
+
                     if (type.customType != null) {
                         kaitaiElement = processSeq(
                             seqElement.id,
@@ -1048,6 +1104,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                             DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                             DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                            DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, enum)
                             // displayStyle.HEX as the fallback (even if it's a known type or whatever)
                             else -> KaitaiBytes(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                         }
@@ -1349,6 +1406,26 @@ class KaitaiString(override val id: String, override var endianness: ByteOrder, 
                 "</div>"
     }
 }
+
+class KaitaiEnum(
+    override val id: String,
+    override var endianness: ByteOrder,
+    override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>,
+    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc,
+    val enum: Pair<KTEnum?, String>,
+) : KaitaiElement {
+    override fun renderHTML(): String {
+        return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
+                    "${id}(${enum.second})enum" +
+                    doc.renderHTML() +
+                "</div>"
+    }
+
+}
+
+
 /*
 class KaitaiArray(val id: String, val endianness: ByteOrder, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>): KaitaiElement {
     override fun renderHTML(): String {
