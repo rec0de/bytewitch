@@ -3,7 +3,6 @@ package decoders
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.hex
-import bitmage.indexOfFirstSubsequence
 import bitmage.padLeft
 import bitmage.toBooleanArray
 import bitmage.toByteArray
@@ -19,7 +18,6 @@ import kaitai.KTValid
 import kaitai.StringOrInt
 import kaitai.toByteOrder
 import kaitai.KTEnum
-import kaitai.KTEnumValue
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
@@ -837,7 +835,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return currentScopeStruct.enums[elements[0]]
     }
 
-    fun processMultipleElements(
+    fun processManyElements(
         seqElement: KTSeq,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
@@ -894,6 +892,37 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         )
     }
 
+    fun processOneOrManyElements(
+        seqElement: KTSeq,
+        currentScopeStruct: KTStruct,
+        bytesListTree: MutableKaitaiTree,
+        ioStream: BooleanArray,
+        offsetInDatastreamInBits: Int,
+        sourceOffsetInBits: Int,
+        dataSizeOfSequenceInBits: Int
+    ) : Triple<KaitaiElement, Int, Int> {
+        return if (seqElement.repeat != null) {
+            processManyElements(
+                seqElement,
+                currentScopeStruct,
+                bytesListTree,
+                ioStream,
+                offsetInDatastreamInBits,
+                sourceOffsetInBits,
+                dataSizeOfSequenceInBits
+            )
+        } else {
+            processSingleElement(
+                seqElement,
+                currentScopeStruct,
+                bytesListTree,
+                ioStream,
+                offsetInDatastreamInBits,
+                sourceOffsetInBits,
+                dataSizeOfSequenceInBits
+            )
+        }
+    }
 
     fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
                    ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
@@ -920,8 +949,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var dataSizeOfSequenceInBits: Int = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
-                var triple = if (seqElement.repeat != null) {
-                    processMultipleElements(
+                val triple = processOneOrManyElements(
                         seqElement,
                         currentScopeStruct,
                         bytesListTree,
@@ -930,17 +958,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         sourceOffsetInBits,
                         dataSizeOfSequenceInBits
                     )
-                } else {
-                    processSingleElement(
-                        seqElement,
-                        currentScopeStruct,
-                        bytesListTree,
-                        ioStream,
-                        offsetInDatastreamInBits,
-                        sourceOffsetInBits,
-                        dataSizeOfSequenceInBits
-                    )
-                }
+
                 bytesListTree.add(triple.first)
                 offsetInDatastreamInBits = triple.second
                 dataSizeOfSequenceInBits = triple.third
@@ -958,6 +976,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
             resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
         }
+
+        if (!currentScopeStruct.instances.isEmpty()) {
+            //  TODO Instances here
+            //bytesListTree.add(
+            //    processOneOrManyElements()
+            //)
+        }
+
         return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
     }
 
@@ -966,31 +992,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
-        offsetInDatastreamInBits: Int,
+        _offsetInDatastreamInBits: Int,
         sourceOffsetInBits: Int,
-        dataSizeOfSequenceInBits: Int,
+        _dataSizeOfSequenceInBits: Int,
     ): Triple<KaitaiElement, Int, Int> {
-        var offsetInDatastreamInBits1 = offsetInDatastreamInBits
-        var dataSizeOfSequenceInBits1 = dataSizeOfSequenceInBits
+        var offsetInDatastreamInBits = _offsetInDatastreamInBits
+        var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
         checkNotNull(seqElement.id) { "Sequence element id must not be null" }
         val elementId = seqElement.id
 
         val type = parseType(currentScopeStruct, seqElement, bytesListTree)
         if (type.sizeIsUntilEOS) {
-            type.sizeInBits = (ioStream.size - offsetInDatastreamInBits1).toUInt()
+            type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
             type.sizeIsKnown = true
         }
         if (type.terminator != null) {
             val dataAsByteArray =
                 ioStream.toByteArray()  // technically not ideal as we don't check for byte-alignment, but right after we throw away all results if it's not byte aligned
             type.sizeInBits =
-                (dataAsByteArray.sliceArray(offsetInDatastreamInBits1 / 8..dataAsByteArray.size - 1).indexOf(type.terminator!!.toByte())
+                (dataAsByteArray.sliceArray(offsetInDatastreamInBits / 8..dataAsByteArray.size - 1).indexOf(type.terminator!!.toByte())
                     .toUInt() + 1u) * 8u
             type.sizeIsKnown = true
         }
 
         // if we are operating on non byte aligned data, but we don't have a binary data type, something is very wrong
-        if (((((offsetInDatastreamInBits1 + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
+        if (((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
             && type.customType == null
         ) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
             throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
@@ -998,7 +1024,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         var kaitaiElement: KaitaiElement
         var ioSubStream = if (type.sizeIsKnown) {  // slice if we have a substream
-            ioStream.sliceArray(offsetInDatastreamInBits1..offsetInDatastreamInBits1 + type.sizeInBits.toInt() - 1)
+            ioStream.sliceArray(offsetInDatastreamInBits..offsetInDatastreamInBits + type.sizeInBits.toInt() - 1)
         } else {
             ioStream
         }
@@ -1084,8 +1110,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 bytesListTree,
                 type.customType!!,
                 ioSubStream,
-                sourceOffsetInBits + dataSizeOfSequenceInBits1,
-                if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits1
+                sourceOffsetInBits + dataSizeOfSequenceInBits,
+                if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits
             )
 
             if (seqElement.doc == null && seqElement.docRef == null) {
@@ -1094,12 +1120,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         } else {
             val sourceByteRange = Pair(
-                (sourceOffsetInBits + dataSizeOfSequenceInBits1) / 8,
-                (sourceOffsetInBits + dataSizeOfSequenceInBits1 + type.sizeInBits.toInt()) / 8
+                (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8,
+                (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) / 8
             )
             val sourceRangeBitOffset = Pair(
-                (sourceOffsetInBits + dataSizeOfSequenceInBits1) % 8,
-                (sourceOffsetInBits + dataSizeOfSequenceInBits1 + type.sizeInBits.toInt()) % 8
+                (sourceOffsetInBits + dataSizeOfSequenceInBits) % 8,
+                (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits.toInt()) % 8
             )
             val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
 
@@ -1128,9 +1154,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.sizeIsKnown
         }
 
-        offsetInDatastreamInBits1 += type.sizeInBits.toInt()
-        dataSizeOfSequenceInBits1 += type.sizeInBits.toInt()
-        return Triple(kaitaiElement, offsetInDatastreamInBits1, dataSizeOfSequenceInBits1)
+        offsetInDatastreamInBits += type.sizeInBits.toInt()
+        dataSizeOfSequenceInBits += type.sizeInBits.toInt()
+        return Triple(kaitaiElement, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
     }
 }
 
