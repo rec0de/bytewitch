@@ -735,13 +735,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
      * @param path: might be just a type or prefixed by a path via "::"
      * @return null if type doesn't exist in any scope or appropriate scope if it does
      */
-    fun getCustomType(currentScopeStruct: KTStruct, path: String) : KTStruct? {
-        val elements = path.split("::", limit = 2)
-        val type = currentScopeStruct.types[elements[0]]
-        if (type != null && elements.size == 2) {
-            return getCustomType(type, elements[1]) // go one scope deeper
+    fun getCustomType(currentScopeStruct: KTStruct?, path: String) : KTStruct? {
+        if (currentScopeStruct == null) {
+            return null
+        } else {
+            val elements = path.split("::", limit = 2)
+            val type = currentScopeStruct.types[elements[0]]
+            if (type != null && elements.size == 2) {
+                return getCustomType(type, elements[1]) // go one scope deeper
+            }
+            return type
         }
-        return type
     }
 
     fun parseBuiltinType(type: Type) : Type {
@@ -808,8 +812,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                (if (parentScopeStruct != null) getCustomType(parentScopeStruct, type.type) else null)?:
-                getCustomType(kaitaiStruct, type.type) // TODO: add possibility to use parent scope
+                getCustomType(parentScopeStruct, type.type)?:
+                getCustomType(kaitaiStruct, type.type)
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type
@@ -828,17 +832,21 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun getEnum(currentScopeStruct: KTStruct, path: String) : KTEnum? {
-        val elements = path.split("::")
-        if (elements.size > 1) {
-            val type = currentScopeStruct.types[elements[0]]
-            if (type != null) return getEnum(type, elements[0])
-        }
+    fun getEnum(currentScopeStruct: KTStruct?, path: String) : KTEnum? {
+        if (currentScopeStruct == null) {
+            return null
+        } else {
+            val elements = path.split("::")
+            if (elements.size > 1) {
+                val type = currentScopeStruct.types[elements[0]]
+                if (type != null) return getEnum(type, path.substringAfter("::"))
+            }
 
-        return currentScopeStruct.enums[elements[0]]
+            return currentScopeStruct.enums[elements[0]]
+        }
     }
 
-    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentSCopeStruct: KTStruct?, currentScopeStruct: KTStruct,
+    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
                    ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
@@ -877,7 +885,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                 var repeatAmount = 0
                 while (true) { // repeat key demands we create many elements possibly. We break at the very end of the loop
-                    val type = parseType(parentSCopeStruct, currentScopeStruct, seqElement, bytesListTree)
+                    val type = parseType(parentScopeStruct, currentScopeStruct, seqElement, bytesListTree)
                     if (type.sizeIsUntilEOS) {
                         type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
                         type.sizeIsKnown = true
@@ -920,7 +928,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                                 type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
                                 (type.usedDisplayStyle == DisplayStyle.BINARY && type.sizeInBits == 1u))) {
                         val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
-                                            getEnum(kaitaiStruct, seqElement.enum) // TODO: add possibility to use parent scope
+                                            getEnum(parentScopeStruct, seqElement.enum)?:
+                                            getEnum(kaitaiStruct, seqElement.enum)
                         if (path != null) {
                             if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
                                 if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
