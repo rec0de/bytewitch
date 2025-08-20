@@ -87,7 +87,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
             val id = kaitaiStruct.meta?.id ?: name
-            processSeq(id, null, parentBytesListTree = null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
             console.error(e)
             throw Exception("Unexpected Exception has been thrown:\n$e")
@@ -789,7 +789,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun parseType(currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
+    fun parseType(parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
         if (seqElement.type is KTType.Switch) {
             throw RuntimeException("Switches are not supported yet")
         }
@@ -808,6 +808,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
+                (if (parentScopeStruct != null) getCustomType(parentScopeStruct, type.type) else null)?:
                 getCustomType(kaitaiStruct, type.type) // TODO: add possibility to use parent scope
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
@@ -837,7 +838,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return currentScopeStruct.enums[elements[0]]
     }
 
-    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
+    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentSCopeStruct: KTStruct?, currentScopeStruct: KTStruct,
                    ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
@@ -876,7 +877,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                 var repeatAmount = 0
                 while (true) { // repeat key demands we create many elements possibly. We break at the very end of the loop
-                    val type = parseType(currentScopeStruct, seqElement, bytesListTree)
+                    val type = parseType(parentSCopeStruct, currentScopeStruct, seqElement, bytesListTree)
                     if (type.sizeIsUntilEOS) {
                         type.sizeInBits = (ioStream.size - offsetInDatastreamInBits).toUInt()
                         type.sizeIsKnown = true
@@ -961,6 +962,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             seqElement.id,
                             seqElement,
                             bytesListTree,
+                            currentScopeStruct,
                             type.customType!!,
                             ioSubStream,
                             sourceOffsetInBits + dataSizeOfSequenceInBits,

@@ -641,6 +641,89 @@ class KaitaiDecoderTests {
     }
 
     @Test
+    fun testTypeReferences2() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id="element_sub", type= KTType.Primitive("sub"))
+            ),
+            types = mapOf(
+                Pair("sub", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="element_subsub", type= KTType.Primitive("subsub"))
+                    ),
+                    types = mapOf(
+                        Pair("subsub", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="element_a", type= KTType.Primitive("a")),
+                                KTSeq(id="element_b", type= KTType.Primitive("b")),
+                                KTSeq(id="element_c", type= KTType.Primitive("c")),
+                            ),
+                            types = mapOf(
+                                Pair("a", KTStruct(
+                                    seq = listOf(
+                                        KTSeq(id="subsub_a", type= KTType.Primitive("u4"))
+                                    )
+                                ))
+                            )
+                        )),
+                        Pair("a", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="sub_a", type= KTType.Primitive("u2"))
+                            )
+                        )),
+                        Pair("b", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="sub_b", type= KTType.Primitive("u2"))
+                            )
+                        ))
+                    )
+                )),
+                Pair("a", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_a", type= KTType.Primitive("u1"))
+                    )
+                )),
+                Pair("b", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_b", type= KTType.Primitive("u1"))
+                    )
+                )),
+                Pair("c", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_c", type= KTType.Primitive("u1"))
+                    )
+                ))
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0xaa, 0xaa, 0xaa, 0xaa, // for type sub::subsub::a from sub::subsub
+            0xbb, 0xbb, // for type sub::b from sub::subsub
+            0xcc, // for type c from sub::subsub
+        )
+
+        val decoder = Kaitai("type_references_2", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        var protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
+        checkElement(protocol, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"].bytesListTree!!["subsub_a"]
+        checkElement(protocol, id="subsub_a", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+
+        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
+        checkElement(protocol, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"].bytesListTree!!["sub_b"]
+        checkElement(protocol, id="sub_b", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+
+        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
+        checkElement(protocol, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"].bytesListTree!!["root_c"]
+        checkElement(protocol, id="root_c", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+    }
+
+    @Test
     fun testEnumTypes() {
         val struct = KTStruct(
             seq = listOf(
