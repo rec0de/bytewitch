@@ -61,20 +61,17 @@ data class KTMeta(
 data class KTSeq(
     val id: String? = null,
 
-    val type: KTType? = null,
-    val enum: String? = null,
-
-    val size: StringOrInt? = null,
-    @SerialName("size-eos")
-    val sizeEos: Boolean = false,
-
-    @Serializable(with = StringOrArraySerializer::class)
-    val contents: List<String>? = null,
-
     val doc: String? = null,
     @Serializable(with = StringOrArraySerializer::class)
     @SerialName("doc-ref")
     val docRef: List<String>? = null,
+
+    @Serializable(with = StringOrArraySerializer::class)
+    val contents: List<String>? = null,
+
+    val valid: KTValid? = null,
+
+    val type: KTType? = null,
 
     val repeat: KTRepeat? = null,
     @SerialName("repeat-expr")
@@ -82,13 +79,30 @@ data class KTSeq(
     @SerialName("repeat-until")
     val repeatUntil: String? = null,
 
+    @SerialName("if")
+    val ifCondition: StringOrBoolean = StringOrBoolean.BooleanValue(true),
+
+    val size: StringOrInt? = null,
+    @SerialName("size-eos")
+    val sizeEos: Boolean = false,
+
+    //TODO val process
+
+    val enum: String? = null,
+
+    //TODO val encoding
+
+    val padRight: Int? = null,
+
     val terminator: Int? = null,
     val consume: Boolean = true,
     val include: Boolean = false,
     @SerialName("eos-error")
     val eosError: Boolean = true,
 
-    val valid: KTValid? = null,
+    val pos: StringOrInt = StringOrInt.IntValue(0),
+
+    val io: String? = null,
 
     val value: String? = null,
 )

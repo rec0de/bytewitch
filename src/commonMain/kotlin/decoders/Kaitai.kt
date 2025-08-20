@@ -836,6 +836,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     }
 
     fun processManyElements(
+        elementId: String,
         seqElement: KTSeq,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
@@ -847,14 +848,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        checkNotNull(seqElement.id) { "Sequence element id must not be null" }
-        val elementId = seqElement.id
         val bytesListTreeForInnerList = MutableKaitaiTree()
         bytesListTreeForInnerList.parent = bytesListTree
         bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
         var repeatAmount = 0
         while (true) {
-            val triple = processSingleElement(seqElement, currentScopeStruct, bytesListTreeForInnerList, ioStream, offsetInDatastreamInBits, sourceOffsetInBits, dataSizeOfSequenceInBits)
+            val triple = processSingleElement(elementId, seqElement, currentScopeStruct, bytesListTreeForInnerList, ioStream, offsetInDatastreamInBits, sourceOffsetInBits, dataSizeOfSequenceInBits)
 
             bytesListTreeForInnerList.add(triple.first)
 
@@ -893,6 +892,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     }
 
     fun processOneOrManyElements(
+        elementId: String,
         seqElement: KTSeq,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
@@ -903,6 +903,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     ) : Triple<KaitaiElement, Int, Int> {
         return if (seqElement.repeat != null) {
             processManyElements(
+                elementId,
                 seqElement,
                 currentScopeStruct,
                 bytesListTree,
@@ -913,6 +914,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             )
         } else {
             processSingleElement(
+                elementId,
                 seqElement,
                 currentScopeStruct,
                 bytesListTree,
@@ -946,10 +948,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             bytesListTree.byteOrder = endian.toByteOrder()
         }
 
-        var dataSizeOfSequenceInBits: Int = 0
+        var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
+                val elementId = seqElement.id
+                checkNotNull(seqElement.id) { "Sequence element id must not be null" }
                 val triple = processOneOrManyElements(
+                        elementId,
                         seqElement,
                         currentScopeStruct,
                         bytesListTree,
@@ -979,15 +984,34 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         if (!currentScopeStruct.instances.isEmpty()) {
             //  TODO Instances here
-            //bytesListTree.add(
-            //    processOneOrManyElements()
-            //)
+            for ((id, instance) in currentScopeStruct.instances) {
+                val offsetInDatastreamInBits = if (instance.pos is StringOrInt.IntValue) {
+                    instance.pos.value * 8
+                } else {
+                    Int.fromBytes(parseValue(instance.pos.toString(), bytesListTree).toByteArray(), ByteOrder.BIG) * 8
+                }
+
+                val triple = processOneOrManyElements(
+                    id,
+                    instance,
+                    currentScopeStruct,
+                    bytesListTree,
+                    ioStream,
+                    offsetInDatastreamInBits,
+                    sourceOffsetInBits,
+                    dataSizeOfSequenceInBits
+                )
+
+                bytesListTree.add(triple.first)
+                dataSizeOfSequenceInBits = triple.third
+            }
         }
 
         return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
     }
 
     private fun processSingleElement(
+        elementId: String,
         seqElement: KTSeq,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
@@ -998,8 +1022,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     ): Triple<KaitaiElement, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
-        checkNotNull(seqElement.id) { "Sequence element id must not be null" }
-        val elementId = seqElement.id
 
         val type = parseType(currentScopeStruct, seqElement, bytesListTree)
         if (type.sizeIsUntilEOS) {
@@ -1105,7 +1127,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         if (type.customType != null) {
             kaitaiElement = processSeq(
-                seqElement.id,
+                elementId,
                 seqElement,
                 bytesListTree,
                 type.customType!!,
