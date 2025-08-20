@@ -707,21 +707,137 @@ class KaitaiDecoderTests {
 
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
-        var protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
-        checkElement(protocol, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
-        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"].bytesListTree!!["subsub_a"]
-        checkElement(protocol, id="subsub_a", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+        var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
+        checkElement(element, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"].bytesListTree!!["subsub_a"]
+        checkElement(element, id="subsub_a", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
 
-        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
-        checkElement(protocol, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
-        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"].bytesListTree!!["sub_b"]
-        checkElement(protocol, id="sub_b", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
+        checkElement(element, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"].bytesListTree!!["sub_b"]
+        checkElement(element, id="sub_b", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
 
-        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
-        checkElement(protocol, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
-        protocol = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"].bytesListTree!!["root_c"]
-        checkElement(protocol, id="root_c", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
+        checkElement(element, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"].bytesListTree!!["root_c"]
+        checkElement(element, id="root_c", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
     }
+
+    @Test
+    fun testEnumReferences() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id="element_sub", type= KTType.Primitive("sub")),
+                KTSeq(id="enumWithPath", type= KTType.Primitive("u1"), enum="sub::subsub::enum_a")
+            ),
+            types = mapOf(
+                Pair("sub", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="element_subsub", type= KTType.Primitive("subsub"))
+                    ),
+                    types = mapOf(
+                        Pair("subsub", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="element_a", type= KTType.Primitive("u1"), enum="enum_a"),
+                                KTSeq(id="element_b", type= KTType.Primitive("u1"), enum="enum_b"),
+                                KTSeq(id="element_c", type= KTType.Primitive("u1"), enum="enum_c"),
+                            ),
+                            enums = mapOf(
+                                Pair("enum_a",
+                                    KTEnum(
+                                        mapOf(
+                                            Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("subsub_a"))),
+                                            Pair(4, KTEnumValue(id= StringOrBoolean.StringValue("subsub_a_from_root")))
+                                        )
+                                    )
+                                )
+                            )
+                        )),
+                    ),
+                    enums = mapOf(
+                        Pair("enum_a",
+                            KTEnum(
+                                mapOf(
+                                    Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("sub_a")))
+                                )
+                            )
+                        ),
+                        Pair("enum_b",
+                            KTEnum(
+                                mapOf(
+                                    Pair(2, KTEnumValue(id= StringOrBoolean.StringValue("sub_b")))
+                                )
+                            )
+                        )
+                    )
+                )),
+            ),
+            enums = mapOf(
+                Pair("enum_a",
+                    KTEnum(
+                        mapOf(
+                            Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("root_a")))
+                        )
+                    )
+                ),
+                Pair("enum_b",
+                    KTEnum(
+                        mapOf(
+                            Pair(2, KTEnumValue(id= StringOrBoolean.StringValue("root_b")))
+                        )
+                    )
+                ),
+                Pair("enum_c",
+                    KTEnum(
+                        mapOf(
+                            Pair(3, KTEnumValue(id= StringOrBoolean.StringValue("root_c")))
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x01, // for enum sub::subsub::enum_a from sub::subsub
+            0x02, // for enum sub::enum_b from sub::subsub
+            0x03, // for enum enum_c from sub::subsub
+            0x04, // for enum sub::subsub::enum_a from root
+        )
+
+        val decoder = Kaitai("type_references_2", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_a", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x01))
+        var enum: Pair<KTEnum?, String> = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_b", elementClass=KaitaiEnum::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x02))
+        enum = Pair(struct.types["sub"]!!.enums["enum_b"], "sub_b")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_c", elementClass=KaitaiEnum::class, sourceByteRange=Pair(2, 3), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x03))
+        enum = Pair(struct.enums["enum_c"], "root_c")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["enumWithPath"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="enumWithPath", elementClass=KaitaiEnum::class, sourceByteRange=Pair(3, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x04))
+        enum = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a_from_root")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+    }
+
 
     @Test
     fun testEnumTypes() {
