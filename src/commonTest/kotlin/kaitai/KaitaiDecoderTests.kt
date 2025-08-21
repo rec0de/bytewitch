@@ -859,7 +859,7 @@ class KaitaiDecoderTests {
                             Pair(1, KTEnumValue(id = StringOrBoolean.StringValue("icmp"))),
                             Pair(6, KTEnumValue(id = StringOrBoolean.StringValue("tcp"))),
                             Pair(17, KTEnumValue(id = StringOrBoolean.StringValue("udp"))),
-                            Pair(0/*3000000000u*/, KTEnumValue(id = StringOrBoolean.StringValue("some_protocol"))), // TODO
+                            Pair(3000000000, KTEnumValue(id = StringOrBoolean.StringValue("some_protocol"))),
                         )
                     )
                 ),
@@ -897,7 +897,7 @@ class KaitaiDecoderTests {
 
         val data = byteArrayOfInts(
             0x00, 0x00, 0x00, 0x06,  // ip_protocols: (6: tcp)
-            0x00, 0x00, 0x00, 0x00, // TODO | 0xB2, 0xD0, 0x5E, 0x00, // ip_protocols: (3000000000: some_protocol)
+            0xB2, 0xD0, 0x5E, 0x00, // ip_protocols: (3000000000: some_protocol)
             0xff, 0xff, 0xff, 0xff, // verbose_levels: (-1: negative)
             0x00, 0x00, 0x00, 0x02, // verbose_levels: (2: medium)
             0x80, // bit_flags: (1: flag2) + bx000_0000
@@ -920,7 +920,7 @@ class KaitaiDecoderTests {
         // Validate field protocol_huge
         protocol = result.bytesListTree["protocol_huge"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x00,)) // TODO
+        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xB2, 0xD0, 0x5E, 0x00,))
         enum = Pair(struct.enums["ip_protocols"], "some_protocol")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
@@ -928,7 +928,7 @@ class KaitaiDecoderTests {
         // Validate field verbose negative
         protocol = result.bytesListTree["verbose_negative"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="verbose_negative", elementClass=KaitaiEnum::class, sourceByteRange=Pair(8, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff, 0xff, 0xff, 0xff,))
+        checkElement(protocol, id="verbose_negative", elementClass=KaitaiEnum::class, sourceByteRange=Pair(8, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff, 0xff, 0xff, 0xff))
         enum = Pair(struct.enums["verbose_levels"], "negative")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
