@@ -159,9 +159,9 @@ data class KTValid(
 
 @Serializable(with = KTEnumSerializer::class)
 data class KTEnum(
-    val values: Map<Int, KTEnumValue>,
+    val values: Map<Long, KTEnumValue>,
 ) {
-    operator fun get(key: Int) = values[key]
+    operator fun get(key: Long) = values[key]
 }
 
 @Serializable(with = KTEnumValueSerializer::class)
@@ -313,13 +313,13 @@ object KTEnumSerializer : KSerializer<KTEnum> {
 
         return KTEnum(
             values = jsonDecoder.decodeSerializableValue(
-                MapSerializer(Int.serializer(), KTEnumValue.serializer())
+                MapSerializer(Long.serializer(), KTEnumValue.serializer())
             ),
         )
     }
 
     override fun serialize(encoder: Encoder, value: KTEnum) {
-        encoder.encodeSerializableValue(MapSerializer(Int.serializer(), KTEnumValue.serializer()), value.values)
+        encoder.encodeSerializableValue(MapSerializer(Long.serializer(), KTEnumValue.serializer()), value.values)
     }
 }
 

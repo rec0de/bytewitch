@@ -74,7 +74,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
             val id = kaitaiStruct.meta?.id ?: name
-            processSeq(id, null, parentBytesListTree = null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
             console.error(e)
             throw Exception("Unexpected Exception has been thrown:\n$e")
@@ -722,13 +722,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
      * @param path: might be just a type or prefixed by a path via "::"
      * @return null if type doesn't exist in any scope or appropriate scope if it does
      */
-    fun getCustomType(currentScopeStruct: KTStruct, path: String) : KTStruct? {
-        val elements = path.split("::", limit = 2)
-        val type = currentScopeStruct.types[elements[0]]
-        if (type != null && elements.size == 2) {
-            return getCustomType(type, elements[1]) // go one scope deeper
+    fun getCustomType(currentScopeStruct: KTStruct?, path: String) : KTStruct? {
+        if (currentScopeStruct == null) {
+            return null
+        } else {
+            val elements = path.split("::", limit = 2)
+            val type = currentScopeStruct.types[elements[0]]
+            if (type != null && elements.size == 2) {
+                return getCustomType(type, elements[1]) // go one scope deeper
+            }
+            return type
         }
-        return type
     }
 
     fun parseBuiltinType(type: Type) : Type {
@@ -776,7 +780,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun parseType(currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
+    fun parseType(parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
         if (seqElement.type is KTType.Switch) {
             throw RuntimeException("Switches are not supported yet")
         }
@@ -795,7 +799,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(kaitaiStruct, type.type) // TODO: add possibility to use parent scope
+                getCustomType(parentScopeStruct, type.type)?:
+                getCustomType(kaitaiStruct, type.type)
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type
@@ -814,19 +819,24 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return type
     }
 
-    fun getEnum(currentScopeStruct: KTStruct, path: String) : KTEnum? {
-        val elements = path.split("::")
-        if (elements.size > 1) {
-            val type = currentScopeStruct.types[elements[0]]
-            if (type != null) return getEnum(type, elements[0])
-        }
+    fun getEnum(currentScopeStruct: KTStruct?, path: String) : KTEnum? {
+        if (currentScopeStruct == null) {
+            return null
+        } else {
+            val elements = path.split("::")
+            if (elements.size > 1) {
+                val type = currentScopeStruct.types[elements[0]]
+                if (type != null) return getEnum(type, path.substringAfter("::"))
+            }
 
-        return currentScopeStruct.enums[elements[0]]
+            return currentScopeStruct.enums[elements[0]]
+        }
     }
 
     private fun processSingleSeqElement(
         elementId: String,
         seqElement: KTSeq,
+        parentScopeStruct: KTStruct?,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -845,7 +855,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         }
 
-        val type = parseType(currentScopeStruct, seqElement, bytesListTree)
+        val type = parseType(parentScopeStruct, currentScopeStruct, seqElement, bytesListTree)
         if (type.sizeIsUntilEOS) {
             type.sizeInBits = (ioStream.size - offsetInDatastreamInBits)
             type.sizeIsKnown = true
@@ -887,11 +897,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
                     (type.usedDisplayStyle == DisplayStyle.BINARY && type.sizeInBits == 1))
         ) {
-            val path: KTEnum? =
-                getEnum(currentScopeStruct, seqElement.enum) ?: getEnum(kaitaiStruct, seqElement.enum) // TODO: add possibility to use parent scope
+            val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
+            getEnum(parentScopeStruct, seqElement.enum)?:
+            getEnum(kaitaiStruct, seqElement.enum)
             if (path != null) {
                 if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
-                    if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
+                    if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
                         throw RuntimeException(
                             "The enum ${seqElement.enum} has no key-value pair with the given key ${
                                 Int.fromBytes(
@@ -903,11 +914,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     } else {
                         enum = Pair(
                             path,
-                            path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString() // TODO change to UInt
+                            path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()]!!.id.toString()
                         )
                     }
                 } else if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
-                    if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) {
+                    if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toLong()] == null) {
                         throw RuntimeException(
                             "The enum ${seqElement.enum} has no key-value pair with the given key ${
                                 Int.fromBytes(
@@ -919,7 +930,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     } else {
                         enum = Pair(
                             path,
-                            path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString()
+                            path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toLong()]!!.id.toString()
                         )
                     }
                 } else {
@@ -927,7 +938,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         val temp = if (ioSubStream[0]) 1 else 0
                         throw RuntimeException(
                             "The enum ${seqElement.enum} has no key-value pair with the given key ${
-                                Int.fromBytes(
+                                Long.fromBytes(
                                     ioSubStream.toByteArray(),
                                     ByteOrder.BIG
                                 )
@@ -951,6 +962,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 elementId,
                 seqElement,
                 bytesListTree,
+                currentScopeStruct,
                 type.customType!!,
                 ioSubStream,
                 sourceOffsetInBits + dataSizeOfSequenceInBits,
@@ -1005,6 +1017,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     fun processManySeqElements(
         elementId: String,
         seqElement: KTSeq,
+        parentScopeStruct: KTStruct?,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -1023,6 +1036,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val triple = processSingleSeqElement(
                 elementId,
                 seqElement,
+                parentScopeStruct,
                 currentScopeStruct,
                 bytesListTreeForInnerList,
                 ioStream,
@@ -1070,6 +1084,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     fun processOneOrManySeqElements(
         elementId: String,
         seqElement: KTSeq,
+        parentScopeStruct: KTStruct?,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -1081,6 +1096,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             processManySeqElements(
                 elementId,
                 seqElement,
+                parentScopeStruct,
                 currentScopeStruct,
                 bytesListTree,
                 ioStream,
@@ -1092,6 +1108,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             processSingleSeqElement(
                 elementId,
                 seqElement,
+                parentScopeStruct,
                 currentScopeStruct,
                 bytesListTree,
                 ioStream,
@@ -1102,10 +1119,46 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
     }
 
-    fun processSeq(
-        parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
-        ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int
-    ): KaitaiElement {
+    private fun processInstance(
+        id: String,
+        instance: KTSeq,
+        parentScopeStruct: KTStruct?,
+        currentScopeStruct: KTStruct,
+        bytesListTree: MutableKaitaiTree,
+        ioStream: BooleanArray,
+        sourceOffsetInBits: Int,
+        dataSizeOfSequenceInBits: Int,
+    ): Triple<KaitaiElement, Int, Int> {
+        throw Exception("Not properly implemented yet")
+        // TODO what to do with value?
+        val value = instance.value?.let {
+            parseExpression(instance.value)
+        }
+
+        // TODO wait until I get iostreams from Justus
+        val actualIoStream : BooleanArray = if (instance.io != null) {
+            parseExpression(instance.io)
+        } else {
+            ioStream
+        }
+
+        val offsetInDatastreamInBits = 0
+
+        return processOneOrManySeqElements(
+            id,
+            instance,
+            parentScopeStruct,
+            currentScopeStruct,
+            bytesListTree,
+            ioStream,
+            offsetInDatastreamInBits,
+            sourceOffsetInBits,
+            dataSizeOfSequenceInBits
+        )
+    }
+
+    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
+                   ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -1134,6 +1187,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 val triple = processOneOrManySeqElements(
                     elementId,
                     seqElement,
+                    parentScopeStruct,
                     currentScopeStruct,
                     bytesListTree,
                     ioStream,
@@ -1162,7 +1216,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         if (currentScopeStruct.instances.isNotEmpty()) {
             for ((id, instance) in currentScopeStruct.instances) {
-                val triple = processInstance(id, instance, currentScopeStruct,  bytesListTree, ioStream, sourceOffsetInBits, dataSizeOfSequenceInBits)
+                val triple = processInstance(id, instance, parentScopeStruct, currentScopeStruct,  bytesListTree, ioStream, sourceOffsetInBits, dataSizeOfSequenceInBits)
 
                 bytesListTree.add(triple.first)
                 dataSizeOfSequenceInBits = triple.third
@@ -1170,42 +1224,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
 
         return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
-    }
-
-    private fun processInstance(
-        id: String,
-        instance: KTSeq,
-        currentScopeStruct: KTStruct,
-        bytesListTree: MutableKaitaiTree,
-        ioStream: BooleanArray,
-        sourceOffsetInBits: Int,
-        dataSizeOfSequenceInBits: Int,
-    ): Triple<KaitaiElement, Int, Int> {
-        throw Exception("Not properly implemented yet")
-        // TODO what to do with value?
-        val value = instance.value?.let {
-            parseExpression(instance.value)
-        }
-
-        // TODO wait until I get iostreams from Justus
-        val actualIoStream : BooleanArray = if (instance.io != null) {
-            parseExpression(instance.io)
-        } else {
-            ioStream
-        }
-
-        val offsetInDatastreamInBits = 0
-
-        return processOneOrManySeqElements(
-            id,
-            instance,
-            currentScopeStruct,
-            bytesListTree,
-            ioStream,
-            offsetInDatastreamInBits,
-            sourceOffsetInBits,
-            dataSizeOfSequenceInBits
-        )
     }
 }
 
