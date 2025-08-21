@@ -100,7 +100,7 @@ data class KTSeq(
     @SerialName("eos-error")
     val eosError: Boolean = true,
 
-    val pos: StringOrInt = StringOrInt.IntValue(0),
+    val pos: StringOrInt? = null,
 
     val io: String? = null,
 

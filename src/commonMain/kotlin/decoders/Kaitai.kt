@@ -835,180 +835,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return currentScopeStruct.enums[elements[0]]
     }
 
-    fun processManyElements(
-        elementId: String,
-        seqElement: KTSeq,
-        currentScopeStruct: KTStruct,
-        bytesListTree: MutableKaitaiTree,
-        ioStream: BooleanArray,
-        _offsetInDatastreamInBits: Int,
-        sourceOffsetInBits: Int,
-        _dataSizeOfSequenceInBits: Int
-    ) : Triple<KaitaiElement, Int, Int> {
-        var offsetInDatastreamInBits = _offsetInDatastreamInBits
-        var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
-
-        val bytesListTreeForInnerList = MutableKaitaiTree()
-        bytesListTreeForInnerList.parent = bytesListTree
-        bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
-        var repeatAmount = 0
-        while (true) {
-            val triple = processSingleElement(elementId, seqElement, currentScopeStruct, bytesListTreeForInnerList, ioStream, offsetInDatastreamInBits, sourceOffsetInBits, dataSizeOfSequenceInBits)
-
-            bytesListTreeForInnerList.add(triple.first)
-
-            offsetInDatastreamInBits = triple.second
-            dataSizeOfSequenceInBits = triple.third
-
-            repeatAmount += 1
-            if (seqElement.repeat == KTRepeat.EOS) {
-                if (ioStream.size == dataSizeOfSequenceInBits) {
-                    break
-                }
-            } else if (seqElement.repeat == KTRepeat.EXPR) {
-                checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
-                if (repeatAmount >= parseValue(seqElement.repeatExpr, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
-                    break
-                }
-            } else if (seqElement.repeat == KTRepeat.UNTIL) {
-                checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
-                throw Exception("repeat-until is not supported yet")
-                // TODO: implement repeat until, needs expression parsing to work
-            }
-        }
-
-        val resultSourceByteRange =
-            Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
-        val resultSourceRangeBitOffset =
-            Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
-        return Triple(
-            KaitaiList(
-                elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-                KaitaiDoc(undefined, undefined)
-            ),
-            offsetInDatastreamInBits,
-            dataSizeOfSequenceInBits
-        )
-    }
-
-    fun processOneOrManyElements(
-        elementId: String,
-        seqElement: KTSeq,
-        currentScopeStruct: KTStruct,
-        bytesListTree: MutableKaitaiTree,
-        ioStream: BooleanArray,
-        offsetInDatastreamInBits: Int,
-        sourceOffsetInBits: Int,
-        dataSizeOfSequenceInBits: Int
-    ) : Triple<KaitaiElement, Int, Int> {
-        return if (seqElement.repeat != null) {
-            processManyElements(
-                elementId,
-                seqElement,
-                currentScopeStruct,
-                bytesListTree,
-                ioStream,
-                offsetInDatastreamInBits,
-                sourceOffsetInBits,
-                dataSizeOfSequenceInBits
-            )
-        } else {
-            processSingleElement(
-                elementId,
-                seqElement,
-                currentScopeStruct,
-                bytesListTree,
-                ioStream,
-                offsetInDatastreamInBits,
-                sourceOffsetInBits,
-                dataSizeOfSequenceInBits
-            )
-        }
-    }
-
-    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
-                   ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
-        var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
-        /*
-        Entweder data als ByteArray und Bitshiften
-        var test = 13  -> 1101
-        test[6..8] = 1
-        test and 0b00000111 >> 0 = -> 101
-        test and 0b00111000 >> 3 = -> 001
-        oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
-        */
-        val bytesListTree = MutableKaitaiTree()
-        bytesListTree.parent = parentBytesListTree
-        if (bytesListTree.parent != null) {
-            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
-        } else {
-            bytesListTree.byteOrder = ByteOrder.BIG
-        }
-        currentScopeStruct.meta?.endian?.let { endian ->
-            bytesListTree.byteOrder = endian.toByteOrder()
-        }
-
-        var dataSizeOfSequenceInBits = 0
-        if (currentScopeStruct.seq.isNotEmpty()) {
-            for (seqElement in currentScopeStruct.seq) {
-                val elementId = seqElement.id
-                checkNotNull(seqElement.id) { "Sequence element id must not be null" }
-                val triple = processOneOrManyElements(
-                        elementId,
-                        seqElement,
-                        currentScopeStruct,
-                        bytesListTree,
-                        ioStream,
-                        offsetInDatastreamInBits,
-                        sourceOffsetInBits,
-                        dataSizeOfSequenceInBits
-                    )
-
-                bytesListTree.add(triple.first)
-                offsetInDatastreamInBits = triple.second
-                dataSizeOfSequenceInBits = triple.third
-            }
-        }
-        val resultDoc = KaitaiDoc(parentSeq?.doc, parentSeq?.docRef)
-
-        // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
-        val resultSourceByteRange: Pair<Int, Int>
-        val resultSourceRangeBitOffset: Pair<Int, Int>
-        if (currentScopeStruct.seq.isEmpty()) {
-            resultSourceByteRange = Pair(0,0) // is it possible to do the actual start and end value (which are the same) here instead of 0?
-            resultSourceRangeBitOffset = Pair(0,0)
-        } else {
-            resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
-            resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
-        }
-
-        if (!currentScopeStruct.instances.isEmpty()) {
-            //  TODO Instances here
-            for ((id, instance) in currentScopeStruct.instances) {
-                val offsetInDatastreamInBits = if (instance.pos is StringOrInt.IntValue) {
-                    instance.pos.value * 8
-                } else {
-                    Int.fromBytes(parseValue(instance.pos.toString(), bytesListTree).toByteArray(), ByteOrder.BIG) * 8
-                }
-
-                val triple = processOneOrManyElements(
-                    id,
-                    instance,
-                    currentScopeStruct,
-                    bytesListTree,
-                    ioStream,
-                    offsetInDatastreamInBits,
-                    sourceOffsetInBits,
-                    dataSizeOfSequenceInBits
-                )
-
-                bytesListTree.add(triple.first)
-                dataSizeOfSequenceInBits = triple.third
-            }
-        }
-
-        return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
-    }
 
     private fun processSingleElement(
         elementId: String,
@@ -1022,6 +848,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     ): Triple<KaitaiElement, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
+
+        if (seqElement.pos != null) {
+            offsetInDatastreamInBits = if (seqElement.pos is StringOrInt.IntValue) {
+                seqElement.pos.value * 8
+            } else {
+                Int.fromBytes(parseValue(seqElement.pos.toString(), bytesListTree).toByteArray(), ByteOrder.BIG) * 8
+            }
+        }
 
         val type = parseType(currentScopeStruct, seqElement, bytesListTree)
         if (type.sizeIsUntilEOS) {
@@ -1133,7 +967,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 type.customType!!,
                 ioSubStream,
                 sourceOffsetInBits + dataSizeOfSequenceInBits,
-                if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits
+                if (type.sizeInBits != 0u) 0 else offsetInDatastreamInBits  // reset offset in case of substream
             )
 
             if (seqElement.doc == null && seqElement.docRef == null) {
@@ -1179,6 +1013,213 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         offsetInDatastreamInBits += type.sizeInBits.toInt()
         dataSizeOfSequenceInBits += type.sizeInBits.toInt()
         return Triple(kaitaiElement, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
+    }
+
+
+    fun processManyElements(
+        elementId: String,
+        seqElement: KTSeq,
+        currentScopeStruct: KTStruct,
+        bytesListTree: MutableKaitaiTree,
+        ioStream: BooleanArray,
+        _offsetInDatastreamInBits: Int,
+        sourceOffsetInBits: Int,
+        _dataSizeOfSequenceInBits: Int
+    ) : Triple<KaitaiElement, Int, Int> {
+        var offsetInDatastreamInBits = _offsetInDatastreamInBits
+        var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
+
+        val bytesListTreeForInnerList = MutableKaitaiTree()
+        bytesListTreeForInnerList.parent = bytesListTree
+        bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
+        var repeatAmount = 0
+        while (true) {
+            val triple = processSingleElement(
+                elementId,
+                seqElement,
+                currentScopeStruct,
+                bytesListTreeForInnerList,
+                ioStream,
+                offsetInDatastreamInBits,
+                sourceOffsetInBits,
+                dataSizeOfSequenceInBits
+            )
+
+            bytesListTreeForInnerList.add(triple.first)
+
+            offsetInDatastreamInBits = triple.second
+            dataSizeOfSequenceInBits = triple.third
+
+            repeatAmount += 1
+            if (seqElement.repeat == KTRepeat.EOS) {
+                if (ioStream.size == dataSizeOfSequenceInBits) {
+                    break
+                }
+            } else if (seqElement.repeat == KTRepeat.EXPR) {
+                checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
+                if (repeatAmount >= parseValue(seqElement.repeatExpr, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
+                    break
+                }
+            } else if (seqElement.repeat == KTRepeat.UNTIL) {
+                checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
+                throw Exception("repeat-until is not supported yet")
+                // TODO: implement repeat until, needs expression parsing to work
+            }
+        }
+
+        val resultSourceByteRange =
+            Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+        val resultSourceRangeBitOffset =
+            Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+        return Triple(
+            KaitaiList(
+                elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
+                KaitaiDoc(undefined, undefined)
+            ),
+            offsetInDatastreamInBits,
+            dataSizeOfSequenceInBits
+        )
+    }
+
+    fun processOneOrManyElements(
+        elementId: String,
+        seqElement: KTSeq,
+        currentScopeStruct: KTStruct,
+        bytesListTree: MutableKaitaiTree,
+        ioStream: BooleanArray,
+        offsetInDatastreamInBits: Int,
+        sourceOffsetInBits: Int,
+        dataSizeOfSequenceInBits: Int
+    ): Triple<KaitaiElement, Int, Int> {
+        return if (seqElement.repeat != null) {
+            processManyElements(
+                elementId,
+                seqElement,
+                currentScopeStruct,
+                bytesListTree,
+                ioStream,
+                offsetInDatastreamInBits,
+                sourceOffsetInBits,
+                dataSizeOfSequenceInBits
+            )
+        } else {
+            processSingleElement(
+                elementId,
+                seqElement,
+                currentScopeStruct,
+                bytesListTree,
+                ioStream,
+                offsetInDatastreamInBits,
+                sourceOffsetInBits,
+                dataSizeOfSequenceInBits
+            )
+        }
+    }
+
+    fun processSeq(
+        parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
+        ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int
+    ): KaitaiElement {
+        var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
+        /*
+        Entweder data als ByteArray und Bitshiften
+        var test = 13  -> 1101
+        test[6..8] = 1
+        test and 0b00000111 >> 0 = -> 101
+        test and 0b00111000 >> 3 = -> 001
+        oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
+        */
+        val bytesListTree = MutableKaitaiTree()
+        bytesListTree.parent = parentBytesListTree
+        if (bytesListTree.parent != null) {
+            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
+        } else {
+            bytesListTree.byteOrder = ByteOrder.BIG
+        }
+        currentScopeStruct.meta?.endian?.let { endian ->
+            bytesListTree.byteOrder = endian.toByteOrder()
+        }
+
+        var dataSizeOfSequenceInBits = 0
+        if (currentScopeStruct.seq.isNotEmpty()) {
+            for (seqElement in currentScopeStruct.seq) {
+                val elementId = seqElement.id
+                checkNotNull(seqElement.id) { "Sequence element id must not be null" }
+                val triple = processOneOrManyElements(
+                    elementId,
+                    seqElement,
+                    currentScopeStruct,
+                    bytesListTree,
+                    ioStream,
+                    offsetInDatastreamInBits,
+                    sourceOffsetInBits,
+                    dataSizeOfSequenceInBits
+                )
+
+                bytesListTree.add(triple.first)
+                offsetInDatastreamInBits = triple.second
+                dataSizeOfSequenceInBits = triple.third
+            }
+        }
+        val resultDoc = KaitaiDoc(parentSeq?.doc, parentSeq?.docRef)
+
+        // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
+        val resultSourceByteRange: Pair<Int, Int>
+        val resultSourceRangeBitOffset: Pair<Int, Int>
+        if (currentScopeStruct.seq.isEmpty()) {
+            resultSourceByteRange = Pair(0, 0) // is it possible to do the actual start and end value (which are the same) here instead of 0?
+            resultSourceRangeBitOffset = Pair(0, 0)
+        } else {
+            resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
+            resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
+        }
+
+        if (currentScopeStruct.instances.isNotEmpty()) {
+            for ((id, instance) in currentScopeStruct.instances) {
+                val triple = processInstance(id, instance, currentScopeStruct,  bytesListTree, ioStream, sourceOffsetInBits, dataSizeOfSequenceInBits)
+
+                bytesListTree.add(triple.first)
+                dataSizeOfSequenceInBits = triple.third
+            }
+        }
+
+        return KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc)
+    }
+
+    private fun processInstance(
+        id: String,
+        instance: KTSeq,
+        currentScopeStruct: KTStruct,
+        bytesListTree: MutableKaitaiTree,
+        ioStream: BooleanArray,
+        sourceOffsetInBits: Int,
+        dataSizeOfSequenceInBits: Int,
+    ): Triple<KaitaiElement, Int, Int> {
+        throw Exception("Not properly implemented yet")
+        // TODO what to do with value?
+        val value = instance.value?.let {
+            parseExpression(instance.value)
+        }
+
+        // TODO wait until I get iostreams from Justus
+        val actualIoStream : BooleanArray = if (instance.io != null) {
+            parseExpression(instance.io)
+        } else {
+            ioStream
+        }
+
+        val offsetInDatastreamInBits = 0
+
+        return processOneOrManyElements(
+            id,
+            instance,
+            currentScopeStruct,
+            bytesListTree,
+            ioStream,
+            offsetInDatastreamInBits,
+            sourceOffsetInBits,
+            dataSizeOfSequenceInBits
+        )
     }
 }
 
