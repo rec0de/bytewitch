@@ -102,15 +102,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         else if (reference.startsWith("_parent."))
             return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
         else (
-            if (reference.contains("."))
-                return parseReference(reference.substringAfter("."), bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!)
-            else
-                return bytesListTree[reference]!!.value
-        )
+                if (reference.contains("."))
+                    return parseReference(
+                        reference.substringAfter("."),
+                        bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!
+                    )
+                else
+                    return bytesListTree[reference]!!.value
+                )
     }
 
 
-    enum class TokenType (val symbol: String) {
+    enum class TokenType(val symbol: String) {
         INTEGER(""),
         FLOAT(""),
         STRING(""), // enclosed by '' or ""
@@ -139,13 +142,303 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         COLON(":"),
         PARENTHESES("()"),
         BRACKETS("[]"),
+        ARRAY("[,]"),
+        INDEX("[]"),
         FUNCTION("f(x)"),
         DOT("."),
         DOUBLECOLON("::"),
         EMPTY(""),
         CAST("as<>"),
         REFERENCE(""),
+        ENUMCALL(""),
+        ENUM(""),
+        STRUCT(""),
+        STREAM(""),
+        KAITAITREE(""),
+        KAITAIELEMENT(""),
     }
+
+    //******************************************************************************************************************
+    //*                                                 methods                                                        *
+    //******************************************************************************************************************
+
+    val methods = listOf(
+        "to_s",
+        "to_i",
+        "length",
+        "reverse",
+        "substring",
+        "first",
+        "last",
+        "size",
+        "min",
+        "max",
+        "eof",
+        "size",
+        "pos",
+    )
+
+    val encodings = listOf(
+        "ASCII",
+        "UTF-8",
+        "UTF-16BE",
+        "UTF-16LE",
+        "UTF-32BE",
+        "UTF-32LE",
+        "ISO-8859-1",
+        "ISO-8859-2",
+        "ISO-8859-3",
+        "ISO-8859-4",
+        "ISO-8859-5",
+        "ISO-8859-6",
+        "ISO-8859-7",
+        "ISO-8859-8",
+        "ISO-8859-9",
+        "ISO-8859-10",
+        "ISO-8859-11",
+        "ISO-8859-13",
+        "ISO-8859-14",
+        "ISO-8859-15",
+        "ISO-8859-16",
+        "windows-1250",
+        "windows-1251",
+        "windows-1252",
+        "windows-1253",
+        "windows-1254",
+        "windows-1255",
+        "windows-1256",
+        "windows-1257",
+        "windows-1258",
+        "IBM437",
+        "IBM866",
+        "Shift_JIS",
+        "Big5",
+        "EUC-KR"
+    )
+
+    fun expressionToString(
+        input: Pair<TokenType, dynamic>,
+        encoding: String? = null,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, String> {
+        when (input.first) {
+            TokenType.INTEGER -> {
+                return Pair(TokenType.STRING, input.second.toString())
+            }
+
+            TokenType.ARRAY -> {
+                if (encoding != "UTF-16BE") {
+                    throw RuntimeException("Encodings other than UTF-16BE are not supported.")
+                }
+                return Pair(TokenType.STRING, input.second.contentToString())
+            }
+
+            else -> {
+                throw RuntimeException("Unexpected token type:" + input.first + "for method: to_s.")
+            }
+        }
+    }
+
+    fun expressionToInt(input: Pair<TokenType, dynamic>, radix: Int = 10): Pair<TokenType, Int> {
+        when (input.first) {
+            TokenType.FLOAT -> {
+                return Pair(TokenType.INTEGER, input.second.toInt())
+            }
+
+            TokenType.STRING -> {
+                return Pair(TokenType.INTEGER, input.second.toInt(radix))
+            }
+
+            TokenType.ENUM -> {
+                return Pair(TokenType.INTEGER, getEnumKeyFromValue(input.second.first, input.second.second))
+            }
+
+            TokenType.BOOLEAN -> {
+                return Pair(TokenType.INTEGER, if (input.second) 1 else 0)
+            }
+
+            else -> {
+                throw RuntimeException("Unexpected token type:" + input.first + "for method: to_i.")
+            }
+        }
+    }
+
+    fun getEnumKeyFromValue(enum: KTEnum, value: String): Int {
+        try {
+            return enum.values.entries.find { it.value.id.toString() == value }!!.key
+        } catch (e: Exception) {
+            throw RuntimeException("Invalid enum value:$value")
+        }
+
+    }
+
+    fun expressionLength(input: Pair<TokenType, dynamic>): Pair<TokenType, Int> {
+        when (input.first) {
+            TokenType.ARRAY -> {
+                return Pair(TokenType.INTEGER, input.second.size)
+            }
+
+            TokenType.STRING -> {
+                return Pair(TokenType.INTEGER, input.second.length)
+            }
+
+            else -> {
+                throw RuntimeException("Unexpected token type:" + input.first + "for method: length.")
+            }
+        }
+    }
+
+    fun expressionStringReverse(input: Pair<TokenType, dynamic>): Pair<TokenType, String> {
+        if (input.first == TokenType.STRING) {
+            return Pair(TokenType.STRING, input.second.reversed())
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: reverse.")
+        }
+    }
+
+    fun expressionSubstring(input: Pair<TokenType, dynamic>, fromIndex: Int, toIndex: Int): Pair<TokenType, String> {
+        if (input.first == TokenType.STRING) {
+            return Pair(TokenType.STRING, input.second.substring(fromIndex, toIndex))
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: substring.")
+        }
+    }
+
+    val validArrayTypes: List<TokenType> =
+        listOf(TokenType.INTEGER, TokenType.FLOAT, TokenType.BOOLEAN, TokenType.STRING, TokenType.STRUCT)
+
+    fun expressionFirst(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        if (input.first == TokenType.ARRAY) {
+            if (input.second.isEmpty()) {
+                throw RuntimeException("The array is empty and therefore has no first element.")
+            } else {
+                if (input.second[0].first in validArrayTypes) {
+                    return Pair(input.second[0].first, input.second.first())
+                } else {
+                    throw RuntimeException("Unexpected array type:" + input.second + "for method: first.")
+                }
+            }
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: first.")
+        }
+    }
+
+    fun expressionLast(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        if (input.first == TokenType.ARRAY) {
+            if (input.second.isEmpty()) {
+                throw RuntimeException("The array is empty and therefore has no first element.")
+            } else {
+                if (input.second[0].first in validArrayTypes) {
+                    return Pair(input.second[0].first, input.second.first())
+                } else {
+                    throw RuntimeException("Unexpected array type:" + input.second + "for method: last.")
+                }
+            }
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: last.")
+        }
+    }
+
+    fun expressionSize(input: Pair<TokenType, dynamic>): Pair<TokenType, Int> {
+        return if (input.first == TokenType.ARRAY) {
+            val validTypes =
+                listOf(TokenType.INTEGER, TokenType.FLOAT, TokenType.BOOLEAN, TokenType.STRING, TokenType.STRUCT)
+            if (input.second.isEmpty()) {
+                Pair(TokenType.INTEGER, 0)
+            } else {
+                if (input.second[0].first in validTypes) {
+                    Pair(TokenType.INTEGER, input.second.size)
+                } else {
+                    throw RuntimeException("Unexpected array type:" + input.first + "for method: size.")
+                }
+            }
+        } else if (input.first == TokenType.STREAM) {
+            return Pair(TokenType.INTEGER, input.second.size / 8)
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: size.")
+        }
+    }
+
+    fun expressionMax(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        if (input.first == TokenType.ARRAY) {
+            return if (input.second.isEmpty()) {
+                throw RuntimeException("The array is empty and therefore has no max element.")
+            } else {
+                if (input.second[0].first in validArrayTypes) {
+                    when (input.second[0].first) {
+                        TokenType.BOOLEAN -> {
+                            Pair(TokenType.BOOLEAN, input.second.contains(true))
+                        }
+
+                        TokenType.STRUCT -> {
+                            Pair(TokenType.STRUCT, input.second.maxBy { it -> it.value.size })
+                        }
+
+                        else -> {
+                            Pair(input.second[0].first, input.second.maxOrNull())
+                        }
+                    }
+                } else {
+                    throw RuntimeException("Unexpected array type:" + input.second + "for method: max.")
+                }
+            }
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: max.")
+        }
+    }
+
+    fun expressionMin(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        if (input.first == TokenType.ARRAY) {
+            return if (input.second.isEmpty()) {
+                throw RuntimeException("The array is empty and therefore has no min element.")
+            } else {
+                if (input.second[0].first in validArrayTypes) {
+                    when (input.second[0].first) {
+                        TokenType.BOOLEAN -> {
+                            Pair(TokenType.BOOLEAN, !(input.second.contains(false)))
+                        }
+
+                        TokenType.STRUCT -> {
+                            Pair(TokenType.STRUCT, input.second.minBy { it -> it.value.size })
+                        }
+
+                        else -> {
+                            Pair(input.second[0].first, input.second.minOrNull())
+                        }
+                    }
+                } else {
+                    throw RuntimeException("Unexpected array type:" + input.second + "for method: min.")
+                }
+            }
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: min.")
+        }
+    }
+
+    fun expressionEof(input: Pair<TokenType, dynamic>, currentOffset: Int): Pair<TokenType, Boolean> {
+
+        if (input.first == TokenType.STREAM) {
+            return Pair(TokenType.BOOLEAN, currentOffset > (input.second as BooleanArray).size) // TODO
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: eof.")
+        }
+    }
+
+    fun expressionPos(input: Pair<TokenType, dynamic>, currentOffset: Int): Pair<TokenType, Int> {
+        if (input.first == TokenType.STREAM) {
+            return Pair(
+                TokenType.INTEGER,
+                if (currentOffset > (input.second as BooleanArray).size) throw RuntimeException("The current position ${currentOffset} is not in the stream.") else currentOffset
+            ) // TODO
+        } else {
+            throw RuntimeException("Unexpected token type:" + input.first + "for method: eof.")
+        }
+    }
+
 
     //******************************************************************************************************************
     //*                                                 operands                                                       *
@@ -157,23 +450,239 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         TokenType.STRING to ::parseString,
         TokenType.BOOLEAN to ::parseBoolean,
         TokenType.PARENTHESES to ::parseParentheses,
-        TokenType.REFERENCE to ::parseReference2 // TODO
+        TokenType.ENUMCALL to ::parseEnum,
+        TokenType.ARRAY to ::parseArray,
+        TokenType.IDENTIFIER to ::parseIdentifier
     )
 
-    fun parseInteger(token: Pair<TokenType, Int>) : Pair<TokenType, Int> = token
+    fun parseInteger(
+        token: Pair<TokenType, Int>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> = token
 
-    fun parseFloat(token: Pair<TokenType, Float>) : Pair<TokenType, Float> = token
+    fun parseFloat(
+        token: Pair<TokenType, Float>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Float> = token
 
-    fun parseString(token: Pair<TokenType, String>) : Pair<TokenType, String> = token
+    fun parseString(
+        token: Pair<TokenType, String>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, String> = token
 
-    fun parseBoolean(token: Pair<TokenType, Boolean>) : Pair<TokenType, Boolean> = token
+    fun parseBoolean(
+        token: Pair<TokenType, Boolean>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> = token
 
-    fun parseParentheses(token: Pair<TokenType, dynamic>) : Pair<TokenType, dynamic> = parseExpressionInner(token.second)
+    fun parseParentheses(
+        token: Pair<TokenType, dynamic>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> = parseExpressionInner(
+        token.second,
+        bytesListTree,
+        currentScopeStruct,
+        parentScopeStruct,
+        ioStream,
+        offsetInCurrentIoStream
+    )
 
-    fun parseReference2(token: Pair<TokenType, dynamic>) : dynamic = null //TODO
+    fun parseEnum(
+        token: Pair<TokenType, String>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ) : Pair<TokenType, Pair<KTEnum, String>> {
+        val path: String = token.second.substringBeforeLast("::")
+        val enum: KTEnum = getEnum(currentScopeStruct, path)?:
+                            getEnum(parentScopeStruct, path)?:
+                            getEnum(kaitaiStruct, path)?:
+                            throw RuntimeException("The enum $path does not exist.")
+
+        return Pair(TokenType.ENUM, Pair(enum, token.second.substringAfterLast("::")))
+    }
+
+    fun tokenizeArray(_array: String): List<String> {
+        var array: String = _array
+        var result: MutableList<String> = mutableListOf()
+
+        while (array.isNotEmpty()) {
+            var slice: Int = array.length
+
+            var sqString: Boolean = false
+            var dqString: Boolean = false
+
+            for ((index, char) in array.withIndex()) {
+                if (char == ',' && !sqString && !dqString) {
+                    slice = index
+                    break
+                } else if (char == '\'' && !dqString) {
+                    sqString = !sqString
+                } else if (char == '"' && !sqString) {
+                    dqString = !dqString
+                }
+            }
+
+            result.add(array.slice(IntRange(0, slice - 1)).trim())
+
+            if (slice == array.length) {
+                if (result.last().trim() == "") {
+                    result.removeLast()
+                }
+                break
+            } else {
+                array = array.slice(IntRange(slice + 1, array.length))
+            }
+        }
+        return result.toList()
+    }
+
+    fun parseArray(
+        token: Pair<TokenType, String>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, List<Pair<TokenType, dynamic>>> {
+        var expressions: List<String> = tokenizeArray(token.second)
+        var array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
+
+        for (expression: String in expressions) {
+            array.add(
+                parseExpressionInner(
+                    expression,
+                    bytesListTree,
+                    currentScopeStruct,
+                    parentScopeStruct,
+                    ioStream,
+                    offsetInCurrentIoStream
+                )
+            )
+        }
+
+        return Pair(TokenType.ARRAY, array.toList())
+    }
+
+    fun parseIdentifier(
+        token: Pair<TokenType, String>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        return when (token.second) {
+            "_io" -> {
+                Pair(TokenType.STREAM, ioStream)
+            }
+            "_parent" -> {
+                Pair(TokenType.KAITAITREE, bytesListTree.parent)
+            }
+            "_root" -> {
+                Pair(TokenType.KAITAITREE, bytesListTree.root)
+            }
+            else -> {
+                val targetElement = bytesListTree[token.second]
+                if (targetElement != null) {
+                    when (targetElement) {
+                        is KaitaiResult -> Pair(TokenType.KAITAIELEMENT, bytesListTree[token.second])
+                        is KaitaiBinary -> Pair(TokenType.INTEGER, Int.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
+                        is KaitaiSignedInteger -> Pair(TokenType.INTEGER, Int.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
+                    }
+                } else {
+                    throw RuntimeException("The identifier ${token.second} does not exist.")
+                }
+                Pair(TokenType.KAITAIELEMENT, bytesListTree[token.second])
+            }
+        }
+    }
 
     //******************************************************************************************************************
-    //*                                           unary operators                                                      *
+    //*                                     indexing, references and functions                                         *
+    //******************************************************************************************************************
+
+    fun parseIndex(
+        tokens: MutableList<Pair<TokenType, dynamic>>,
+        index: Pair<TokenType, String>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val array: Pair<TokenType, List<Pair<TokenType, dynamic>>> = parseTokens(tokens,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream)
+        val index: Int = parseExpressionInner(
+            index.second,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        ).second
+
+        return array.second[index]
+    }
+
+    fun parseDot(leftTokens: MutableList<Pair<TokenType, dynamic>>,
+                 rightToken: Pair<TokenType, dynamic>,
+                 bytesListTree: MutableKaitaiTree,
+                 currentScopeStruct: KTStruct,
+                 parentScopeStruct: KTStruct?,
+                 ioStream: BooleanArray,
+                 offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            leftTokens,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = rightToken
+
+        if (op2.first == TokenType.STREAM) {
+            if (op2.second == "eof") {
+                return expressionEof(op1, offsetInCurrentIoStream)
+            } else if (op2.second == "size") {
+                return expressionSize(op2)
+            } else if (op2.second == "pos") {
+                return expressionPos(op2, offsetInCurrentIoStream)
+            }
+        }
+        return Pair(TokenType.EMPTY, "")
+    }
+
+    //******************************************************************************************************************
+    //*                                              unary operators                                                   *
     //******************************************************************************************************************
 
     val unaryPrecedence = mapOf( // unary tokens
@@ -182,12 +691,40 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         TokenType.BOOLEANNOT to ::parseBooleanNot
     )
 
-    fun parseUnaryPlus(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        return parseTokens(tokens)
+    fun parseUnaryPlus(
+        tokens: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        return parseTokens(
+            tokens,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
     }
 
-    fun parseUnaryMinus(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        val op: Pair<TokenType, Number> = parseTokens(tokens)
+    fun parseUnaryMinus(
+        tokens: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        val op: Pair<TokenType, Number> = parseTokens(
+            tokens,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         return if (op.first == TokenType.INTEGER)
             Pair(
@@ -201,15 +738,29 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             )
     }
 
-    fun parseBooleanNot(tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op: Pair<TokenType, dynamic> = parseTokens(tokens)
+    fun parseBooleanNot(
+        tokens: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op: Pair<TokenType, dynamic> = parseTokens(
+            tokens,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
         return if (op.first == TokenType.BOOLEAN)
-                Pair(
-                    TokenType.BOOLEAN,
-                    !op.second
-                )
-            else
-                throw Exception("Cannot apply logical or to non boolean")
+            Pair(
+                TokenType.BOOLEAN,
+                !op.second
+            )
+        else
+            throw Exception("Cannot apply logical or to non boolean")
     }
 
     //******************************************************************************************************************
@@ -229,9 +780,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         mapOf(TokenType.BOOLEANOR to ::parseBooleanOr),
     )
 
-    fun parseMul(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
+    fun parseMul(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Number> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
             Pair(
@@ -247,9 +820,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseDiv(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
+    fun parseDiv(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Number> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
             Pair(
@@ -265,9 +860,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseModulo(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
+    fun parseModulo(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Number> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
             Pair(
@@ -283,9 +900,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parsePlus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parsePlus(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING)
             Pair(
@@ -306,9 +945,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseMinus(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Number> {
-        val op1: Pair<TokenType, Number> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Number> = parseTokens(tokens2)
+    fun parseMinus(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Number> {
+        val op1: Pair<TokenType, Number> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Number> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
             Pair(
@@ -324,9 +985,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseLShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
-        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
+    fun parseLShift(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Int> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Int> = Pair(
             TokenType.INTEGER,
@@ -336,9 +1019,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseRShift(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
-        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
+    fun parseRShift(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Int> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Int> = Pair(
             TokenType.INTEGER,
@@ -348,9 +1053,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseLess(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseLess(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -360,9 +1087,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseLessEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseLessEqual(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -372,9 +1121,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseGreater(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseGreater(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -384,9 +1155,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseGreaterEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseGreaterEqual(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -396,9 +1189,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseEqual(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -408,9 +1223,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseNotEqual(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -420,9 +1257,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseBitwiseAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
-        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
+    fun parseBitwiseAnd(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Int> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Int> = Pair(
             TokenType.INTEGER,
@@ -432,9 +1291,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseBitwiseXor(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
-        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
+    fun parseBitwiseXor(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Int> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Int> = Pair(
             TokenType.INTEGER,
@@ -444,9 +1325,31 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseBitwiseOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Int> {
-        val op1: Pair<TokenType, Int> = parseTokens(tokens1)
-        val op2: Pair<TokenType, Int> = parseTokens(tokens2)
+    fun parseBitwiseOr(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Int> {
+        val op1: Pair<TokenType, Int> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        val op2: Pair<TokenType, Int> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Int> = Pair(
             TokenType.INTEGER,
@@ -456,9 +1359,36 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseBooleanAnd(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseBooleanAnd(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+
+        if (!op1.second) {
+            return Pair(TokenType.BOOLEAN, false)
+        }
+
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -468,9 +1398,36 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseBooleanOr(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, Boolean> {
-        val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
-        val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
+    fun parseBooleanOr(
+        tokens1: MutableList<Pair<TokenType, dynamic>>,
+        tokens2: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, Boolean> {
+        val op1: Pair<TokenType, dynamic> = parseTokens(
+            tokens1,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+
+        if (op1.second) {
+            return Pair(TokenType.BOOLEAN, true)
+        }
+
+        val op2: Pair<TokenType, dynamic> = parseTokens(
+            tokens2,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
 
         val result: Pair<TokenType, Boolean> = Pair(
             TokenType.BOOLEAN,
@@ -484,51 +1441,127 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     //*                                         ternary operators                                                      *
     //******************************************************************************************************************
 
-    fun parseIfElse(condition: MutableList<Pair<TokenType, dynamic>>, tokensTrue: MutableList<Pair<TokenType, dynamic>>, tokensFalse: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
-        return if (parseTokens(condition).second as Boolean) parseTokens(tokensTrue) else parseTokens(tokensFalse)
+    fun parseIfElse(
+        condition: MutableList<Pair<TokenType, dynamic>>,
+        tokensTrue: MutableList<Pair<TokenType, dynamic>>,
+        tokensFalse: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        val evaluation = parseTokens(
+            condition,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
+        return if (evaluation.second as Boolean) {
+            parseTokens(
+                tokensTrue,
+                bytesListTree,
+                currentScopeStruct,
+                parentScopeStruct,
+                ioStream,
+                offsetInCurrentIoStream
+            )
+        } else {
+            parseTokens(
+                tokensFalse,
+                bytesListTree,
+                currentScopeStruct,
+                parentScopeStruct,
+                ioStream,
+                offsetInCurrentIoStream
+            )
+        }
     }
 
 
-    fun parseTokens (tokens: MutableList<Pair<TokenType, dynamic>>) : Pair<TokenType, dynamic> {
-        if (tokens.size == 1 && tokens[0].first in operandTokens){
+    fun parseTokens(
+        tokens: MutableList<Pair<TokenType, dynamic>>,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        if (tokens.size == 1 && tokens[0].first in operandTokens) { // while they have the highest precedence of any token they are the only option in case there is only one token left and can therefore be the first check
             val function = operandTokens.getValue(tokens[0].first)
-            return function.invoke(tokens[0])
+            return function.invoke(
+                tokens[0],
+                bytesListTree,
+                currentScopeStruct,
+                parentScopeStruct,
+                ioStream,
+                offsetInCurrentIoStream
+            )
         }
 
-        if (tokens.contains(Pair(TokenType.QUESTIONMARK, "?"))){
+        if (tokens.contains(Pair(TokenType.QUESTIONMARK, "?"))) { // ternary if else has the lowest precedence
             var depth: Int = 0
             var posQuestionmark: Int = 0
             var posColon: Int
-            for ((index,token) in tokens.withIndex()) {
-                if (token == Pair(TokenType.QUESTIONMARK, "?")){
+            for ((index, token) in tokens.withIndex()) {
+                if (token == Pair(TokenType.QUESTIONMARK, "?")) {
                     if (depth == 0) posQuestionmark = index
                     depth++
-                } else if (token == Pair(TokenType.COLON, ":")){
+                } else if (token == Pair(TokenType.COLON, ":")) {
                     posColon = index
                     depth--
-                    if(depth == 0)
-                        return parseIfElse(tokens.subList(0, posQuestionmark), tokens.subList(posQuestionmark+1, posColon), tokens.subList(posColon+1, tokens.size))
+                    if (depth == 0)
+                        return parseIfElse(
+                            tokens.subList(0, posQuestionmark),
+                            tokens.subList(posQuestionmark + 1, posColon),
+                            tokens.subList(posColon + 1, tokens.size),
+                            bytesListTree,
+                            currentScopeStruct,
+                            parentScopeStruct,
+                            ioStream,
+                            offsetInCurrentIoStream
+                        )
                 }
             }
         }
 
-        for (operatorMap in binaryPrecedence.reversed()) {
+        for (operatorMap in binaryPrecedence.reversed()) { // the lower precedence operators are checked first
             for ((index, token) in tokens.reversed().withIndex()) {
-                if (index != tokens.size-1 && tokens.reversed()[index+1].first in operandTokens && token.first in operatorMap) {
-                    val op1: MutableList<Pair<TokenType, dynamic>> = tokens.subList(0, tokens.size-index-1)
-                    val op2: MutableList<Pair<TokenType, dynamic>> = tokens.subList(tokens.size-index, tokens.size)
+                if (index != tokens.size - 1 && tokens.reversed()[index + 1].first in operandTokens && token.first in operatorMap) {
+                    val op1: MutableList<Pair<TokenType, dynamic>> = tokens.subList(0, tokens.size - index - 1)
+                    val op2: MutableList<Pair<TokenType, dynamic>> = tokens.subList(tokens.size - index, tokens.size)
                     val function = operatorMap.getValue((token.first))
-                    return function.invoke(op1, op2)
+                    return function.invoke(
+                        op1, op2,
+                        bytesListTree,
+                        currentScopeStruct,
+                        parentScopeStruct,
+                        ioStream,
+                        offsetInCurrentIoStream
+                    )
                 }
             }
         }
 
-        for ((index, token) in tokens.withIndex()){
+        for ((index, token) in tokens.withIndex()) { // unary operands all have the same precedence
             if (token.first in unaryPrecedence) {
-                val op: MutableList<Pair<TokenType, dynamic>> = tokens.subList(index+1, tokens.size)
+                val op: MutableList<Pair<TokenType, dynamic>> = tokens.subList(index + 1, tokens.size)
                 val function = unaryPrecedence.getValue(token.first)
-                return function.invoke(op)
+                return function.invoke(
+                    op,
+                    bytesListTree,
+                    currentScopeStruct,
+                    parentScopeStruct,
+                    ioStream,
+                    offsetInCurrentIoStream
+                )
             }
+        }
+
+        for ((index, token) in tokens.withIndex()) { //
+
         }
 
         return Pair(TokenType.EMPTY, null)
@@ -543,36 +1576,39 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     fun getOperator(char: Char): TokenType = operatorMap[char.toString()]!!
     fun getOperator2(string: String): TokenType = operator2Map[string]!!
 
-    fun isKeyword(char: Char?) : Boolean {
+    fun isKeyword(char: Char?): Boolean {
         return (char == null
                 || (!char.isLetterOrDigit()
                 && char != '_'))
     }
 
-    fun nextToken(expression: String) : Pair<Pair<TokenType, dynamic>, Int> {
+    fun nextToken(expression: String): Pair<Pair<TokenType, dynamic>, Int> {
         val trimmedExpression = expression.trimStart()
         if (trimmedExpression.isEmpty()) return Pair(Pair(TokenType.EMPTY, null), 0)
         val trimmed = expression.length - trimmedExpression.length
 
         if (trimmedExpression.length >= 5 && trimmedExpression.startsWith("false")) // token FALSE
             if (isKeyword(trimmedExpression.getOrNull(5)))
-                return Pair(Pair(TokenType.BOOLEAN, false), trimmed+5)
+                return Pair(Pair(TokenType.BOOLEAN, false), trimmed + 5)
         if (trimmedExpression.length >= 4 && trimmedExpression.startsWith("true")) // token TRUE
             if (isKeyword(trimmedExpression.getOrNull(4)))
-                return Pair(Pair(TokenType.BOOLEAN, true), trimmed+4)
+                return Pair(Pair(TokenType.BOOLEAN, true), trimmed + 4)
         if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("not")) // token NOT
             if (isKeyword(trimmedExpression.getOrNull(3)))
-                return Pair(Pair(TokenType.BOOLEANNOT, "not"), trimmed+3)
+                return Pair(Pair(TokenType.BOOLEANNOT, "not"), trimmed + 3)
         if (trimmedExpression.length >= 3 && trimmedExpression.startsWith("and")) // token AND
             if (isKeyword(trimmedExpression.getOrNull(3)))
-                return Pair(Pair(TokenType.BOOLEANAND, "and"), trimmed+3)
+                return Pair(Pair(TokenType.BOOLEANAND, "and"), trimmed + 3)
         if (trimmedExpression.length >= 2 && trimmedExpression.startsWith("or")) // token OR
             if (isKeyword(trimmedExpression.getOrNull(2)))
-                return Pair(Pair(TokenType.BOOLEANOR, "or"), trimmed+2)
+                return Pair(Pair(TokenType.BOOLEANOR, "or"), trimmed + 2)
         if (trimmedExpression.length >= 2 && trimmedExpression.substring(0..1) in operators2) // tokens consisting of two symbols: "<=", ">=", "==", "!=", "<<", ">>", "::"
-            return Pair(Pair(getOperator2(trimmedExpression.substring(0..1)), trimmedExpression.substring(0..1)) ,trimmed+2)
+            return Pair(
+                Pair(getOperator2(trimmedExpression.substring(0..1)), trimmedExpression.substring(0..1)),
+                trimmed + 2
+            )
         if (trimmedExpression[0].toString() in operators) // one symbol tokens: "+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", "."
-            return Pair(Pair(getOperator(trimmedExpression[0]), trimmedExpression[0].toString()), trimmed+1)
+            return Pair(Pair(getOperator(trimmedExpression[0]), trimmedExpression[0].toString()), trimmed + 1)
 
         var breakIndex: Int = 0
 
@@ -583,7 +1619,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             for ((index, char) in trimmedExpression.substring(2).withIndex()) {
                 when (char.toString()) {
                     "'" -> if (!dqstring) sqstring = !sqstring
-                    "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                    "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring = !dqstring
                     "<" -> if (!(sqstring || dqstring)) depth++
                     ">" -> {
                         if (!(sqstring || dqstring)) {
@@ -596,7 +1632,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
                 }
             }
-            return Pair(Pair(TokenType.CAST, trimmedExpression.substring(0..breakIndex+1)), trimmed+breakIndex+2)
+            return Pair(Pair(TokenType.CAST, trimmedExpression.substring(0..breakIndex + 1)), trimmed + breakIndex + 2)
         }
 
         when (trimmedExpression[0]) {
@@ -607,7 +1643,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 for ((index, char) in trimmedExpression.withIndex()) {
                     when (char.toString()) {
                         "'" -> if (!dqstring) sqstring = !sqstring
-                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
+                            !dqstring
+
                         "(" -> if (!(sqstring || dqstring)) depth++
                         ")" -> {
                             if (!(sqstring || dqstring)) {
@@ -620,8 +1658,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         }
                     }
                 }
-                return Pair(Pair(TokenType.PARENTHESES, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+                return Pair(
+                    Pair(TokenType.PARENTHESES, trimmedExpression.substring(1..breakIndex - 2)),
+                    trimmed + breakIndex
+                )
             }
+
             '[' -> { // token BRACKETS
                 var depth: Int = 0
                 var sqstring: Boolean = false
@@ -629,7 +1671,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 for ((index, char) in trimmedExpression.withIndex()) {
                     when (char.toString()) {
                         "'" -> if (!dqstring) sqstring = !sqstring
-                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index-1] != '\\')) dqstring = !dqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
+                            !dqstring
+
                         "[" -> if (!(sqstring || dqstring)) depth++
                         "]" -> {
                             if (!(sqstring || dqstring)) {
@@ -642,25 +1686,36 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         }
                     }
                 }
-                return Pair(Pair(TokenType.BRACKETS, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+                return Pair(
+                    Pair(TokenType.BRACKETS, trimmedExpression.substring(1..breakIndex - 2)),
+                    trimmed + breakIndex
+                )
             }
+
             '\'' -> { // token STRING with single quotation marks
                 for ((index, char) in trimmedExpression.withIndex()) {
                     if (char == '\'' && index != 0) {
-                        breakIndex = index+1
+                        breakIndex = index + 1
                         break
                     }
                 }
-                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+                return Pair(
+                    Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                    trimmed + breakIndex
+                )
             }
+
             '"' -> { // token STRING with double quotation marks
                 for ((index, char) in trimmedExpression.withIndex()) {
                     if (char == '"' && index != 0) {
-                        breakIndex = index+1
+                        breakIndex = index + 1
                         break
                     }
                 }
-                return Pair(Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex-2)), trimmed+breakIndex)
+                return Pair(
+                    Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                    trimmed + breakIndex
+                )
             }
         }
 
@@ -670,9 +1725,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     breakIndex = index
                     break
                 }
-                breakIndex = index+1
+                breakIndex = index + 1
             }
-            return Pair(Pair(TokenType.IDENTIFIER, trimmedExpression.substring(0..breakIndex-1)), trimmed+breakIndex)
+            return Pair(
+                Pair(TokenType.IDENTIFIER, trimmedExpression.substring(0..breakIndex - 1)),
+                trimmed + breakIndex
+            )
         } else if (trimmedExpression[0].isDigit()) { // tokens INTEGER and FLOAT
             val exceptions = setOf<Char>('x', 'X', 'o', 'O', 'b', 'B')
             if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'x' || trimmedExpression.getOrNull(1) == 'X')) { // token INTEGER in hexadecimal notation
@@ -682,30 +1740,49 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         breakIndex = index
                         break
                     }
-                    breakIndex = index+1
+                    breakIndex = index + 1
                 }
-                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(16)), trimmed+breakIndex)
-            }
-            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'b' || trimmedExpression.getOrNull(1) == 'B')) { // token INTEGER in binary notation
+                return Pair(
+                    Pair(
+                        TokenType.INTEGER,
+                        trimmedExpression.substring(2..breakIndex - 1).replace("_", "").toInt(16)
+                    ), trimmed + breakIndex
+                )
+            } else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'b' || trimmedExpression.getOrNull(
+                    1
+                ) == 'B')
+            ) { // token INTEGER in binary notation
                 for ((index, char) in trimmedExpression.withIndex()) {
                     if (char != '0' && char != '1' && char != '_' && !(index == 1 && char in exceptions)) {
                         breakIndex = index
                         break
                     }
-                    breakIndex = index+1
+                    breakIndex = index + 1
                 }
-                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(2)), trimmed+breakIndex)
-            }
-            else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(1) == 'O')) { // token INTEGER in octal notation
+                return Pair(
+                    Pair(
+                        TokenType.INTEGER,
+                        trimmedExpression.substring(2..breakIndex - 1).replace("_", "").toInt(2)
+                    ), trimmed + breakIndex
+                )
+            } else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(
+                    1
+                ) == 'O')
+            ) { // token INTEGER in octal notation
                 val octalRegex: Regex = Regex("^[0-7_]$")
                 for ((index, char) in trimmedExpression.withIndex()) {
                     if (!octalRegex.matches(char.toString()) && !(index == 1 && char in exceptions)) {
                         breakIndex = index
                         break
                     }
-                    breakIndex = index+1
+                    breakIndex = index + 1
                 }
-                return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(2..breakIndex-1).replace("_", "").toInt(8)), trimmed+breakIndex)
+                return Pair(
+                    Pair(
+                        TokenType.INTEGER,
+                        trimmedExpression.substring(2..breakIndex - 1).replace("_", "").toInt(8)
+                    ), trimmed + breakIndex
+                )
             } else { // tokens INTEGER AND FLOAT in decimal notation
                 var float_point: Boolean = false
                 var exponential: Boolean = false
@@ -719,28 +1796,35 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         exponential = true
                         continue
                     }
-                    if ((char == '+' || char == '-') && (trimmedExpression[index-1] == 'e' || trimmedExpression[index-1] == 'E'))
+                    if ((char == '+' || char == '-') && (trimmedExpression[index - 1] == 'e' || trimmedExpression[index - 1] == 'E'))
                         continue
                     if (!char.isDigit() && char != '_') {
                         breakIndex = index
                         break
                     }
-                    breakIndex = index+1
+                    breakIndex = index + 1
                 }
                 if (float_point)
-                    return Pair(Pair(TokenType.FLOAT, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toFloat()), trimmed+breakIndex)
+                    return Pair(
+                        Pair(
+                            TokenType.FLOAT,
+                            trimmedExpression.substring(0..breakIndex - 1).replace("_", "").toFloat()
+                        ), trimmed + breakIndex
+                    )
                 else
-                    return Pair(Pair(TokenType.INTEGER, trimmedExpression.substring(0..breakIndex-1).replace("_", "").toInt()), trimmed+breakIndex)
+                    return Pair(
+                        Pair(
+                            TokenType.INTEGER,
+                            trimmedExpression.substring(0..breakIndex - 1).replace("_", "").toInt()
+                        ), trimmed + breakIndex
+                    )
 
             }
         }
         return Pair(Pair(TokenType.EMPTY, null), 0)
     }
 
-    val tokensForReference = setOf<TokenType>(TokenType.IDENTIFIER, TokenType.DOT, TokenType.DOUBLECOLON, TokenType.FUNCTION,
-        TokenType.CAST, TokenType.BRACKETS)
-
-    fun tokenizeExpression(expression: String) : MutableList<Pair<TokenType, dynamic>> {
+    fun tokenizeExpression(expression: String): MutableList<Pair<TokenType, dynamic>> {
         var expression: String = expression
         var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
         while (expression != "") {
@@ -749,42 +1833,103 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             expression = expression.substring(token.second)
         }
 
-        var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        var tokensWithEnums: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        var enum: Boolean = false
 
-        for ((index, token: Pair<TokenType, dynamic>) in tokens.withIndex()) { // combining TokenType IDENTIFIER followed by PARENTHESES to TokenType FUNCTION
-            if ((token.first == TokenType.IDENTIFIER && tokens[index+1].first == TokenType.PARENTHESES) || token.first == TokenType.EMPTY)
-                continue
-            else if (token.first == TokenType.PARENTHESES && index > 0 && tokens[index-1].first == TokenType.IDENTIFIER)
-                tokensWithFunctions.add(Pair(TokenType.FUNCTION, Pair(tokens[index-1], token)))
-            else
-                tokensWithFunctions.add(token)
+        for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
+            if (!enum) {
+                if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens.getOrNull(index + 1)!!.first == TokenType.DOUBLECOLON) {
+                    tokensWithEnums.add(Pair(TokenType.ENUMCALL, String))
+                    tokensWithEnums.last().second.plus(token.second)
+                }
+            } else {
+                if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
+                    enum = false
+                } else {
+                    tokensWithEnums.last().second.plus(token.second)
+                }
+            }
         }
 
-        var tokensWithReferences: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
-        var reference: Boolean = false
+        var tokensWithIndex: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
 
-        /*for (token: Pair<TokenType, dynamic> in tokensWithFunctions) { // combining tokens of types in val tokensForReference to TokenType REFERENCE
-            if (token.first in tokensForReference) {
-                if (!reference) {
-                    tokensWithReferences.add(Pair(TokenType.REFERENCE, mutableListOf<Pair<TokenType, dynamic>>()))
-                    reference = true
+        for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
+            if (token.first == TokenType.ARRAY) {
+                if (index > 0 &&
+                    (tokensWithEnums[index - 1].second == TokenType.IDENTIFIER ||
+                            tokensWithEnums[index - 1].second == TokenType.ARRAY ||
+                            tokensWithEnums[index - 1].second == TokenType.INDEX)
+                ) {
+                    tokensWithIndex.add(Pair(TokenType.INDEX, token.second))
                 }
-                (tokensWithReferences.last().second as MutableList<Pair<TokenType, dynamic>>).add(token)
-            } else {
-                reference = false
-                tokensWithReferences.add(token)
             }
-        }*/
+            tokensWithIndex.add(token)
+        }
+
+
+        var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        var function: Boolean = false
+
+        for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
+            if (token.first == TokenType.IDENTIFIER &&
+                (token.second == "to_s" ||
+                        token.second == "substring" ||
+                        token.second == "to_i") &&
+                index + 1 < tokensWithIndex.size &&
+                tokensWithIndex[index + 1].first == TokenType.PARENTHESES
+            ) {
+                function = true
+            } else {
+                if (function) {
+                    tokensWithFunctions.add(
+                        Pair(
+                            TokenType.FUNCTION,
+                            Pair(tokensWithIndex[index - 1], token)
+                        )
+                    )
+                } else {
+                    tokensWithFunctions.add(token)
+                }
+            }
+        }
 
         return tokensWithFunctions
     }
 
-    fun parseExpressionInner (expression: String) : Pair<TokenType, dynamic> {
-        return parseTokens(tokenizeExpression(expression))
+    fun parseExpressionInner(
+        expression: String,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): Pair<TokenType, dynamic> {
+        return parseTokens(
+            tokenizeExpression(expression),
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        )
     }
 
-    fun parseExpression (expression: String) : dynamic {
-        return parseExpressionInner(expression).second
+    fun parseExpression(
+        expression: String,
+        bytesListTree: MutableKaitaiTree,
+        currentScopeStruct: KTStruct,
+        parentScopeStruct: KTStruct?,
+        ioStream: BooleanArray,
+        offsetInCurrentIoStream: Int
+    ): dynamic {
+        return parseExpressionInner(
+            expression,
+            bytesListTree,
+            currentScopeStruct,
+            parentScopeStruct,
+            ioStream,
+            offsetInCurrentIoStream
+        ).second
     }
 
     fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
