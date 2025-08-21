@@ -1129,7 +1129,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
     ): Triple<KaitaiElement, Int, Int> {
-        throw Exception("Not properly implemented yet")
+        throw Exception("Instances are not properly implemented yet. Please come back later.")
         // TODO what to do with value?
         val value = instance.value?.let {
             parseExpression(instance.value)

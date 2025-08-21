@@ -92,6 +92,8 @@ data class KTSeq(
 
     //TODO val encoding
 
+
+    @SerialName("pad-right")
     val padRight: Int? = null,
 
     val terminator: Int? = null,
