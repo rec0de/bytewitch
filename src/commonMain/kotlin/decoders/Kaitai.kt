@@ -2193,27 +2193,28 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                                             getEnum(kaitaiStruct, seqElement.enum)
                         if (path != null) {
                             if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
-                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) { // TODO change to UInt
-                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()}")
                                 }else {
                                     enum = Pair(
                                         path,
-                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString() // TODO change to UInt
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()]!!.id.toString()
                                     )
                                 }
                             } else if (type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
-                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)] == null) {
-                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toLong()] == null) {
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toLong()}")
                                 }else {
                                     enum = Pair(
                                         path,
-                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)]!!.id.toString()
+                                        path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toLong()]!!.id.toString()
                                     )
                                 }
-                            } else {
+                            }
+                            else {
                                 if (path[if (ioSubStream[0]) 1 else 0] == null) {
                                     val temp = if (ioSubStream[0]) 1 else 0
-                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
+                                    throw RuntimeException("The enum ${seqElement.enum} has no key-value pair with the given key ${Long.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG)}")
                                 }else {
                                     enum = Pair(
                                         path,
