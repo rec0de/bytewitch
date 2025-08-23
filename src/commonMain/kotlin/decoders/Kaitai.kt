@@ -27,7 +27,7 @@ enum class DisplayStyle {
 }
 
 // acts just like a MutableList except it also has the added features specifically for Kaitai stuff
-class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf()) : MutableList<KaitaiElement> by innerList {
+class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
 
     // getter and setters for integer ids already implemented, now we do them for strings aswell, as ids are unique
@@ -985,14 +985,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
 
             kaitaiElement = when (type.usedDisplayStyle) {
-                DisplayStyle.BINARY -> KaitaiBinary(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, enum)
+                DisplayStyle.BINARY -> KaitaiBinary(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, enum)
                 // displayStyle.HEX as the fallback (even if it's a known type or whatever)
-                else -> KaitaiBytes(elementId, type.byteOrder, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
+                else -> KaitaiBytes(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
             }
         }
 
@@ -1028,7 +1028,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        val bytesListTreeForInnerList = MutableKaitaiTree()
+        val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream)
         bytesListTreeForInnerList.parent = bytesListTree
         bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
         var repeatAmount = 0
@@ -1168,7 +1168,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         test and 0b00111000 >> 3 = -> 001
         oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
         */
-        val bytesListTree = MutableKaitaiTree()
+        val bytesListTree = MutableKaitaiTree(ioStream = ioStream)
         bytesListTree.parent = parentBytesListTree
         if (bytesListTree.parent != null) {
             bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
@@ -1233,6 +1233,7 @@ interface KaitaiElement : ByteWitchResult {
     val value: BooleanArray
     var endianness: ByteOrder
     var doc: KaitaiDoc
+    val ioStream: BooleanArray
 }
 
 class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
@@ -1305,9 +1306,12 @@ class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
     }
 }
 
-class KaitaiResult(override val id: String, override var endianness: ByteOrder,
-                   override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
+class KaitaiResult(
+    override val id: String, override var endianness: ByteOrder,
+    override val bytesListTree: MutableKaitaiTree,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc,
+) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
@@ -1324,12 +1328,16 @@ class KaitaiResult(override val id: String, override var endianness: ByteOrder,
             }
             return result
         }
+
+    override val ioStream: BooleanArray = bytesListTree.ioStream
 }
 
-class KaitaiList(override val id: String, override var endianness: ByteOrder,
-                 override val bytesListTree: MutableKaitaiTree, override val sourceByteRange: Pair<Int, Int>,
-                 override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc
-): KaitaiElement {
+class KaitaiList(
+    override val id: String, override var endianness: ByteOrder,
+    override val bytesListTree: MutableKaitaiTree,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc,
+) : KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>${bytesListTree.joinToString(", ", "${id}[", "]") { it.renderHTML() }}</div>"
     }
@@ -1343,10 +1351,16 @@ class KaitaiList(override val id: String, override var endianness: ByteOrder,
             }
             return result
         }
+
+    override val ioStream: BooleanArray = bytesListTree.ioStream
 }
 
-class KaitaiBytes(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                  override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
+class KaitaiBytes(
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc,
+) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().hex()})h" +
@@ -1358,9 +1372,9 @@ class KaitaiBytes(override val id: String, override var endianness: ByteOrder, o
 // TODO: Currently the endianness is not used, because the value is already flipped in the Kaitai parser.
 //  Therefor, do we even need it here? The conversion here can support both endianness, if the value is not flipped
 abstract class KaitaiNumber(
-    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
-    override val sourceByteRange: Pair<Int, Int>,
-    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
 ) : KaitaiElement {
     abstract val suffix: String
@@ -1376,11 +1390,11 @@ abstract class KaitaiNumber(
 }
 
 class KaitaiSignedInteger(
-    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
-    override val sourceByteRange: Pair<Int, Int>,
-    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
-) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc) {
     override val suffix: String = "s"
 
     override fun parseValueAsString(): String {
@@ -1396,11 +1410,11 @@ class KaitaiSignedInteger(
 }
 
 class KaitaiUnsignedInteger(
-    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
-    override val sourceByteRange: Pair<Int, Int>,
-    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
-) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc) {
     override val suffix: String = "u"
 
     override fun parseValueAsString(): String {
@@ -1416,11 +1430,11 @@ class KaitaiUnsignedInteger(
 }
 
 class KaitaiFloat(
-    override val id: String, override var endianness: ByteOrder, override val value: BooleanArray,
-    override val sourceByteRange: Pair<Int, Int>,
-    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
-) : KaitaiNumber(id, endianness, value, sourceByteRange, sourceRangeBitOffset, doc) {
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc) {
     override val suffix: String = "f"
 
     override fun parseValueAsString(): String {
@@ -1433,8 +1447,12 @@ class KaitaiFloat(
     }
 }
 
-class KaitaiBinary(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
+class KaitaiBinary(
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc,
+) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.joinToString("") { if (it) "1" else "0" }})b" +
@@ -1443,8 +1461,12 @@ class KaitaiBinary(override val id: String, override var endianness: ByteOrder, 
     }
 }
 
-class KaitaiString(override val id: String, override var endianness: ByteOrder, override val value: BooleanArray, override val sourceByteRange: Pair<Int, Int>,
-                   override val sourceRangeBitOffset: Pair<Int, Int>, override var doc: KaitaiDoc): KaitaiElement {
+class KaitaiString(
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
+    override var doc: KaitaiDoc
+) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
                     "${id}(${value.toByteArray().toUTF8String()})utf8" +
@@ -1454,11 +1476,9 @@ class KaitaiString(override val id: String, override var endianness: ByteOrder, 
 }
 
 class KaitaiEnum(
-    override val id: String,
-    override var endianness: ByteOrder,
-    override val value: BooleanArray,
-    override val sourceByteRange: Pair<Int, Int>,
-    override val sourceRangeBitOffset: Pair<Int, Int>,
+    override val id: String, override var endianness: ByteOrder,
+    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc,
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
@@ -1468,20 +1488,4 @@ class KaitaiEnum(
                     doc.renderHTML() +
                 "</div>"
     }
-
 }
-
-
-/*
-class KaitaiArray(val id: String, val endianness: ByteOrder, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>): KaitaiElement {
-    override fun renderHTML(): String {
-        val formattedValues = ""
-        for (i in 0 until (value.size / valuesSizeBytes)) {
-            formattedValues.plus("<span>${value.slice(i*valuesSizeBytes ..i*valuesSizeBytes+valuesSizeBytes)}</span>")
-        }
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>" +
-                formattedValues +
-                "</div>"
-    }
-}
-*/
