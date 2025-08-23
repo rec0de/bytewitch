@@ -2020,10 +2020,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
             if (!enum) {
-                if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens.getOrNull(index + 1)!!.first == TokenType.DOUBLECOLON) {
+                if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
                     tokensWithEnums.add(Pair(TokenType.ENUMCALL, String))
                     tokensWithEnums.last().second.plus(token.second)
+                    enum = true
+                    continue
                 }
+                tokensWithEnums.add(token)
             } else {
                 if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
                     enum = false
