@@ -638,7 +638,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             is KaitaiFloat -> Pair(TokenType.FLOAT, Float.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
             is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.enum)
             is KaitaiBytes -> Pair(TokenType.BYTEARRAY, targetElement.value.toByteArray())
-            else -> { // TODO instances with values
+            else -> { // TODO instances with values and repeat arrays
                 throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
             }
         }
@@ -2100,6 +2100,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         )
     }
 
+    fun decapsulateArrayTokens(array: MutableList<Pair<TokenType, dynamic>>) : MutableList<dynamic> {
+        val result: MutableList<dynamic> = mutableListOf()
+        for (token: Pair<TokenType, dynamic> in array) {
+            if (token.first == TokenType.ARRAY) {
+                result.add(decapsulateArrayTokens(token.second))
+            } else {
+                result.add(token.second)
+            }
+        }
+        return result
+    }
+
     fun parseExpression(
         expression: String,
         bytesListTree: MutableKaitaiTree,
@@ -2108,14 +2120,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         ioStream: BooleanArray,
         offsetInCurrentIoStream: Int
     ): dynamic {
-        return parseExpressionInner(
+        val result: Pair<TokenType, dynamic> = parseExpressionInner(
             expression,
             bytesListTree,
             currentScopeStruct,
             parentScopeStruct,
             ioStream,
             offsetInCurrentIoStream
-        ).second
+        )
+        return if (result.first == TokenType.ARRAY) {
+            decapsulateArrayTokens(result.second)
+        } else {
+            result.second
+        }
     }
 
     fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
