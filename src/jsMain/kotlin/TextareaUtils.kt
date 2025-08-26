@@ -13,8 +13,25 @@ fun removeTextArea(dataContainer: Element) {
     dataContainer.removeChild(dataContainer.lastElementChild!!)
 
     parsedMessages.remove(lastIndex)
+    ssfEligible.remove(lastIndex)
 
-    // TODO need to remove alignment listeners
+    removeAllSequenceAlignmentListeners()
+    if (ssfEligible.size >= 2) {
+        showStartSequenceAlignmentButton()
+    } else {
+        hideStartSequenceAlignmentButton()
+        hideSequenceAlignmentToggleButton()
+
+        // switch to segmentwise view if only one ssf item is left
+        if (!showSegmentWiseAlignment && ssfEligible.isNotEmpty()) {
+            showSegmentWiseAlignment = true
+            ssfEligible.forEach { idx ->
+                parsedMessages[idx]?.let { parsed ->
+                    rerenderSSF(idx, parsed)
+                }
+            }
+        }
+    }
 
     // delete from output view
     val output = document.getElementById("output") as HTMLDivElement

@@ -6,6 +6,31 @@ import org.w3c.dom.*
 import org.w3c.dom.events.MouseEvent
 import decoders.SwiftSegFinder.*
 
+// button to show SwiftSegFinder if it's not eligible to show by default
+fun attachShowSSFButtonHandler(container: Element, originalBytes: ByteArray, msgIndex: Int) {
+    container.querySelectorAll(".show-ssf-button").asList().forEach { btnElement ->
+        val button = btnElement as HTMLButtonElement
+        button.addEventListener("click", {
+            button.remove()
+
+            // add message to ssfEligible messages
+            ssfEligible.add(msgIndex)
+
+            // render and attach SSF view
+            val messageBox = document.getElementById("message-output-$msgIndex") as HTMLDivElement
+
+            val ssfEl = decodeWithSSF(originalBytes, msgIndex)
+            messageBox.appendChild(ssfEl)
+
+            attachSSFButtons(ssfEl, originalBytes, msgIndex)
+
+            if (ssfEligible.size >= 2) {
+                showStartSequenceAlignmentButton()
+            }
+        })
+    }
+}
+
 // to start sequence alignment
 fun attachStartSequenceAlignmentButtonHandler(container: Element) {
     container.querySelectorAll(".alignment-button").asList().forEach { btnElement ->
