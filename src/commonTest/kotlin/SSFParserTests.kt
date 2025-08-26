@@ -900,4 +900,174 @@ class SSFParserTests {
         // add payload field
         assertTrue(segmentOffsets.contains(1))
     }
+
+    @Test
+    fun testBoundaries_rule1_detectsLocalEntropyMaximum() {
+        val bytes1 = "1111223344".fromHex()
+        val bytes2 = "1111333344".fromHex()
+        val bytes3 = "1111443344".fromHex()
+
+        val messages = listOf(bytes1, bytes2, bytes3).mapIndexed { index, bytes ->
+            SSFParsedMessage(
+                segments = emptyList(),
+                bytes = bytes,
+                msgIndex = index
+            )
+        }
+
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        val boundaries = parser.getBoundariesUsingEntropy(messages, entropy, gr, threshold = 0.01)
+
+        // position 2 has higher entropy than neighboring bytes. So set boundary
+        assertEquals(true, boundaries.contains(2), "Expected boundary at entropy peak position 2")
+    }
+
+
+    @Test
+    fun testBoundaries_rule2_detectsBoundaryAfterStaticZeros() {
+        val bytes1 = "000000A1BB".fromHex()
+        val bytes2 = "000000A2CC".fromHex()
+        val bytes3 = "000000A3DD".fromHex()
+
+        val messages = listOf(bytes1, bytes2, bytes3).mapIndexed { index, bytes ->
+            SSFParsedMessage(
+                segments = emptyList(),
+                bytes = bytes,
+                msgIndex = index
+            )
+        }
+
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        val boundaries = parser.getBoundariesUsingEntropy(messages, entropy, gr, threshold = 0.01)
+
+        // set boundary before static zeros
+        assertEquals(true, boundaries.contains(0), "Expected field boundary at start of static block (offset 0)")
+    }
+
+    @Test
+    fun testBoundaryDetectedAfterStaticBlock_rule2() {
+        val messages = listOf(
+            SSFParsedMessage(emptyList(), "000000AA".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "000000BB".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "000000CC".fromHex(), 2)
+        )
+
+        val result = parser.findEntropyBoundaries(messages)
+
+        // set boundary at pos 0 before the static block starts
+        val segmentOffsets = result[0].segments.map { it.offset }
+        assertEquals(true, segmentOffsets.contains(0), "Expected boundary at start of static block")
+    }
+
+    @Test
+    fun testEntropy_zeroWhenAllValuesSame() {
+        val msg1 = SSFParsedMessage(emptyList(), "FF01A1".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF02A2".fromHex(), 1)
+        val msg3 = SSFParsedMessage(emptyList(), "FF03A3".fromHex(), 2)
+
+        val result = parser.calcBytewiseEntropy(listOf(msg1, msg2, msg3))
+
+        // entropy at byte 0 should be 0.0 as it's FF for all messages
+        assertEquals(0.0, result[0], 0.0001)
+    }
+
+    @Test
+    fun testEntropy_highWhenUniformDistribution() {
+        val msg1 = SSFParsedMessage(emptyList(), "00".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF".fromHex(), 1)
+
+        val result = parser.calcBytewiseEntropy(listOf(msg1, msg2))
+
+        // ln(2) = 0.6931
+        assertEquals(kotlin.math.ln(2.0), result[0], 0.0001)
+    }
+
+
+    @Test
+    fun testEntropy_lowButNotZeroWhenBiasedDistribution() {
+        val msg1 = SSFParsedMessage(emptyList(), "FF".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF".fromHex(), 1)
+        val msg3 = SSFParsedMessage(emptyList(), "00".fromHex(), 2)
+
+        val result = parser.calcBytewiseEntropy(listOf(msg1, msg2, msg3))
+
+        // 2x FF, 1x 00 should be between 0 and ln(2)
+        assertTrue(result[0] in 0.0..kotlin.math.ln(2.0))
+        assertTrue(result[0] > 0.0)
+    }
+
+    @Test
+    fun testEntropy_truncatesToShortestMessage() {
+        val msg1 = SSFParsedMessage(emptyList(), "FF00AA".fromHex(), 0)
+        val msg2 = SSFParsedMessage(emptyList(), "FF00".fromHex(), 1)
+
+        val result = parser.calcBytewiseEntropy(listOf(msg1, msg2))
+
+        // shortest messages has length 2, so the result size should be 2 as well
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun testGainRatio_zeroWhenEntropyIsZero() {
+        val messages = listOf(
+            SSFParsedMessage(emptyList(), "AA11".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "AA22".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "AA33".fromHex(), 2)
+        )
+
+        // entropy at position 0 is 0 as all bytes are "AA"
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        assertEquals(0.0, gr[0], 0.0001)
+    }
+
+    @Test
+    fun testGainRatio_highWhenPairCorrelationIsStrong() {
+        val messages = listOf(
+            SSFParsedMessage(emptyList(), "0011".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "2233".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "4455".fromHex(), 2)
+        )
+
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        // Gain Ratio should be high as all pairs are linked to each other
+        assertTrue(gr[0] > 0.5, "Expected high GR at position 0 due to strong pairing")
+    }
+
+    @Test
+    fun testGainRatio_lowerWhenPairingIsWeak() {
+        val messages = listOf(
+            SSFParsedMessage(emptyList(), "00AA".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "00BB".fromHex(), 1),
+            SSFParsedMessage(emptyList(), "00CC".fromHex(), 2)
+        )
+
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        // byte 0 is always "OO" byte byte 1 changes a lot. So, GR should be 0
+        assertEquals(0.0, gr[0], 0.0001)
+    }
+
+    @Test
+    fun testGainRatio_skipsLastByte() {
+        val messages = listOf(
+            SSFParsedMessage(emptyList(), "1122".fromHex(), 0),
+            SSFParsedMessage(emptyList(), "334455".fromHex(), 1)
+        )
+
+        val entropy = parser.calcBytewiseEntropy(messages)
+        val gr = parser.calcGainRatio(messages, entropy)
+
+        // shortest messages is two bytes long, so gr shouldn't be longer
+        assertEquals(2, gr.size)
+        assertEquals(0.0, gr[1], 0.0001)
+    }
 }

@@ -6,11 +6,37 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.random.Random
 
+data class GaussianKernel(val sigma: Double, val radius: Int, val weights: DoubleArray)
+
 class SSFParser {
+    private val GAUSS_06: GaussianKernel = precomputeGaussianKernel(0.6)
+
     // this finds all segment boundaries and returns a SSF object that can be called to get the html code
     fun parse(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val segments = findSegmentBoundaries(bytes)
         return SSFParsedMessage(segments, bytes, msgIndex)
+    }
+
+    // every byte is one field. don't use postprocessing
+    private fun setBytewiseSegmentBoundaries(bytes: ByteArray): List<SSFSegment>{
+        // val taken = BooleanArray(bytes.size) { false }
+
+        // preProcessing to detect length fields
+        // val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+
+        val dynamicSegments = mutableListOf<SSFSegment>()
+        for (i in bytes.indices) { // go through each byte
+            /* if (!taken[i]) {
+                val slice = byteArrayOf(bytes[i])
+                // do some post processing to merge bytes together
+                val type = postProcessing(mutableListOf(0), slice).firstOrNull()?.fieldType ?: SSFField.UNKNOWN
+                dynamicSegments.add(SSFSegment(i, type))
+            } */
+            dynamicSegments.add(SSFSegment(i, SSFField.UNKNOWN))
+        }
+
+        // return (fixedSegments + dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
+        return (dynamicSegments).sortedBy { it.offset }.distinctBy { it.offset }
     }
 
     // count how often every segment exists
@@ -157,13 +183,6 @@ class SSFParser {
 
             val finalSegments = replacedSegments.sortedBy { it.offset }
             msg.copy(segments = finalSegments)
-
-            /*val newSegments = msg.segments.toMutableList()
-            newSegments.add(SSFSegment(lengthFieldOffset,
-                if (chosenEndian) SSFField.PAYLOAD_LENGTH_BIG_ENDIAN else SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
-            newSegments.add(SSFSegment(payloadStart, SSFField.UNKNOWN))
-
-            msg.copy(segments = newSegments.sortedBy { it.offset }.distinctBy { it.offset })*/
         }
     }
 
@@ -226,6 +245,264 @@ class SSFParser {
         return -1
     }
 
+    // calculate information entropy H(Di) for every position
+    fun calcBytewiseEntropy(messages: List<SSFParsedMessage>): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val entropy = DoubleArray(minLength) { 0.0 }
+
+        // to through all bytes
+        for (i in 0 until minLength) {
+            val counts = mutableMapOf<Int, Int>()
+            for (msg in messages) {
+                val byte = msg.bytes[i].toInt() and 0xFF
+                counts[byte] = counts.getOrPut(byte) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+            entropy[i] = counts.entries.sumOf { (v, c) ->
+                val p = c / total
+                -p * ln(p)
+            }
+        }
+
+        return entropy
+    }
+
+    // calc Gain Ratio GR. GR(Di) means IGR from Di to Di+1. This says how much neighboring bytes belong together
+    fun calcGainRatio(messages: List<SSFParsedMessage>, entropy: DoubleArray): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val gr = DoubleArray(minLength) { 0.0 }
+
+        for (i in 0 until minLength - 1) { // don't need to check the last byte
+            val pairCounts = mutableMapOf<Pair<Int, Int>, Int>() // how often byte combination [a,b] appear at pos i
+            val countsI = mutableMapOf<Int, Int>() // how often byte a appears at position i
+            val countsJ = mutableMapOf<Int, Int>() // how often byte b appears at position i
+
+            // go through all messages for counting byte a and byte b
+            for (msg in messages) {
+                val a = msg.bytes[i].toInt() and 0xFF
+                val b = msg.bytes[i + 1].toInt() and 0xFF
+                pairCounts[a to b] = pairCounts.getOrPut(a to b) { 0 } + 1
+                countsI[a] = countsI.getOrPut(a) { 0 } + 1
+                countsJ[b] = countsJ.getOrPut(b) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            // Entropy of (i, i+1)
+            val hXY = pairCounts.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i
+            val hX = countsI.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i+1
+            val hY = countsJ.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // calculate igr
+            val igr = hY - (hXY - hX)
+            gr[i] = if (entropy[i] > 0) igr / entropy[i] else 0.0
+        }
+
+        return gr
+    }
+
+    private fun getHalfByte(bytes: ByteArray, halfByteIndex: Int): Int {
+        val byteIndex = halfByteIndex / 2
+        val isHigh = halfByteIndex % 2 == 0
+        val byte = bytes[byteIndex].toInt() and 0xFF
+        return if (isHigh) (byte shr 4) and 0x0F else byte and 0x0F
+    }
+
+    private fun calcHalfByteGainRatio(messages: List<SSFParsedMessage>, entropy: DoubleArray): DoubleArray {
+        val minHalfBytes = messages.minOf { it.bytes.size } * 2
+        val gr = DoubleArray(minHalfBytes) { 0.0 }
+
+        for (i in 0 until minHalfBytes - 1) {
+            val pairCounts = mutableMapOf<Pair<Int, Int>, Int>()
+            val countsI = mutableMapOf<Int, Int>()
+            val countsJ = mutableMapOf<Int, Int>()
+
+            for (msg in messages) {
+                val byteArray = msg.bytes
+                val nibbleA = getHalfByte(byteArray, i)
+                val nibbleB = getHalfByte(byteArray, i + 1)
+
+                pairCounts[nibbleA to nibbleB] = pairCounts.getOrPut(nibbleA to nibbleB) { 0 } + 1
+                countsI[nibbleA] = countsI.getOrPut(nibbleA) { 0 } + 1
+                countsJ[nibbleB] = countsJ.getOrPut(nibbleB) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            // H(Di, Di+1)
+            val hXY = pairCounts.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // H(Di)
+            val hX = countsI.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // H(Di+1)
+            val hY = countsJ.values.sumOf { count ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            val igr = hY - (hXY - hX)
+            gr[i] = if (entropy[i] > 0) igr / entropy[i] else 0.0
+        }
+
+        return gr
+    }
+
+
+    // set boundaries using Entropy and Gain Ratio
+    fun getBoundariesUsingEntropy(messages: List<SSFParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+        val minLength = messages.minOf { it.bytes.size }
+        val boundaries = mutableSetOf<Int>()
+
+        for (i in 1 until minLength - 1) {
+            // Rule 1: local maximum in entropy
+            if (entropy[i] >= entropy[i - 1] && entropy[i] > entropy[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 3: local minimum in GR
+            if (entropy[i] > 0 && gr[i] < gr[i - 1] && gr[i] < gr[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 4: GR < threshold
+            if (entropy[i] > 0 && gr[i] < threshold) {
+                boundaries.add(i)
+            }
+        }
+
+        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 34 AC | 00 00 00 A5
+        for (i in 1 until minLength) {
+            if (entropy[i - 1] == 0.0 && entropy[i] > 0.0) { // past entropy was 0 and now it changed to something higher
+                val o = (i - 1 downTo 0).takeWhile { entropy[it] == 0.0 }.count() // check how many previous bytes with entropy 0 exist
+                val delta = (i - o) % 4 // TODO not sure if that's correct
+                boundaries.add(delta)
+            }
+        }
+
+        return boundaries.sorted().toSet()
+    }
+
+
+    // set boundaries using Entropy and Gain Ratio
+    private fun getBoundariesUsingHalbByteEntropy(messages: List<SSFParsedMessage>, entropy: DoubleArray, gr: DoubleArray, threshold: Double): Set<Int> {
+        val minHalfBytes = messages.minOf { it.bytes.size } * 2
+
+        val boundaries = mutableSetOf<Int>()
+
+        for (i in 1 until minHalfBytes - 1) {
+            // Rule 1: local maximum in entropy
+            if (entropy[i] >= entropy[i - 1] && entropy[i] > entropy[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 3: local minimum in GR
+            if (entropy[i] > 0 && gr[i] < gr[i - 1] && gr[i] < gr[i + 1]) {
+                boundaries.add(i)
+            }
+
+            // Rule 4: GR < threshold
+            if (entropy[i] > 0 && gr[i] < threshold) {
+                boundaries.add(i)
+            }
+        }
+
+
+        // Rule 2: Entropy changes from 0 to > 0. Detect boundaries like this: 34 AC | 00 00 00 A5
+        for (i in 1 until minHalfBytes) {
+            if (entropy[i - 1] == 0.0 && entropy[i] > 0.0) {
+                val o = (i - 1 downTo 0).takeWhile { entropy[it] == 0.0 }.count()
+                val delta = (i - o) % 4
+                boundaries.add(i - delta)
+            }
+        }
+
+        return boundaries.sorted().toSet()
+    }
+
+    fun calcHalfByteEntropy(messages: List<SSFParsedMessage>): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val entropy = DoubleArray(minLength * 2) { 0.0 } // 2 half-bytes per byte
+
+        for (i in 0 until minLength) {
+            val countsHigh = mutableMapOf<Int, Int>()
+            val countsLow = mutableMapOf<Int, Int>()
+
+            for (msg in messages) {
+                val byte = msg.bytes[i].toInt() and 0xFF
+                val highNibble = (byte shr 4) and 0x0F
+                val lowNibble = byte and 0x0F
+
+                countsHigh[highNibble] = countsHigh.getOrPut(highNibble) { 0 } + 1
+                countsLow[lowNibble] = countsLow.getOrPut(lowNibble) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            entropy[i * 2] = countsHigh.entries.sumOf { (_, c) ->
+                val p = c / total
+                -p * ln(p)
+            }
+
+            entropy[i * 2 + 1] = countsLow.entries.sumOf { (_, c) ->
+                val p = c / total
+                -p * ln(p)
+            }
+        }
+
+        return entropy
+    }
+
+
+
+    // entropy decoder for multiple messages
+    fun findEntropyBoundaries(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
+        if (messages.isEmpty()) return emptyList()
+
+        // TODO calculation of entropy and gr could be made in one step. This saves performance but is harder to read.
+        // get information entropy H(Di) for every byte position
+        // val entropy = calcBytewiseEntropy(messages)
+        val entropy = calcHalfByteEntropy(messages)
+
+        // get Gain Ratio (gr)
+        // val gr = calcGainRatio(messages, entropy)
+        val gr = calcHalfByteGainRatio(messages, entropy)
+
+        // get boundaries based on rules
+        // val globalBoundaries = getBoundariesUsingEntropy(messages, entropy, gr, 0.01)
+        val globalBoundaries = getBoundariesUsingHalbByteEntropy(messages, entropy, gr, 0.01)
+
+        // postprocessing and return in right format
+        return messages.map { message ->
+            // Post Processing to improve local segmentation
+            val localOffsets = globalBoundaries.filter { it < message.bytes.size }.toMutableList()
+
+            val segments = postProcessing(localOffsets, message.bytes).toMutableList()
+
+            SSFParsedMessage(segments, message.bytes, message.msgIndex)
+        }
+    }
+
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<SSFSegment> {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
@@ -256,7 +533,7 @@ class SSFParser {
             val deltaBC = computeDeltaBC(slice)
 
             // sigma should depend on the field length: Nemesys paper on page 5
-            val smoothed = applyGaussianFilter(deltaBC, 0.6)
+            val smoothed = applyGaussianFilter(deltaBC, GAUSS_06)
 
             // Safety check (it mostly enters if the bytes are too short)
             if (smoothed.isEmpty()) {
@@ -317,34 +594,39 @@ class SSFParser {
         return deltaBC
     }
 
-    // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
-    private fun applyGaussianFilter(deltaBC: DoubleArray, sigma: Double): DoubleArray {
+    // pre compute kernel value
+    private fun precomputeGaussianKernel(sigma: Double): GaussianKernel {
         val radius = ceil(3 * sigma).toInt()
         val size = 2 * radius + 1 // calc kernel size
-        val kernel = DoubleArray(size)  // kernel as DoubleArray
+        val weights = DoubleArray(size) // kernel as DoubleArray
         var sum = 0.0
-
-        // calc kernel and sum of values
         for (i in -radius..radius) {
-            kernel[i + radius] = exp(-0.5 * (i * i) / (sigma * sigma))  // gaussian weight
-            sum += kernel[i + radius]
+            weights[i + radius] = exp(-0.5 * (i * i) / (sigma * sigma)) // gaussian weight
+            sum += weights[i + radius]
         }
 
         // normalize kernel
-        for (i in kernel.indices) {
-            kernel[i] /= sum
-        }
+        for (i in weights.indices) weights[i] /= sum
+
+        return GaussianKernel(sigma, radius, weights)
+    }
+
+    // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
+    private fun applyGaussianFilter(deltaBC: DoubleArray, kernel: GaussianKernel): DoubleArray {
+        val r = kernel.radius
+        val w = kernel.weights
 
         // calc smoothed array
         val smoothed = DoubleArray(deltaBC.size)
         for (i in deltaBC.indices) {
-            smoothed[i] = 0.0
-            for (j in -radius..radius) {
+            var acc = 0.0
+            for (j in -r..r) {
                 val idx = i + j
-                if (idx >= 0 && idx < deltaBC.size) {
-                    smoothed[i] += deltaBC[idx] * kernel[j + radius]  // weighted average
+                if (idx in deltaBC.indices) {
+                    acc += deltaBC[idx] * w[j + r] // weighted average
                 }
             }
+            smoothed[i] = acc
         }
 
         return smoothed
@@ -724,6 +1006,22 @@ class SSFParser {
         return improved
     }
 
+    // check if segment is a char sequence
+    private fun isCharSegment(segment: ByteArray): Boolean {
+        if (segment.size < 6) return false
+        if (!segment.all { it >= 0 && it < 0x7f }) return false
+
+        val nonZeroBytes = segment.filter { it != 0.toByte() }
+        if (nonZeroBytes.isEmpty()) return false
+
+        val mean = nonZeroBytes.map { it.toUByte().toInt() }.average()
+        if (mean !in 50.0..115.0) return false
+
+        val nonPrintable = nonZeroBytes.count { it < 0x20 || it == 0x7f.toByte() }
+        val ratio = nonPrintable.toDouble() / segment.size
+        return ratio < 0.33
+    }
+
     // handle length field payload and add it to the result
     fun handlePrintablePayload(
         bytes: ByteArray, taken: BooleanArray, result: MutableList<SSFSegment>,
@@ -852,5 +1150,14 @@ object SSFUtil {
         val start = message.segments[index].offset
         val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
         return start until end
+    }
+
+    fun setSSFFieldfromDecoder(decoder: ByteWitchDecoder): SSFField {
+        return when (decoder.name.lowercase()) {
+            "utf8" -> SSFField.STRING
+            "utf16" -> SSFField.UNKNOWN // STRING_UTF16
+            "ieee754" -> SSFField.UNKNOWN // FLOAT
+            else -> SSFField.UNKNOWN
+        }
     }
 }

@@ -39,6 +39,9 @@ fun main() {
         val liveDecode = document.getElementById("livedecode") as HTMLInputElement
         liveDecodeEnabled = liveDecode.checked
 
+        // input listener for text areas
+        applyLiveDecodeListeners()
+
         decodeBtn.onclick = {
             tryhard = false
             mainDecode(false)
@@ -79,7 +82,7 @@ fun main() {
 
         // to add more text areas for protocols
         addDataBox.onclick = {
-            appendTextArea()
+            appendTextArea("")
         }
 
         // to delete last text area
@@ -91,6 +94,7 @@ fun main() {
 
         liveDecode.onchange = {
             liveDecodeEnabled = liveDecode.checked
+            applyLiveDecodeListeners()
             0.0
         }
 
@@ -119,7 +123,6 @@ fun main() {
 
     })
 }
-
 
 fun clearSelections() {
     lastSelectionEvent = null
@@ -184,6 +187,15 @@ fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean)
     } else {
         ssfEligible.remove(taIndex)
         (messageBox.querySelector(".ssf") as? HTMLElement)?.remove()
+
+        // button for SSF rendering
+        val btn = document.createElement("button") as HTMLButtonElement
+        btn.className = "show-ssf-button"
+        btn.textContent = "Show SwiftSegFinder"
+        btn.setAttribute("data-msg-index", taIndex.toString())
+        messageBox.appendChild(btn)
+
+        attachShowSSFButtonHandler(messageBox, bytes, taIndex)
     }
 }
 
@@ -207,7 +219,7 @@ private fun renderByteWitchResult(it: Pair<String, ByteWitchResult>, taIndex: In
 }
 
 // decode bytes with SwiftSegFinder and return HTML content
-private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
+fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
     val ssfParsed = SSFParser().parse(bytes, taIndex)
     parsedMessages[taIndex] = ssfParsed
 
@@ -248,6 +260,7 @@ fun mainDecode(isLiveDecoding: Boolean) {
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+
             decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
         }
     }
@@ -284,10 +297,9 @@ fun mainDecode(isLiveDecoding: Boolean) {
 fun hasHighEndHit(results: List<Pair<String, ByteWitchResult>>): Boolean =
     results.any { (name, _) -> name in HIGH_END_DECODERS }
 
-// only show Messages that are allowed for SwiftSegFinder view
+// only return Messages that are allowed for SwiftSegFinder view
 fun getEligibleMsgsForSSF(): Map<Int, SSFParsedMessage> =
-    parsedMessages
-        .filter { (idx, msg) -> idx in ssfEligible && msg.bytes.size <= byteLimitSSFContent }
+    parsedMessages.filter { (idx, msg) -> idx in ssfEligible }
 
 // check if the messages are too long for auto sequence alignment
 fun autoRunSeqAlign(msgs: Map<Int, SSFParsedMessage>): Boolean {

@@ -48,10 +48,11 @@ object ByteWitch {
 
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
-        
+        val allDecoders = decoders
+
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
-            return decoders.mapNotNull {
+            return allDecoders.mapNotNull {
                 val decode = it.tryhardDecode(data)
                 Logger.log("decode with ${it.name} yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
