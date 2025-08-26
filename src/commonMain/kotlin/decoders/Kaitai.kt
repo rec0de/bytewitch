@@ -3,7 +3,6 @@ package decoders
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.hex
-import bitmage.indexOfFirstSubsequence
 import bitmage.padLeft
 import bitmage.toBooleanArray
 import bitmage.toByteArray
@@ -79,11 +78,18 @@ class Type(val type: String?) {
     var customType: KTStruct? = null
 }
 
-class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
+class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String) : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
+
+    private val importedStructs = mutableMapOf<String, KTStruct>()
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
+            val imports = kaitaiStruct.meta?.imports
+            if (imports != null) {
+                importedStructs.putAll(importTypes(imports))
+            }
+
             val id = kaitaiStruct.meta?.id ?: name
             processSeq(id, null, parentBytesListTree = null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
@@ -727,7 +733,41 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return true
     }
 
-    // TODO: add support for imports
+    fun importTypes(imports: List<String>) : Map<String, KTStruct> {
+        val result = mutableMapOf<String, KTStruct>()
+        for (import in imports) {
+            val currentPath = if (import.startsWith("/")) {
+                emptyList<String>()
+            } else {
+                canonicalPath.split("/").dropLast(1)
+            }
+            val importPath = import.split("/").filter { it != "." && it != "" }
+            for (part in importPath) {
+                if (part == "..") {
+                    currentPath.dropLast(1)
+                } else {
+                    currentPath + part
+                }
+            }
+            val canonicalPath = currentPath.joinToString(separator = "/")
+
+            val struct = ByteWitch.findKaitaiStructByPath(canonicalPath)
+            checkNotNull(struct) { "Could not find imported file at path $canonicalPath for import $import" }
+            val name = struct.meta?.id ?: import.substringAfterLast("/")
+            result[name] = struct
+        }
+        return result
+    }
+
+    fun getImportedType(path: String) : KTStruct? {
+        val elements = path.split("::", limit = 2)
+        val type = importedStructs[elements[0]]
+        if (type != null && elements.size == 2) {
+            return getCustomType(type, elements[1]) // go one scope deeper
+        }
+        return type
+    }
+
     /**
      * check if there is a fitting custom type defined in the current scope
      * @param path: might be just a type or prefixed by a path via "::"
@@ -806,7 +846,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(kaitaiStruct, type.type)
+                getCustomType(kaitaiStruct, type.type) ?:
+                getImportedType(type.type)
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type

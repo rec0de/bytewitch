@@ -49,6 +49,9 @@ data class KTStruct(
 data class KTMeta(
     val id: String? = null,
     val title: String? = null,
+
+    val imports: List<String> = emptyList(),
+
     val endian: KTEndian? = null,
 
     val doc: String? = null,
