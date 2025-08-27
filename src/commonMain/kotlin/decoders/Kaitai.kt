@@ -2507,7 +2507,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream)
         bytesListTreeForInnerList.parent = bytesListTree.parent
-        bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
+        if (bytesListTree.parent != null) {
+            bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
+        } else {
+            bytesListTreeForInnerList.byteOrder = ByteOrder.BIG
+        }
         var repeatAmount = 0
         while (true) {
             val triple = processSingleSeqElement(
