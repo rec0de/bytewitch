@@ -534,51 +534,51 @@ OURS
 }
 
 .icon-add {
-    background-image: url("icon_add_red.png");
+    background-image: url("icons/add_red.png");
 }
 
 .icon-add:hover {
-    background-image: url("icon_add_red_filled.png");
+    background-image: url("icons/add_red_filled.png");
 }
 
 .icon-delete {
-    background-image: url("icon_delete_red.png");
+    background-image: url("icons/delete_red.png");
 }
 
 .icon-delete:hover {
-    background-image: url("icon_delete_red_filled.png");
+    background-image: url("icons/delete_red_filled.png");
 }
 
 .icon-edit {
-    background-image: url("icon_edit_white.png");
+    background-image: url("icons/edit_white.png");
 }
 
 .icon-edit:hover {
-    background-image: url("icon_edit_white_filled.png");
+    background-image: url("icons/edit_white_filled.png");
 }
 
 .icon-finish {
-    background-image: url("icon_finish_white.png");
+    background-image: url("icons/finish_white.png");
 }
 
 .icon-finish:hover {
-    background-image: url("icon_finish_white_filled.png");
+    background-image: url("icons/finish_white_filled.png");
 }
 
 .icon-toggle-left {
-    background-image: url("icon_switch_left_white.png");
+    background-image: url("icons/switch_left_white.png");
 }
 
 .icon-toggle-left:hover {
-    background-image: url("icon_switch_left_white_filled.png");
+    background-image: url("icons/switch_left_white_filled.png");
 }
 
 .icon-toggle-right {
-    background-image: url("icon_switch_right_white.png");
+    background-image: url("icons/switch_right_white.png");
 }
 
 .icon-toggle-right:hover {
-    background-image: url("icon_switch_right_white_filled.png");
+    background-image: url("icons/switch_right_white_filled.png");
 }
 
 .message-output {
