@@ -51,6 +51,12 @@ h3 {
     margin-bottom: var(--rowgap);
 }
 
+h2 > img {
+    height: 1.5rem;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
 button {
     border-radius: 0.3rem;
     color: var(--on-accent);
