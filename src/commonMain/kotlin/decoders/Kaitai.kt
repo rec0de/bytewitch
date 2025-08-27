@@ -2506,7 +2506,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
         val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream)
-        bytesListTreeForInnerList.parent = bytesListTree
+        bytesListTreeForInnerList.parent = bytesListTree.parent
         bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
         var repeatAmount = 0
         while (true) {
