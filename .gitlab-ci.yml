@@ -1,5 +1,6 @@
 # The Docker image that will be used to build your app
 image: gradle:8.14.2-jdk24
+
 create-pages:
   pages:
     # The folder that contains the files to be exposed at the Page URL

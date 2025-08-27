@@ -6,6 +6,9 @@ enum class ByteOrder {
     BIG, LITTLE
 }
 
+fun byteArrayOfInts(vararg ints: Int) = ByteArray(ints.size) { pos -> ints[pos].toByte() }
+fun booleanArrayOfInts(vararg ints: Int): BooleanArray { return byteArrayOfInts(*ints).toBooleanArray() }
+
 @OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.hex() = asUByteArray().joinToString("") { it.toString(16).padStart(2, '0') }
 fun ByteArray.fromIndex(i: Int) = sliceArray(i until size)
@@ -67,7 +70,7 @@ fun ByteArray.toBooleanArray(): BooleanArray {
     return BooleanArray(size * 8) { i -> (this[i / 8].toInt() shr (7 - (i % 8)) and 1) == 1 }
 }
 
-fun ByteArray.toInt(endianness: ByteOrder): Int {
+fun ByteArray.toInt(endianness: ByteOrder = ByteOrder.BIG): Int {
     if (this.size > 4) {
         throw IllegalArgumentException("Int can not be larger than 4 Bytes")
     }
@@ -155,6 +158,16 @@ fun Byte.toBooleanArray(): BooleanArray {
 }
 
 // Integers
+
+fun Short.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Short {
+    return if (byteOrder == ByteOrder.BIG) {
+        ((bytes[0].toInt() and 0xFF) shl 8 or
+                (bytes[1].toInt() and 0xFF)).toShort()
+    } else {
+        ((bytes[1].toInt() and 0xFF) shl 8 or
+                (bytes[0].toInt() and 0xFF)).toShort()
+    }
+}
 
 fun ULong.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): ULong {
     check(bytes.size <= 8) { "trying to parse oversized bytearray ${bytes.hex()} as ULong" }
@@ -269,6 +282,8 @@ fun String.fromHex(): ByteArray {
         .toByteArray()
 }
 
+fun Byte.toHex(): String = this.toUByte().toString(16).padStart(2, '0')
+
 
 
 // by ephemient from https://slack-chats.kotlinlang.org/t/527242/i-have-a-bytearray-of-utf-16-encoded-bytes-read-from-a-cinte
@@ -358,4 +373,38 @@ fun String.toUnicodeCodepoints(): List<Int> {
         codepoints.add(codepoint)
     }
     return codepoints
+}
+
+fun decodeBase32(values: List<Int>): ByteArray {
+    var currentByte = 0
+    var missingBits = 8
+    val bytes = mutableListOf<Byte>()
+    values.forEach { v ->
+        val newBits = (v and 0x1F)
+        Logger.log("new bits: ${newBits.toString(2)}, current byte: ${currentByte.toString(2)}, missing bits $missingBits")
+        // decoded character fits entirely into current byte
+        if(missingBits == 5) {
+            currentByte = currentByte or newBits
+            Logger.log("finishing byte: ${currentByte.toString(2)}")
+            bytes.add(currentByte.toByte())
+            currentByte = 0
+            missingBits = 8
+        }
+        else if (missingBits > 5) {
+            currentByte = currentByte or (newBits shl (missingBits-5))
+            missingBits -= 5
+            //Logger.log("adding bits: ${currentByte.toString(2)} now missing $missingBits")
+        }
+        else {
+            val remainingBits = 5 - missingBits
+            currentByte = currentByte or (newBits shr remainingBits)
+            //Logger.log("finishing byte: ${currentByte.toString(2)}")
+            bytes.add(currentByte.toByte())
+            currentByte = newBits shl (8 - remainingBits)
+            missingBits = 8 - remainingBits
+            //Logger.log("adding bits: ${currentByte.toString(2)} now missing $missingBits")
+        }
+    }
+
+    return bytes.toTypedArray().toByteArray()
 }

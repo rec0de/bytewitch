@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>bytewitch</title>
-    <link rel="icon" href="favicon.ico">
+
+    <meta name=viewport content="width=device-width, initial-scale=1">
+    <link rel="icon" sizes="300x300" href="icon.png">
 
     <!-- Primary Meta Tags -->
     <meta name="title" content="bytewitch - binary payload analyzer" />
@@ -46,7 +48,14 @@
             <img src="icons/binary.svg"/>
             Input
         </h2>
-        <textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>
+        <!--<textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>-->
+        <div id="data_container"></div>
+
+        <div class="icon-buttons">
+            <div class="icon icon-add" id="add_data"></div>
+            <div class="icon icon-delete" id="delete_data"></div>
+        </div>
+
         <div class="parsebuttons">
           <span>
               <input type="checkbox" id="livedecode" checked/>
@@ -97,7 +106,10 @@
         <div id="kaitai-legend" class="legend" style="color: black">
             <div>Kaitai parsers:</div>
         </div>
-        <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
+        <div class="textareaContainer">
+            <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
+            <div id="kaitai-valid" class="annotationLabel" style="display: none"><span>Not valid</span></div>
+        </div>
         <div class="kaitaibuttons">
               <span>
                   <input type="checkbox" id="kaitai-live"/>
@@ -110,7 +122,7 @@
     </div>
 </div>
 
-<div class="card" id="output"><i>no valid decode yet</i></div>
+<div class="card" id="output"><i id="no_decode_yet">no valid decode yet</i></div>
 
 <div class="card" id="bytefinder">
     <h3>Byte Finder</h3>
@@ -118,6 +130,7 @@
     <div id="hexview"></div>
     <div id="textview"></div>
 </div>
+
 
 </body>
 </html>
