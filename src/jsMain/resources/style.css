@@ -413,10 +413,14 @@ button:hover {
 /* Default: only editor visible, centered */
 .container.editor-only {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
+}
+.container.editor-only #editor {
+    grid-row: 1;
+    grid-column: 1;
+    width: 100%;
     max-width: 60%;
+    min-width: 50rem;
     justify-self: center;
-    padding: 0rem;
 }
 
 /* Editor + Settings: 50/50 split */
