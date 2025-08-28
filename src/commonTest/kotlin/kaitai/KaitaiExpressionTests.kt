@@ -435,6 +435,7 @@ class KaitaiExpressionTests {
             0
         )
         var expected: dynamic = mutableListOf(3, 4, 12, 3)
+        check(result.size == expected.size) { "The expected size is ${expected.size}, actual size is ${result.size}" }
         for (i in 0..expected.size - 1) {
             check(result[i] == expected[i]) { "The expected result is ${expected[i]}, actual result is ${result[i]}" }
         }
@@ -449,7 +450,7 @@ class KaitaiExpressionTests {
             0
         ) as MutableList<dynamic>
         expected = mutableListOf("Hel,lo", "World!", "")
-        println(result)
+        check(result.size == expected.size) { "The expected size is ${expected.size}, actual size is ${result.size}" }
         for (i in 0..<expected.size) {
             check(result[i] == expected[i]) { "The expected result is ${expected[i]}, actual result is ${result[i]}" }
         }
