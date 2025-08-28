@@ -1171,6 +1171,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Array indexing and dot basically have the same precedence or more specifically are mutually exclusive anyway.
             // The token before an index token cannot be a dot token. In Kaitai dot can be used for references, functions and casts,
             // but this is handled by parseDot.
+            println(tokens)
             if (tokens.last().first == TokenType.INDEX) {
                 return parseIndex(
                     tokens.subList(0, tokens.size - 2),
@@ -1493,13 +1494,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 function = true
             } else {
                 if (function) {
-                    val function = Pair(tokensWithIndex[index - 1], token)
+                    val functionToken = Pair(tokensWithIndex[index - 1], token)
                     tokensWithFunctions.add(
                         Pair(
                             TokenType.FUNCTION,
-                            function
+                            functionToken
                         )
                     )
+                    function = false
                 } else {
                     tokensWithFunctions.add(token)
                 }
