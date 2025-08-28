@@ -129,7 +129,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         QUESTIONMARK("?"),
         COLON(":"),
         PARENTHESES("()"),
-        BRACKETS("[]"),
         ARRAY("[,]"),
         BYTEARRAY(""),
         INDEX("[]"),
@@ -152,14 +151,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int
     ) {
-        //******************************************************************************************************************
-        //*                                                 methods                                                        *
-        //******************************************************************************************************************
-        fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
-            when (input.first) {
-                TokenType.INTEGER -> {
-                    return Pair(TokenType.STRING, input.second.toString())
-                }
+    //******************************************************************************************************************
+    //*                                                 methods                                                        *
+    //******************************************************************************************************************
+    fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
+        when (input.first) {
+            TokenType.INTEGER -> {
+                return Pair(TokenType.STRING, input.second.toString())
+            }
 
                 TokenType.ARRAY -> {
                     if (encoding != "UTF-16BE") {
@@ -493,9 +492,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             return Pair(TokenType.ENUM, Pair(enum, token.second.substringAfterLast("::")))
         }
 
-        fun tokenizeArray(_array: String): List<String> {
-            var array: String = _array
-            var result: MutableList<String> = mutableListOf()
+    fun tokenizeArray(fullArray: String): List<String> {
+        var array: String = fullArray
+        val result: MutableList<String> = mutableListOf()
 
             while (array.isNotEmpty()) {
                 var slice: Int = array.length
@@ -801,16 +800,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
-                Pair(
-                    TokenType.FLOAT,
-                    (op1.second).toFloat() * (op2.second).toFloat()
-                )
-            else
-                Pair(
-                    TokenType.INTEGER,
-                    (op1.second).toLong() * (op2.second).toLong()
-                )
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
+            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            Pair(
+                TokenType.FLOAT,
+                left * right
+            )
+        }
+        else
+            Pair(
+                TokenType.INTEGER,
+                op1.second as Long * op2.second as Long
+            )
 
             return result
         }
@@ -819,16 +821,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
-                Pair(
-                    TokenType.FLOAT,
-                    (op1.second).toFloat() / (op2.second).toFloat()
-                )
-            else
-                Pair(
-                    TokenType.INTEGER,
-                    (op1.second).toLong() / (op2.second).toLong()
-                )
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
+            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            Pair(
+                TokenType.FLOAT,
+                left / right
+            )
+        }
+        else
+            Pair(
+                TokenType.INTEGER,
+                op1.second as Long / op2.second as Long
+            )
 
             return result
         }
@@ -837,16 +842,20 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
-                Pair(
-                    TokenType.FLOAT,
-                    (op1.second).toFloat() % (op2.second).toFloat()
-                )
-            else
-                Pair(
-                    TokenType.INTEGER,
-                    (op1.second).toLong() % (op2.second).toLong()
-                )
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+            val result: Float = (op1.second).toFloat() % (op2.second).toFloat()
+            Pair(
+                TokenType.FLOAT,
+                if (result < 0) result + (op2.second).toFloat() else result
+            )
+        }
+        else {
+            val result: Long = (op1.second).toLong() % (op2.second).toLong()
+            Pair(
+                TokenType.INTEGER,
+                if (result < 0) result + (op2.second).toLong() else result
+            )
+        }
 
             return result
         }
@@ -855,21 +864,24 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
             val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-            val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING)
-                Pair(
-                    TokenType.STRING,
-                    (op1.second as String) + (op2.second as String)
-                )
-            else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
-                Pair(
-                    TokenType.FLOAT,
-                    (op1.second).toFloat() + (op2.second).toFloat()
-                )
-            else
-                Pair(
-                    TokenType.INTEGER,
-                    (op1.second).toLong() + (op2.second).toLong()
-                )
+        val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING)
+            Pair(
+                TokenType.STRING,
+                (op1.second as String) + (op2.second as String)
+            )
+        else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
+            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            Pair(
+                TokenType.FLOAT,
+                left + right
+            )
+        }
+        else
+            Pair(
+                TokenType.INTEGER,
+                op1.second as Long + op2.second as Long
+            )
 
             return result
         }
@@ -878,16 +890,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT)
-                Pair(
-                    TokenType.FLOAT,
-                    (op1.second).toFloat() - (op2.second).toFloat()
-                )
-            else
-                Pair(
-                    TokenType.INTEGER,
-                    (op1.second).toLong() - (op2.second).toLong()
-                )
+        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
+            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            Pair(
+                TokenType.FLOAT,
+                left - right
+            )
+        }
+        else
+            Pair(
+                TokenType.INTEGER,
+                op1.second as Long - op2.second as Long
+            )
 
             return result
         }
@@ -1255,33 +1270,33 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     )
                 }
 
-                '[' -> { // token BRACKETS
-                    var depth: Int = 0
-                    var sqstring: Boolean = false
-                    var dqstring: Boolean = false
-                    for ((index, char) in trimmedExpression.withIndex()) {
-                        when (char.toString()) {
-                            "'" -> if (!dqstring) sqstring = !sqstring
-                            "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
-                                !dqstring
+            '[' -> { // token ARRAY
+                var depth: Int = 0
+                var sqstring: Boolean = false
+                var dqstring: Boolean = false
+                for ((index, char) in trimmedExpression.withIndex()) {
+                    when (char.toString()) {
+                        "'" -> if (!dqstring) sqstring = !sqstring
+                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
+                            !dqstring
 
-                            "[" -> if (!(sqstring || dqstring)) depth++
-                            "]" -> {
-                                if (!(sqstring || dqstring)) {
-                                    depth--
-                                    if (depth == 0) {
-                                        breakIndex = index + 1
-                                        break
-                                    }
+                        "[" -> if (!(sqstring || dqstring)) depth++
+                        "]" -> {
+                            if (!(sqstring || dqstring)) {
+                                depth--
+                                if (depth == 0) {
+                                    breakIndex = index + 1
+                                    break
                                 }
                             }
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.BRACKETS, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
                 }
+                return Pair(
+                    Pair(TokenType.ARRAY, trimmedExpression.substring(1..breakIndex - 2)),
+                    trimmed + breakIndex
+                )
+            }
 
                 '\'' -> { // token STRING with single quotation marks
                     for ((index, char) in trimmedExpression.withIndex()) {
@@ -1415,81 +1430,83 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             return Pair(Pair(TokenType.EMPTY, null), 0)
         }
 
-        fun tokenizeExpression(expression: String): MutableList<Pair<TokenType, dynamic>> {
-            var expression: String = expression
-            var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
-            while (expression != "") {
-                var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(expression)
-                tokens.add(token.first)
-                expression = expression.substring(token.second)
-            }
+    fun tokenizeExpression(expression: String): MutableList<Pair<TokenType, dynamic>> {
+        var expression: String = expression
+        var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+        while (expression != "") {
+            var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(expression)
+            tokens.add(token.first)
+            expression = expression.substring(token.second)
+            expression = expression.trimStart()
+        }
 
             var tokensWithEnums: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var enum: Boolean = false
 
-            for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
-                if (!enum) {
-                    if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
-                        tokensWithEnums.add(Pair(TokenType.ENUMCALL, String))
-                        tokensWithEnums.last().second.plus(token.second)
-                        enum = true
-                        continue
-                    }
-                    tokensWithEnums.add(token)
+        for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
+            if (!enum) {
+                if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
+                    tokensWithEnums.add(Pair(TokenType.ENUMCALL, token.second))
+                    enum = true
+                    continue
+                }
+                tokensWithEnums.add(token)
+            } else {
+                if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
+                    enum = false
                 } else {
-                    if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
-                        enum = false
-                    } else {
-                        tokensWithEnums.last().second.plus(token.second)
-                    }
+                    val tempEnum: String = tokensWithEnums.last().second
+                    tokensWithEnums.removeLast()
+                    tokensWithEnums.add(Pair(TokenType.ENUMCALL, tempEnum + token.second))
                 }
             }
+        }
 
             var tokensWithIndex: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
 
-            for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
-                if (token.first == TokenType.ARRAY) {
-                    if (index > 0 &&
-                        (tokensWithEnums[index - 1].second == TokenType.IDENTIFIER ||
-                                tokensWithEnums[index - 1].second == TokenType.ARRAY ||
-                                tokensWithEnums[index - 1].second == TokenType.INDEX)
-                    ) {
-                        tokensWithIndex.add(Pair(TokenType.INDEX, token.second))
-                        continue
-                    }
+        for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
+            if (token.first == TokenType.ARRAY) {
+                if (index > 0 &&
+                    (tokensWithEnums[index - 1].first == TokenType.IDENTIFIER ||
+                            tokensWithEnums[index - 1].first == TokenType.ARRAY ||
+                            tokensWithEnums[index - 1].first == TokenType.INDEX)
+                ) {
+                    tokensWithIndex.add(Pair(TokenType.INDEX, token.second))
+                    continue
                 }
-                tokensWithIndex.add(token)
             }
+            tokensWithIndex.add(token)
+        }
 
 
             var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var function: Boolean = false
 
-            for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
-                if (token.first == TokenType.IDENTIFIER &&
-                    (token.second == "to_s" ||
-                            token.second == "substring" ||
-                            token.second == "to_i") &&
-                    index + 1 < tokensWithIndex.size &&
-                    tokensWithIndex[index + 1].first == TokenType.PARENTHESES
-                ) {
-                    function = true
-                } else {
-                    if (function) {
-                        tokensWithFunctions.add(
-                            Pair(
-                                TokenType.FUNCTION,
-                                Pair(tokensWithIndex[index - 1], token)
-                            )
+        for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
+            if (token.first == TokenType.IDENTIFIER &&
+                (token.second == "to_s" ||
+                        token.second == "substring" ||
+                        token.second == "to_i") &&
+                index + 1 < tokensWithIndex.size &&
+                tokensWithIndex[index + 1].first == TokenType.PARENTHESES
+            ) {
+                function = true
+            } else {
+                if (function) {
+                    val function = Pair(tokensWithIndex[index - 1], token)
+                    tokensWithFunctions.add(
+                        Pair(
+                            TokenType.FUNCTION,
+                            function
                         )
-                    } else {
-                        tokensWithFunctions.add(token)
-                    }
+                    )
+                } else {
+                    tokensWithFunctions.add(token)
                 }
             }
-
-            return tokensWithFunctions
         }
+        return tokensWithFunctions
+    }
 
         fun parseExpressionInner(expression: String): Pair<TokenType, dynamic> {
             return parseTokens(tokenizeExpression(expression))
