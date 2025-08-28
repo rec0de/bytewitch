@@ -121,7 +121,7 @@ object Randomness : ByteWitchDecoder {
             fourGramCounts[lowerNibble] += 1
             fourGramCounts[upperNibble] += 1
 
-            byteCounts[byte.toInt()] += 1
+            byteCounts[byte.toUByte().toInt()] += 1
             oneCounts[byte.countOneBits()] += 1
 
             val lowBit = byte.toInt() and 0x01
