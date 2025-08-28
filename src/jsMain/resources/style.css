@@ -13,7 +13,7 @@
     --opack-highlight: #46b951;
     --asn: #c574c9;
     --asn-highlight: #b346b9;
-    --generic: #c9a07420;
+    --generic: #c9a074;
     --generic-highlight: #b98346;
     --neutral: #a0a0a0;
     --neutral-highlight: #838383;
@@ -24,10 +24,15 @@
     --mono: monospace;
 }
 
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 html, body {
     font-family: var(--sans);
     margin: 0;
-    height: 100%;
     width: 100%;
 }
 
@@ -37,8 +42,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    box-sizing: border-box;
-    padding: 5px;
+    gap: 1rem;
+    padding: 1rem;
 }
 
 h1, h2, h3 {
@@ -47,6 +52,12 @@ h1, h2, h3 {
 
 h3 {
     margin-bottom: var(--rowgap);
+}
+
+h2 > img {
+    height: 1.5rem;
+    vertical-align: middle;
+    margin-right: 0.5rem;
 }
 
 button {
@@ -66,26 +77,34 @@ button:hover {
     background: var(--on-accent);
 }
 
-.header {
+#header {
     display: flex;
     flex-direction: row;
-    gap: 1rem;
     align-self: center;
     align-items: center;
+    flex-shrink: 0;
+    width: 50rem;
+    gap: 1rem;
 }
 
-.header > img {
+#settings-btn,
+#kaitai-btn {
+    width: 8em;
+}
+
+#header > img {
     height: 4rem;
 }
 
 .legend {
     display: flex;
     flex-direction: row;
+    align-items: center;
+    justify-content: start;
+    flex-wrap: wrap;
     gap: 0.5rem;
     color: #fff;
     font-size: 0.75rem;
-    justify-content: center;
-    flex-wrap: wrap;
 }
 
 .parsebuttons, .kaitaibuttons {
@@ -100,16 +119,25 @@ button:hover {
     flex-grow: 1;
 }
 
-.container {
+.card {
     box-sizing: border-box;
     border-radius: 0.5rem;
     padding: 1rem;
-    margin: 0.5rem;
     float: right;
     display: flex;
     flex-direction: column;
     background: var(--content-back);
+    height: fit-content;
     max-width: 100%;
+    overflow: hidden;
+    gap: 1rem;
+}
+
+.card-hidden {
+    opacity: 0;
+    padding: 0;
+    pointer-events: none;
+    display: none;
 }
 
 .textareaContainer {
@@ -119,11 +147,12 @@ button:hover {
 }
 
 .textareaContainer > textarea {
-    max-width: 100%;
     height: 250px;
-    width: 800px;
-    max-height: 30vh;
+    min-height: 3rem;
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    resize: vertical;
 }
 
 #data_container {
@@ -132,19 +161,13 @@ button:hover {
     gap: 1rem;
 }
 
-.textareaContainer > textarea {
-    max-width: 100%;
-    width: 800px;
-    height: 250px;
-    max-height: 30vh;
-}
 
-.container > span {
+.card > span {
     padding-top:  0.5rem;
     padding-bottom:  0.5rem;
 }
 
-.container > button {
+.card > button {
     padding-top:  0.25rem;
     padding-bottom:  0.25rem;
     margin-top:  0.5rem;
@@ -401,10 +424,10 @@ button:hover {
 }
 
 #output {
+    gap: 1rem;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 1rem;
     justify-content: center;
     align-items: flex-start;
 }
@@ -488,51 +511,51 @@ button:hover {
 }
 
 .icon-add {
-    background-image: url("icon_add_red.png");
+    background-image: url("icons/add_red.png");
 }
 
 .icon-add:hover {
-    background-image: url("icon_add_red_filled.png");
+    background-image: url("icons/add_red_filled.png");
 }
 
 .icon-delete {
-    background-image: url("icon_delete_red.png");
+    background-image: url("icons/delete_red.png");
 }
 
 .icon-delete:hover {
-    background-image: url("icon_delete_red_filled.png");
+    background-image: url("icons/delete_red_filled.png");
 }
 
 .icon-edit {
-    background-image: url("icon_edit_white.png");
+    background-image: url("icons/edit_white.png");
 }
 
 .icon-edit:hover {
-    background-image: url("icon_edit_white_filled.png");
+    background-image: url("icons/edit_white_filled.png");
 }
 
 .icon-finish {
-    background-image: url("icon_finish_white.png");
+    background-image: url("icons/finish_white.png");
 }
 
 .icon-finish:hover {
-    background-image: url("icon_finish_white_filled.png");
+    background-image: url("icons/finish_white_filled.png");
 }
 
 .icon-toggle-left {
-    background-image: url("icon_switch_left_white.png");
+    background-image: url("icons/switch_left_white.png");
 }
 
 .icon-toggle-left:hover {
-    background-image: url("icon_switch_left_white_filled.png");
+    background-image: url("icons/switch_left_white_filled.png");
 }
 
 .icon-toggle-right {
-    background-image: url("icon_switch_right_white.png");
+    background-image: url("icons/switch_right_white.png");
 }
 
 .icon-toggle-right:hover {
-    background-image: url("icon_switch_right_white_filled.png");
+    background-image: url("icons/switch_right_white_filled.png");
 }
 
 .message-output {
@@ -647,4 +670,77 @@ button:hover {
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     border-top: 10px solid #333333ee;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 0fr;
+    align-items: start;
+    justify-content: center;
+    width: 100%;
+    max-width: 1920px;
+    gap: 1rem;
+}
+
+#editor {
+    align-content: center;
+}
+#search {
+    align-content: start;
+}
+#kaitai {
+    align-content: start;
+}
+
+/* Default: only editor visible, centered */
+.container.editor-only {
+    grid-template-columns: 1fr;
+}
+.container.editor-only #editor {
+    grid-row: 1;
+    grid-column: 1;
+    width: 100%;
+    max-width: 60%;
+    min-width: 50rem;
+    justify-self: center;
+}
+
+/* Editor + Settings: 50/50 split */
+/* Editor + Kaitai: 50/50 split */
+.container.editor-settings,
+.container.editor-kaitai {
+    grid-template-columns: 1fr 1fr;
+}
+
+.container.editor-settings #editor,
+.container.editor-kaitai #editor {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.container.editor-settings #settings,
+.container.editor-kaitai #kaitai {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+/* All visible: Editor spans 2 rows, Settings and Kaitai stack in column 2 */
+.container.all-visible {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+}
+
+.container.all-visible #editor {
+    grid-row: 1 / 3;
+    grid-column: 1;
+}
+
+.container.all-visible #settings {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.container.all-visible #kaitai {
+    grid-row: 2;
+    grid-column: 2;
 }
