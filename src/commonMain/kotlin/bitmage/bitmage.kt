@@ -70,7 +70,7 @@ fun ByteArray.toBooleanArray(): BooleanArray {
     return BooleanArray(size * 8) { i -> (this[i / 8].toInt() shr (7 - (i % 8)) and 1) == 1 }
 }
 
-fun ByteArray.toInt(endianness: ByteOrder): Int {
+fun ByteArray.toInt(endianness: ByteOrder = ByteOrder.BIG): Int {
     if (this.size > 4) {
         throw IllegalArgumentException("Int can not be larger than 4 Bytes")
     }

@@ -11,6 +11,7 @@ import decoders.KaitaiResult
 import decoders.KaitaiSignedInteger
 import decoders.KaitaiString
 import decoders.KaitaiUnsignedInteger
+import decoders.KaitaiEnum
 import kaitai.KaitaiTestUtils.checkElement
 import kotlin.test.Test
 
@@ -637,5 +638,323 @@ class KaitaiDecoderTests {
         val field2_sub2_leaf = field2_sub2.bytesListTree!!["leaf"]
         checkElement(field2_sub2_leaf, "leaf", KaitaiBytes::class, Pair(6, 8), Pair(0, 0), booleanArrayOfInts(0x22, 0x22))
 
+    }
+
+    @Test
+    fun testTypeReferences2() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id="element_sub", type= KTType.Primitive("sub"))
+            ),
+            types = mapOf(
+                Pair("sub", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="element_subsub", type= KTType.Primitive("subsub"))
+                    ),
+                    types = mapOf(
+                        Pair("subsub", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="element_a", type= KTType.Primitive("a")),
+                                KTSeq(id="element_b", type= KTType.Primitive("b")),
+                                KTSeq(id="element_c", type= KTType.Primitive("c")),
+                            ),
+                            types = mapOf(
+                                Pair("a", KTStruct(
+                                    seq = listOf(
+                                        KTSeq(id="subsub_a", type= KTType.Primitive("u4"))
+                                    )
+                                ))
+                            )
+                        )),
+                        Pair("a", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="sub_a", type= KTType.Primitive("u2"))
+                            )
+                        )),
+                        Pair("b", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="sub_b", type= KTType.Primitive("u2"))
+                            )
+                        ))
+                    )
+                )),
+                Pair("a", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_a", type= KTType.Primitive("u1"))
+                    )
+                )),
+                Pair("b", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_b", type= KTType.Primitive("u1"))
+                    )
+                )),
+                Pair("c", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="root_c", type= KTType.Primitive("u1"))
+                    )
+                ))
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0xaa, 0xaa, 0xaa, 0xaa, // for type sub::subsub::a from sub::subsub
+            0xbb, 0xbb, // for type sub::b from sub::subsub
+            0xcc, // for type c from sub::subsub
+        )
+
+        val decoder = Kaitai("type_references_2", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
+        checkElement(element, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"].bytesListTree!!["subsub_a"]
+        checkElement(element, id="subsub_a", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
+        checkElement(element, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"].bytesListTree!!["sub_b"]
+        checkElement(element, id="sub_b", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
+        checkElement(element, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"].bytesListTree!!["root_c"]
+        checkElement(element, id="root_c", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+    }
+
+    @Test
+    fun testEnumReferences() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id="element_sub", type= KTType.Primitive("sub")),
+                KTSeq(id="enumWithPath", type= KTType.Primitive("u1"), enum="sub::subsub::enum_a")
+            ),
+            types = mapOf(
+                Pair("sub", KTStruct(
+                    seq = listOf(
+                        KTSeq(id="element_subsub", type= KTType.Primitive("subsub"))
+                    ),
+                    types = mapOf(
+                        Pair("subsub", KTStruct(
+                            seq = listOf(
+                                KTSeq(id="element_a", type= KTType.Primitive("u1"), enum="enum_a"),
+                                KTSeq(id="element_b", type= KTType.Primitive("u1"), enum="enum_b"),
+                                KTSeq(id="element_c", type= KTType.Primitive("u1"), enum="enum_c"),
+                            ),
+                            enums = mapOf(
+                                Pair("enum_a",
+                                    KTEnum(
+                                        mapOf(
+                                            Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("subsub_a"))),
+                                            Pair(4, KTEnumValue(id= StringOrBoolean.StringValue("subsub_a_from_root")))
+                                        )
+                                    )
+                                )
+                            )
+                        )),
+                    ),
+                    enums = mapOf(
+                        Pair("enum_a",
+                            KTEnum(
+                                mapOf(
+                                    Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("sub_a")))
+                                )
+                            )
+                        ),
+                        Pair("enum_b",
+                            KTEnum(
+                                mapOf(
+                                    Pair(2, KTEnumValue(id= StringOrBoolean.StringValue("sub_b")))
+                                )
+                            )
+                        )
+                    )
+                )),
+            ),
+            enums = mapOf(
+                Pair("enum_a",
+                    KTEnum(
+                        mapOf(
+                            Pair(1, KTEnumValue(id= StringOrBoolean.StringValue("root_a")))
+                        )
+                    )
+                ),
+                Pair("enum_b",
+                    KTEnum(
+                        mapOf(
+                            Pair(2, KTEnumValue(id= StringOrBoolean.StringValue("root_b")))
+                        )
+                    )
+                ),
+                Pair("enum_c",
+                    KTEnum(
+                        mapOf(
+                            Pair(3, KTEnumValue(id= StringOrBoolean.StringValue("root_c")))
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x01, // for enum sub::subsub::enum_a from sub::subsub
+            0x02, // for enum sub::enum_b from sub::subsub
+            0x03, // for enum enum_c from sub::subsub
+            0x04, // for enum sub::subsub::enum_a from root
+        )
+
+        val decoder = Kaitai("type_references_2", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_a", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x01))
+        var enum: Pair<KTEnum?, String> = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_b", elementClass=KaitaiEnum::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x02))
+        enum = Pair(struct.types["sub"]!!.enums["enum_b"], "sub_b")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="element_c", elementClass=KaitaiEnum::class, sourceByteRange=Pair(2, 3), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x03))
+        enum = Pair(struct.enums["enum_c"], "root_c")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+
+        element = result.bytesListTree["enumWithPath"]
+        check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
+        checkElement(element, id="enumWithPath", elementClass=KaitaiEnum::class, sourceByteRange=Pair(3, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x04))
+        enum = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a_from_root")
+        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
+        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+    }
+
+
+    @Test
+    fun testEnumTypes() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "protocol", type = KTType.Primitive("u4"), enum = "ip_protocols"),
+                KTSeq(id = "protocol_huge", type = KTType.Primitive("u4"), enum = "ip_protocols"),
+                KTSeq(id = "verbose_negative", type = KTType.Primitive("s4"), enum = "verbose_levels"),
+                KTSeq(id = "verbose_positive", type = KTType.Primitive("s4"), enum = "verbose_levels"),
+                KTSeq(id = "flags", type = KTType.Primitive("b1"), enum = "bit_flags"),
+                KTSeq(id = "buffer", type = KTType.Primitive("b7")),
+                KTSeq(id = "padding", type = KTType.Primitive("u1"), enum = "has_padding"),
+            ),
+            enums = mapOf(
+                Pair(
+                    "ip_protocols",
+                    KTEnum(
+                        mapOf(
+                            Pair(1, KTEnumValue(id = StringOrBoolean.StringValue("icmp"))),
+                            Pair(6, KTEnumValue(id = StringOrBoolean.StringValue("tcp"))),
+                            Pair(17, KTEnumValue(id = StringOrBoolean.StringValue("udp"))),
+                            Pair(3000000000, KTEnumValue(id = StringOrBoolean.StringValue("some_protocol"))),
+                        )
+                    )
+                ),
+                Pair(
+                    "verbose_levels",
+                    KTEnum(
+                        mapOf(
+                            Pair(-1, KTEnumValue(id = StringOrBoolean.StringValue("negative"), doc = "No verbosity")),
+                            Pair(0, KTEnumValue(id = StringOrBoolean.StringValue("none"), doc = "No verbosity")),
+                            Pair(1, KTEnumValue(id = StringOrBoolean.StringValue("low"), doc = "Low verbosity", docRef = listOf("https://example.com/low"))),
+                            Pair(2, KTEnumValue(id = StringOrBoolean.StringValue("medium"), docRef = listOf("https://example.com/medium"))),
+                        )
+                    )
+                ),
+                Pair(
+                    "bit_flags",
+                    KTEnum(
+                        mapOf(
+                            Pair(0, KTEnumValue(id = StringOrBoolean.StringValue("flag1"))),
+                            Pair(1, KTEnumValue(id = StringOrBoolean.StringValue("flag2"))),
+                        )
+                    )
+                ),
+                Pair(
+                    "has_padding",
+                    KTEnum(
+                        mapOf(
+                            Pair(0x01, KTEnumValue(id = StringOrBoolean.BooleanValue(false))),
+                            Pair(0x10, KTEnumValue(id = StringOrBoolean.BooleanValue(true))),
+                        )
+                    )
+                ),
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x00, 0x00, 0x00, 0x06,  // ip_protocols: (6: tcp)
+            0xB2, 0xD0, 0x5E, 0x00, // ip_protocols: (3000000000: some_protocol)
+            0xff, 0xff, 0xff, 0xff, // verbose_levels: (-1: negative)
+            0x00, 0x00, 0x00, 0x02, // verbose_levels: (2: medium)
+            0x80, // bit_flags: (1: flag2) + bx000_0000
+            0x10, // has_padding: (0x10: true)
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        // Validate field protocol
+        var protocol = result.bytesListTree["protocol"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="protocol", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x06))
+        var enum: Pair<KTEnum?, String> = Pair(struct.enums["ip_protocols"], "tcp")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+
+        // Validate field protocol_huge
+        protocol = result.bytesListTree["protocol_huge"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xB2, 0xD0, 0x5E, 0x00,))
+        enum = Pair(struct.enums["ip_protocols"], "some_protocol")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+
+        // Validate field verbose negative
+        protocol = result.bytesListTree["verbose_negative"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="verbose_negative", elementClass=KaitaiEnum::class, sourceByteRange=Pair(8, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff, 0xff, 0xff, 0xff))
+        enum = Pair(struct.enums["verbose_levels"], "negative")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+
+        // Validate field verbose positive
+        protocol = result.bytesListTree["verbose_positive"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="verbose_positive", elementClass=KaitaiEnum::class, sourceByteRange=Pair(12, 16), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x02,))
+        enum = Pair(struct.enums["verbose_levels"], "medium")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+
+        // Validate field flags
+        protocol = result.bytesListTree["flags"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="flags", elementClass=KaitaiEnum::class, sourceByteRange=Pair(16, 16), sourceRangeBitOffset=Pair(0, 1), value=booleanArrayOf(true,))
+        enum = Pair(struct.enums["bit_flags"], "flag2")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+
+        // Validate field padding
+        protocol = result.bytesListTree["padding"]
+        check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
+        checkElement(protocol, id="padding", elementClass=KaitaiEnum::class, sourceByteRange=Pair(17, 18), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x10,))
+        enum = Pair(struct.enums["has_padding"], "true")
+        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
+        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
     }
 }
