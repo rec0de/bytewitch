@@ -43,12 +43,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 1rem;
-    /* OURS
-    */
-    /* THEIRS
-    box-sizing: border-box;
-    padding: 5px;
-     */
+    padding: 1rem;
 }
 
 h1, h2, h3 {
@@ -90,7 +85,6 @@ button:hover {
     flex-shrink: 0;
     width: 50rem;
     gap: 1rem;
-    margin-top: 1rem;
 }
 
 #settings-btn,
@@ -105,17 +99,12 @@ button:hover {
 .legend {
     display: flex;
     flex-direction: row;
-    /* OURS
     align-items: center;
-    justify-content: center;
-     */
+    justify-content: start;
+    flex-wrap: wrap;
     gap: 0.5rem;
     color: #fff;
     font-size: 0.75rem;
-    /* THEIRS
-    justify-content: center;
-    flex-wrap: wrap;
-     */
 }
 
 .parsebuttons, .kaitaibuttons {
@@ -150,16 +139,6 @@ button:hover {
     pointer-events: none;
     display: none;
 }
-
-/*
-OURS
-.card > textarea {
-    font-family: monospace;
-    width: 100%;
-    height: 250px;
-    resize: vertical;
-}
- */
 
 .textareaContainer {
     position: relative;
@@ -446,13 +425,11 @@ OURS
 
 #output {
     gap: 1rem;
-    /* THEIRS
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
     align-items: flex-start;
-    */
 }
 
 #bytefinder {
@@ -703,7 +680,6 @@ OURS
     margin-left: 1rem;
     margin-right: 1rem;
     gap: 1rem;
-    padding: 0rem 1rem;
 }
 
 #editor {

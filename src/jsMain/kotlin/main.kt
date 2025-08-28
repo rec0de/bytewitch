@@ -32,6 +32,7 @@ fun main() {
         }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
+        // Initialize the layout manager
         LayoutManager
 
         val dataContainer = document.getElementById("data_container")!!
