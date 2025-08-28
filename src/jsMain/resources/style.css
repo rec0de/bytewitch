@@ -675,10 +675,10 @@ button:hover {
 .container {
     display: grid;
     grid-template-columns: 0fr;
+    align-items: start;
+    justify-content: center;
     width: 100%;
     max-width: 1920px;
-    margin-left: 1rem;
-    margin-right: 1rem;
     gap: 1rem;
 }
 
@@ -727,7 +727,7 @@ button:hover {
 /* All visible: Editor spans 2 rows, Settings and Kaitai stack in column 2 */
 .container.all-visible {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto 1fr;
 }
 
 .container.all-visible #editor {
