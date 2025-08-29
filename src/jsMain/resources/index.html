@@ -68,27 +68,23 @@
         </div>
     </div>
 
+    <template id="decoder-chip-template">
+        <div class="chip">
+            <span class="chip-name"></span>
+            <div class="chip-separator"></div>
+            <div class="chip-buttons">
+                <div class="chip-btn chip-enable-btn icon"></div>
+                <div class="chip-btn chip-delete-btn icon icon-delete-black"></div>
+            </div>
+        </div>
+    </template>
+
     <div id="settings" class="card card-hidden">
         <h2>
             <img src="icons/settings_black.png"/>
             Settings
         </h2>
-        <p>Configuration options and preferences.</p>
-        <div class="setting-item">
-            <label>Theme:</label>
-            <select>
-                <option>Light</option>
-                <option>Dark</option>
-            </select>
-        </div>
-        <div class="setting-item">
-            <label>Font Size:</label>
-            <input type="range" min="12" max="24" value="16">
-        </div>
-        <div class="setting-item">
-            <label>Auto-save:</label>
-            <input type="checkbox" checked>
-        </div>
+        <div class="chip-list" id="default-decoder-list"></div>
     </div>
 
     <div id="kaitai" class="card card-hidden">

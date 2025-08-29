@@ -35,6 +35,9 @@ fun main() {
         // Initialize the layout manager
         LayoutManager
 
+        // Initialize the tag manager
+        TagManager
+
         val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
         val tryhardBtn = document.getElementById("tryhard") as HTMLButtonElement
@@ -225,7 +228,7 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 }
 
 // decode all text areas
-fun decode(isLiveDecoding: Boolean) {
+fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -241,7 +244,7 @@ fun decode(isLiveDecoding: Boolean) {
 
         // only decode text area if input changed or the Kaitai struct changed
         val oldBytes = parsedMessages[i]?.bytes
-        if (KaitaiUI.hasChangedSinceLastDecode() || oldBytes == null || !oldBytes.contentEquals(bytes)) {
+        if (force || KaitaiUI.hasChangedSinceLastDecode() || oldBytes == null || !oldBytes.contentEquals(bytes)) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
             decodeBytes(bytes, i)
         }

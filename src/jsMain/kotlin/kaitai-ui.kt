@@ -34,7 +34,7 @@ object KaitaiUI {
             }
         }
 
-        if (getInputValue().isNotEmpty()) {
+        if (includeLiveStruct.checked && getInputValue().isNotEmpty()) {
             updateLiveDecoder(getInputValue())
         }
 

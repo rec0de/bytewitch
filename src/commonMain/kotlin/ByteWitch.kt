@@ -19,6 +19,37 @@ object ByteWitch {
     private var plainHex = false
     fun isPlainHex() = plainHex
 
+    object DecoderManager {
+        private var disabledDefaultDecoders = mutableSetOf<String>()
+        private var disabledBundledDecoders = mutableSetOf<String>()
+        fun getDisabledDefaultDecoders() = disabledDefaultDecoders
+        fun getDisabledBundledDecoders() = disabledBundledDecoders
+
+        fun setDefaultDecoderEnabled(name: String, enabled: Boolean) {
+            if (enabled) {
+                disabledDefaultDecoders.remove(name)
+            } else {
+                disabledDefaultDecoders.add(name)
+            }
+        }
+
+        fun getDefaultDecoderNames() : List<Pair<String, String>> {
+            return decoders.map { decoder ->
+                Pair(decoder.name, decoder.name)
+            }
+        }
+
+        fun getActiveDefaultDecoders(): List<ByteWitchDecoder> {
+            return decoders.filter { !disabledDefaultDecoders.contains(it.name) }
+        }
+
+        fun getBundledDecoderNames() : List<Pair<String, String>> {
+            return bundledKaitaiDecoders.map { decoder ->
+                Pair(decoder.key, decoder.key)
+            }
+        }
+    }
+
     fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         val struct = KaitaiParser.parseYaml(kaitaiStruct)
         if (struct == null) {
@@ -81,7 +112,9 @@ object ByteWitch {
     }
 
     fun getAllDecoders(): List<ByteWitchDecoder> {
-        val allDecoders = kaitaiDecoders.values + bundledKaitaiDecoders.values + decoders
+        val allDecoders = kaitaiDecoders.values +
+                bundledKaitaiDecoders.values +
+                DecoderManager.getActiveDefaultDecoders()
         return listOfNotNull(kaitaiLiveDecoder) + allDecoders
     }
 

@@ -550,12 +550,36 @@ button:hover {
     background-image: url("icons/switch_left_white_filled.png");
 }
 
+.icon-toggle-left-black {
+    background-image: url("icons/switch_left_black.png");
+}
+
+.icon-toggle-left-black:hover {
+    background-image: url("icons/switch_left_black_filled.png");
+}
+
 .icon-toggle-right {
     background-image: url("icons/switch_right_white.png");
 }
 
 .icon-toggle-right:hover {
     background-image: url("icons/switch_right_white_filled.png");
+}
+
+.icon-toggle-right-black {
+    background-image: url("icons/switch_right_black.png");
+}
+
+.icon-toggle-right-black:hover {
+    background-image: url("icons/switch_right_black_filled.png");
+}
+
+.icon-delete-black {
+    background-image: url("icons/delete_black.png");
+}
+
+.icon-delete-black:hover {
+    background-image: url("icons/delete_black_filled.png");
 }
 
 .message-output {
@@ -743,4 +767,124 @@ button:hover {
 .container.all-visible #kaitai {
     grid-row: 2;
     grid-column: 2;
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    min-height: 40px;
+}
+
+.chip-list.sortable {
+    user-select: none;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    background-color: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 0.3rem;
+    padding: 0 0.4rem;
+    transition: all 0.2s ease;
+}
+
+.chip.chip-enabled {
+    background-color: #e3f2fd;
+    border-color: #90caf9;
+    color: #1976d2;
+}
+
+.chip.chip-disabled {
+    background-color: #f5f5f5;
+    border-color: #bdbdbd;
+    color: #757575;
+    opacity: 0.7;
+}
+
+.chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chip[draggable="true"] {
+    cursor: move;
+}
+
+.chip-name {
+    white-space: nowrap;
+}
+
+.chip-separator {
+    width: 1px;
+    height: 16px;
+    background-color: #90caf9;
+    margin: 0 4px;
+}
+
+.chip-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.chip-btn {
+    /*background: none;*/
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 12px;
+    transition: background-color 0.2s ease;
+}
+
+.chip-btn.delete-btn {
+    color: #d32f2f;
+    font-weight: bold;
+}
+
+.chip-btn.delete-btn:hover {
+    background-color: #ffebee;
+}
+
+.chip-btn.disable-btn {
+    color: #f57c00;
+}
+
+.chip-btn.disable-btn:hover {
+    background-color: #fff3e0;
+}
+
+.chip-btn.enable-btn {
+    color: #388e3c;
+}
+
+.chip-btn.enable-btn:hover {
+    background-color: #e8f5e8;
+}
+
+.chip:hover:not(.dragging) {
+    background-color: #bbdefb;
+    transform: translateY(-1px);
+}
+
+.chip-list.drag-active {
+    background-color: #f0f8ff;
+}
+
+.drop-indicator {
+    width: 2px;
+    height: 32px;
+    background-color: #2196f3;
+    border-radius: 1px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    margin: 0 4px;
+}
+
+.drop-indicator.active {
+    opacity: 1;
 }
