@@ -501,7 +501,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                 var sqString: Boolean = false
                 var dqString: Boolean = false
-
+                // add logic here to support more complex arrays: nested arrays, entries with complex expression containing more commas
                 for ((index, char) in array.withIndex()) {
                     if (char == ',' && !sqString && !dqString) {
                         slice = index
@@ -528,9 +528,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
 
         fun parseArray(token: Pair<TokenType, String>): Pair<TokenType, List<Pair<TokenType, dynamic>>> {
+
             var expressions: List<String> = tokenizeArray(token.second)
             var array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
-
             for (expression: String in expressions) {
                 array.add(
                     parseExpressionInner(
@@ -646,12 +646,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     return expressionReverse(op1)
                 } else if (op2.second == "to_i") {
                     return expressionToInt(op1)
-                } else if (op2.second.first.second == "to_i") {
+                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).first.second == "to_i") {
                     return expressionToInt(op1, op2.second.second.second)
-                } else if (op2.second.first.second == "substring") {
+                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).first.second == "substring") {
                     val range =
-                        parseArray( // the params from and to for substring can also be any expression. since at this point the content of the parenthesis is just a string and the two params are seperated via a comma
-                            op2.second.second.second // I just use the parseArray function to give me an integer array of length 2 which I later index accordingly.
+                        parseArray( // the params from and to for substring can also be any expression. since at this point the content of the parentheses is just a string and the two params are seperated via a comma
+                            Pair(TokenType.ARRAY, (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).second.second) // I just use the parseArray function to give me an integer array of length 2 which I later index accordingly.
                         )
                     return expressionSubstring(op1, range.second[0].second, range.second[1].second)
                 } else if (op2.first == TokenType.CAST) {
@@ -721,7 +721,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         op2
                     ) // the source type KAITAIELEMENT is not supported in expressionCast. The function just returns the token op1
                 } else {
-                    val targetElement: KaitaiElement = op1.second.bytesListTree[op2.second]
+                    val targetElement: KaitaiElement = (op1.second as KaitaiResult).bytesListTree[op2.second as String]
                     parseReferenceHelper(targetElement)
                 }
             }
@@ -1121,6 +1121,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         }
 
+    val validTokensForBinaryPlusAndMinus: List<TokenType> = listOf(TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING, TokenType.IDENTIFIER, TokenType.BOOLEAN, TokenType.PARENTHESES, TokenType.ARRAY, TokenType.INDEX, TokenType.FUNCTION, TokenType.CAST, TokenType.ENUMCALL)
+        // TokenType.BYTEARRAY, TokenType.ENUM, TokenType.STREAM, TokenType.KAITAITREE, TokenType.KAITAIELEMENT
+        // These tokens are not in the list as they are only returned by parse functions and never created while tokenizing an expression. If they are for some reason added to expressions naturally later on, they also have to be added to the list for parseTokens to work properly.
 
         fun parseTokens(tokens: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, dynamic> {
             if (tokens.size == 1 && tokens[0].first in operandTokens) { // while they have the highest precedence of any token they are the only option in case there is only one token left and can therefore be the first check
@@ -1151,7 +1154,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
             for (operatorMap in binaryPrecedence.reversed()) { // the lower precedence operators are checked first
                 for ((index, token) in tokens.reversed().withIndex()) {
-                    if (index != tokens.size - 1 && tokens.reversed()[index + 1].first in operandTokens && token.first in operatorMap) {
+                    if (index != tokens.size - 1 && tokens.reversed()[index + 1].first in validTokensForBinaryPlusAndMinus && token.first in operatorMap) {
                         val op1: MutableList<Pair<TokenType, dynamic>> = tokens.subList(0, tokens.size - index - 1)
                         val op2: MutableList<Pair<TokenType, dynamic>> = tokens.subList(tokens.size - index, tokens.size)
                         val function = operatorMap.getValue(token.first)
@@ -1171,7 +1174,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Array indexing and dot basically have the same precedence or more specifically are mutually exclusive anyway.
             // The token before an index token cannot be a dot token. In Kaitai dot can be used for references, functions and casts,
             // but this is handled by parseDot.
-            println(tokens)
             if (tokens.last().first == TokenType.INDEX) {
                 return parseIndex(
                     tokens.subList(0, tokens.size - 2),
@@ -1179,11 +1181,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 )
             } else if (tokens[tokens.size - 2].first == TokenType.DOT) {
                 return parseDot(
-                    tokens.subList(0, tokens.size - 3),
+                    tokens.subList(0, tokens.size - 2),
                     tokens.last()
                 )
             }
-
             return Pair(TokenType.EMPTY, null)
         }
 
