@@ -10,6 +10,8 @@ import bitmage.toInt
 import bitmage.toMinimalAmountOfBytes
 import bitmage.toUInt
 import bitmage.toUTF8String
+import kaitai.KTEndian
+import kaitai.KTEnum
 import kaitai.KTRepeat
 import kaitai.KTSeq
 import kaitai.KTStruct
@@ -17,7 +19,6 @@ import kaitai.KTType
 import kaitai.KTValid
 import kaitai.StringOrInt
 import kaitai.toByteOrder
-import kaitai.KTEnum
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
@@ -76,8 +77,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val id = kaitaiStruct.meta?.id ?: name
             processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
-            console.error(e)
-            throw Exception("Unexpected Exception has been thrown:\n$e")
+            console.error("[$name] $e")
+            throw Exception("[$name] Unexpected Exception has been thrown:\n$e")
         }
         return result
     }
@@ -678,6 +679,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return fullyFlatArray
     }
 
+    fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, bytesListTree: MutableKaitaiTree): V? {
+        val value = parseValue(switchOn, bytesListTree)
+        val transformedMap = cases.mapKeys { case -> parseValue(case.key, bytesListTree) }
+        val matchingKey = transformedMap.keys.find {
+            if (it.size < value.size) {
+                it.padLeft(value.size - it.size).contentEquals(value)
+            } else {
+                value.padLeft(it.size - value.size).contentEquals(it)
+            }
+        }
+        return matchingKey?.let { transformedMap[matchingKey] } ?: cases["_"]
+    }
+
     fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
         return parseValue(contents, bytesListTree).contentEquals(dataBytes)
     }
@@ -781,10 +795,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     }
 
     fun parseType(parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree) : Type {
-        if (seqElement.type is KTType.Switch) {
-            throw RuntimeException("Switches are not supported yet")
+        var type = when (seqElement.type) {
+            is KTType.Primitive -> {
+                Type(seqElement.type.type)
+            }
+            is KTType.Switch -> {
+                val entry = processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, bytesListTree)
+                checkNotNull(entry) { "No matching case found" }
+                Type(entry)
+            }
+            null -> { Type(null) }
         }
-        var type = Type((seqElement.type as KTType.Primitive?)?.type)
 
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
@@ -1176,7 +1197,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             bytesListTree.byteOrder = ByteOrder.BIG
         }
         currentScopeStruct.meta?.endian?.let { endian ->
-            bytesListTree.byteOrder = endian.toByteOrder()
+            bytesListTree.byteOrder = when (endian) {
+                is KTEndian.Primitive -> {
+                    endian.value.toByteOrder()
+                }
+                is KTEndian.Switch -> {
+                    val entry = processSwitchOn(endian.switchOn, endian.cases, bytesListTree)
+                    checkNotNull(entry) { "No matching case found" }
+                    entry.toByteOrder()
+                }
+            }
         }
 
         var dataSizeOfSequenceInBits = 0
