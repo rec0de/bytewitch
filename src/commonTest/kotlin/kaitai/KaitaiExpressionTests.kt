@@ -9,7 +9,7 @@ class KaitaiExpressionTests {
     @Test
     fun tokenizerTest() {
         val kaitai = Kaitai("tokenizer", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
 
         var expression: String = "13_37  "
         var result:  MutableList<Pair<Kaitai.TokenType, dynamic>> = expressionParser.tokenizeExpression(expression)
@@ -187,7 +187,7 @@ class KaitaiExpressionTests {
     @Test
     fun operationsTest() {
         val kaitai = Kaitai("operations", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
 
         var expression: String = "-5 + 6 + 3.3 + -2.0"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -311,7 +311,7 @@ class KaitaiExpressionTests {
     @Test
     fun arrayTest() {
         val kaitai = Kaitai("array", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
 
         var expression: String = "[3, 3+1, 3 << 2, 7 / 2, ]"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -329,5 +329,10 @@ class KaitaiExpressionTests {
             check(result[i] == expected[i]) { "The expected result is ${expected[i]}, actual result is ${result[i]}" }
         }
     }
+
+    /*@Test
+    fun identifierTest() {
+
+    }*/
 
 }
