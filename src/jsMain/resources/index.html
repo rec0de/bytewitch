@@ -85,15 +85,15 @@
             <img src="icons/settings_black.png"/>
             Settings
         </h2>
-        <div style="display: flex; flex-direction: column; gap: 0.3rem">
-            <div style="display: flex; align-items: center; gap: 0.5rem">
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
                 <p>builtin decoders</p>
                 <div style="flex-grow: 1"></div>
                 <button id="builtin-decoders-disable-all">disable all</button>
                 <button id="builtin-decoders-enable-all">enable all</button>
                 <button id="builtin-decoders-reset-order" style="display: none">reset order</button>
             </div>
-            <div class="chip-list" id="default-decoder-list"></div>
+            <div class="decoder-list" id="builtin-decoder-list"></div>
         </div>
     </div>
 
@@ -105,6 +105,16 @@
             </h2>
             <div style="flex-grow: 1"></div>
             <a href="https://kaitai.io/" target="_blank" rel="noopener noreferrer">Kaitai Struct</a>
+        </div>
+
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
+                <p>builtin Kaitai decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="builtin-kaitai-decoders-disable-all">disable all</button>
+                <button id="builtin-kaitai-decoders-enable-all">enable all</button>
+            </div>
+            <div class="decoder-list" id="builtin-kaitai-decoder-list"></div>
         </div>
         <div id="kaitai-bundled-legend" class="legend" style="color: black">
             <div>Bundled Kaitai parsers:</div>

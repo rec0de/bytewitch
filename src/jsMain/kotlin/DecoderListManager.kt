@@ -6,10 +6,11 @@ object DecoderListManager {
     init {
         // Default decoders
         setupBuiltinDecoder()
+        setupBuiltinKaitaiDecoder()
     }
 
     fun setupBuiltinDecoder() {
-        val listElement = document.getElementById("default-decoder-list") as HTMLDivElement
+        val listElement = document.getElementById("builtin-decoder-list") as HTMLDivElement
         val chipList = ChipList(listElement, canEdit = false, canDelete = false)
 
         chipList.setItemToggleCallback { item, enabled ->
@@ -46,4 +47,11 @@ object DecoderListManager {
             }
         }
     }
+
+    fun setupBuiltinKaitaiDecoder() {
+        val listElement = document.getElementById("builtin-kaitai-decoder-list") as HTMLDivElement
+        val chipList = ChipList(listElement, canEdit = false, canDelete = false)
+    }
+
+
 }

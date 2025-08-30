@@ -152,6 +152,7 @@ class ChipList(
     private val itemStore = mutableMapOf<String, ChipListItem>()
     private var itemToggleCallback: ((String, Boolean) -> Unit)? = null
     private val dragAndDropHandler = DragAndDropHandler()
+    private var noDecodersMessage: HTMLDivElement? = null
 
 
     companion object {
@@ -163,6 +164,14 @@ class ChipList(
 
     init {
         node.classList.toggle("sortable", canSort)
+
+        val d = document.createElement("div") as HTMLDivElement
+        d.innerHTML = "no decoders available"
+        d.style.fontStyle = "italic"
+        d.style.color = "gray"
+        d.style.padding = "8px"
+        noDecodersMessage = d;
+        node.appendChild(noDecodersMessage!!)
 
         node.ondragstart = { event ->
             dragAndDropHandler.handleDragStart(event)
@@ -238,6 +247,12 @@ class ChipList(
 
         itemStore[item.id] = item
         node.appendChild(item.node)
+
+        noDecodersMessage?.let {
+            if (node.contains(it)) {
+                node.removeChild(it)
+            }
+        }
     }
 
     /**
@@ -264,6 +279,9 @@ class ChipList(
     fun deleteItem(id: String): Boolean {
         return itemStore.remove(id)?.let {
             node.removeChild(it.node)
+            if (itemStore.isEmpty()) {
+                node.appendChild(noDecodersMessage!!)
+            }
             true
         } ?: false
     }
@@ -304,6 +322,7 @@ class ChipList(
             node.removeChild(item.node)
         }
         itemStore.clear()
+        node.appendChild(noDecodersMessage!!)
     }
 
     /**

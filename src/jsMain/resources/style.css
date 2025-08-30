@@ -777,6 +777,20 @@ button:hover {
     grid-column: 2;
 }
 
+.decoder-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.decoder-list-header {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.decoder-list,
 .chip-list {
     display: flex;
     flex-wrap: wrap;
@@ -784,6 +798,7 @@ button:hover {
     background-color: white;
     border-radius: 4px;
     align-items: center;
+    min-height: 48px;
 }
 
 .chip-list.sortable {
@@ -913,8 +928,8 @@ button:hover {
 .debug-dot {
     display: block;
     position: absolute;
-    width: 2px;
-    height: 32px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
     z-index: 100;
-    translate: -50% -50%;
 }
