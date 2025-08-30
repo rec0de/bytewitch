@@ -36,7 +36,7 @@ fun main() {
         LayoutManager
 
         // Initialize the tag manager
-        TagManager
+        DecoderListManager
 
         val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement

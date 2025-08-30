@@ -84,7 +84,16 @@
             <img src="icons/settings_black.png"/>
             Settings
         </h2>
-        <div class="chip-list" id="default-decoder-list"></div>
+        <div style="display: flex; flex-direction: column; gap: 0.3rem">
+            <div style="display: flex; align-items: center; gap: 0.5rem">
+                <p>builtin decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="builtin-decoders-enable-all">enable all</button>
+                <button id="builtin-decoders-disable-all">disable all</button>
+                <button id="builtin-decoders-reset-order">reset order</button>
+            </div>
+            <div class="chip-list" id="default-decoder-list"></div>
+        </div>
     </div>
 
     <div id="kaitai" class="card card-hidden">
