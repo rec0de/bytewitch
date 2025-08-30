@@ -8,6 +8,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLSpanElement
 import org.w3c.dom.HTMLTemplateElement
 import org.w3c.dom.asList
+import org.w3c.dom.events.Event
 import kotlin.math.abs
 
 data class ChipListItem(
@@ -138,7 +139,7 @@ class ChipList(
     private val canDelete: Boolean = true,
     private val canToggleEnabled: Boolean = true
 ) {
-    private val _items = mutableListOf<ChipListItem>()
+    private val itemStore = mutableMapOf<String, ChipListItem>()
 
     private var itemToggleCallback: ((String, Boolean) -> Unit)? = null
 
@@ -236,12 +237,10 @@ class ChipList(
 
         event.preventDefault()
 
-        // Replace placeholder with the dragged element
         placeholder?.parentNode?.insertBefore(draggedElement!!, placeholder)
         removePlaceholder()
         removeLinebreaker()
 
-        // Trigger custom event for order change
         onOrderChange()
     }
 
@@ -385,42 +384,38 @@ class ChipList(
 
     fun onOrderChange() {
         // Get the current order of chip IDs
-        val chips = container.querySelectorAll(".chip")
-        /*
-        val order = chips.map(chip => chip.getAttribute("data-chip-id"))
-
-        // You can dispatch a custom event or call a callback here
-        console.log("New order:", order)
-
-        // Dispatch custom event
-        val event = CustomEvent("chipOrderChanged", {
-            detail: { order: order }
-        })
-        container.dispatchEvent(event)
-        */
+        container.dispatchEvent(
+            Event("orderChanged")
+        )
     }
 
     fun setItemToggleCallback(callback: (String, Boolean) -> Unit) {
         itemToggleCallback = callback
     }
 
+    private fun getItemKeysOrdered(): List<String> {
+        //return container.querySelectorAll(".chip").asList().mapNotNull { it.getAttribute("data-chip-id") }
+        return container.querySelectorAll(".chip").asList().mapNotNull { node -> (node as HTMLElement).getAttribute("data-chip-id") }
+    }
+
     /**
      * Gets all items in the list regardless of their enabled state
      */
     val allItems: List<ChipListItem>
-        get() = _items.toList()
+        get() = getItemKeysOrdered().mapNotNull { key -> itemStore[key] }
+
 
     /**
      * Gets only enabled items
      */
     val enabledItems: List<ChipListItem>
-        get() = _items.filter { it.isEnabled }
+        get() = allItems.filter { item -> item.isEnabled }
 
     /**
      * Gets only disabled items
      */
     val disabledItems: List<ChipListItem>
-        get() = _items.filter { !it.isEnabled }
+        get() = allItems.filter { item -> !item.isEnabled }
 
     /**
      * Adds an item to the list
@@ -440,7 +435,7 @@ class ChipList(
             }
         }
 
-        _items.add(item)
+        itemStore[item.id] = item
         node.appendChild(item.node)
     }
 
@@ -462,95 +457,60 @@ class ChipList(
      * Removes an item from the list by ID
      */
     fun deleteItem(id: String): Boolean {
-        console.log("ChipList.deleteItem")
-        val itemIndex = _items.indexOfFirst { it.id == id }
-        return if (itemIndex != -1) {
-            val item = _items.removeAt(itemIndex)
-            console.log(node.children, node.childNodes, item.node)
-            node.removeChild(item.node)
+        return itemStore.remove(id)?.let {
+            node.removeChild(it.node)
             true
-        } else {
-            false
-        }
+        } ?: false
     }
 
     /**
      * Toggles the enabled state of an item
      */
     fun toggleItem(id: String): Boolean {
-        val item = _items.find { it.id == id }
-        console.log(id, item)
-        return if (item != null) {
-            item.statusToggle()
-            itemToggleCallback?.invoke(id, item.isEnabled)
+        return itemStore[id]?.let {
+            it.statusToggle()
+            itemToggleCallback?.invoke(id, it.isEnabled)
             true
-        } else {
-            false
-        }
+        } ?: false
     }
 
     /**
      * Sets the enabled state of an item
      */
     fun setItemEnabled(id: String, enabled: Boolean): Boolean {
-        val item = _items.find { it.id == id }
-        return if (item != null) {
-            item.setStatus(enabled)
+        return itemStore[id]?.let {
+            it.setStatus(enabled)
             true
-        } else {
-            false
-        }
+        } ?: false
     }
 
     /**
      * Finds an item by ID
      */
-    fun findItem(id: String): ChipListItem? {
-        return _items.find { it.id == id }
-    }
-
-    /**
-     * Moves an item from one position to another (for drag and drop sorting)
-     */
-    fun moveItem(fromIndex: Int, toIndex: Int): Boolean {
-        if (fromIndex < 0 || fromIndex >= _items.size || toIndex < 0 || toIndex >= _items.size) {
-            return false
-        }
-
-        val item = _items.removeAt(fromIndex)
-        _items.add(toIndex, item)
-        return true
-    }
-
-    /**
-     * Moves an item by ID to a new position
-     */
-    fun moveItemById(itemId: String, toIndex: Int): Boolean {
-        val fromIndex = _items.indexOfFirst { it.id == itemId }
-        return if (fromIndex != -1) {
-            moveItem(fromIndex, toIndex)
-        } else {
-            false
-        }
+    fun getItem(id: String): ChipListItem? {
+        return itemStore[id]
     }
 
     /**
      * Clears all items from the list
      */
     fun clear() {
-        _items.clear()
+        allItems.forEach { item ->
+            node.removeChild(item.node)
+        }
+        itemStore.clear()
     }
 
     /**
      * Gets the current size of the list
      */
     val size: Int
-        get() = _items.size
+        get() = itemStore.size
 
     /**
      * Checks if the list is empty
      */
     val isEmpty: Boolean
-        get() = _items.isEmpty()
+        get() = itemStore.isEmpty()
 
 }
