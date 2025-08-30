@@ -25,6 +25,16 @@ object ByteWitch {
         fun getDisabledDefaultDecoders() = disabledDefaultDecoders
         fun getDisabledBundledDecoders() = disabledBundledDecoders
 
+        fun setAllDefaultDecoderEnabled(enabled: Boolean) {
+            if (enabled) {
+                disabledDefaultDecoders.clear()
+            } else {
+                disabledDefaultDecoders.addAll(
+                    decoders.map { it.name }
+                )
+            }
+        }
+
         fun setDefaultDecoderEnabled(name: String, enabled: Boolean) {
             if (enabled) {
                 disabledDefaultDecoders.remove(name)

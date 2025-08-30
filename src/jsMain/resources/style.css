@@ -534,6 +534,14 @@ button:hover {
     background-image: url("icons/edit_white_filled.png");
 }
 
+.icon-edit-black {
+    background-image: url("icons/edit_black.png");
+}
+
+.icon-edit-black:hover {
+    background-image: url("icons/edit_black_filled.png");
+}
+
 .icon-finish {
     background-image: url("icons/finish_white.png");
 }

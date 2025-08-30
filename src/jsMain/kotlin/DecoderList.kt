@@ -17,6 +17,7 @@ data class ChipListItem(
     val displayName: String,
     val sortable: Boolean,
     val toggleable: Boolean,
+    val editable: Boolean,
     val deletable: Boolean,
     var isEnabled: Boolean = true
 ) {
@@ -26,9 +27,11 @@ data class ChipListItem(
     val separatorElement = node.querySelector(".chip-separator") as HTMLDivElement
     val buttonDivElement = node.querySelector(".chip-buttons") as HTMLDivElement
     val enableButton = node.querySelector(".chip-enable-btn") as HTMLDivElement
+    val editButton = node.querySelector(".chip-edit-btn") as HTMLDivElement
     val deleteButton = node.querySelector(".chip-delete-btn") as HTMLDivElement
 
 
+    var editCallback: ((String) -> Unit)? = null
     var deleteCallback: ((String) -> Unit)? = null
     var toggleCallback: ((String) -> Unit)? = null
 
@@ -41,7 +44,8 @@ data class ChipListItem(
     }
 
     init {
-        statusEnable()
+        setStatus(isEnabled)
+
         divElement.setAttribute("data-chip-id", id)
         divElement.setAttribute("draggable", sortable.toString())
 
@@ -55,6 +59,15 @@ data class ChipListItem(
             enableButton.style.display = "none"
         }
 
+        if (editable) {
+            editButton.onclick = { event ->
+                console.log("editButton.onclick")
+                onEditClick()
+            }
+        } else {
+            editButton.style.display = "none"
+        }
+
         if (deletable) {
             deleteButton.onclick = { event ->
                 onDeleteClick()
@@ -63,7 +76,7 @@ data class ChipListItem(
             deleteButton.style.display = "none"
         }
 
-        if (!toggleable && !deletable) {
+        if (!toggleable && !editable && !deletable) {
             separatorElement.style.display = "none"
             buttonDivElement.style.display = "none"
         }
@@ -81,6 +94,10 @@ data class ChipListItem(
      */
     fun setToggleCallback(callback: (String) -> Unit) {
         toggleCallback = callback
+    }
+
+    fun onEditClick() {
+        editCallback?.invoke(id)
     }
 
     /**
@@ -129,12 +146,12 @@ class ChipList(
     val node: HTMLDivElement,
     private val canSort: Boolean = true,
     private val canDelete: Boolean = true,
+    private val canEdit: Boolean = true,
     private val canToggleEnabled: Boolean = true
 ) {
     private val itemStore = mutableMapOf<String, ChipListItem>()
     private var itemToggleCallback: ((String, Boolean) -> Unit)? = null
     private val dragAndDropHandler = DragAndDropHandler()
-
 
 
     companion object {
@@ -165,7 +182,6 @@ class ChipList(
     }
 
 
-
     fun onOrderChange() {
         // Get the current order of chip IDs
         node.dispatchEvent(
@@ -179,7 +195,8 @@ class ChipList(
 
     private fun getItemKeysOrdered(): List<String> {
         //return container.querySelectorAll(".chip").asList().mapNotNull { it.getAttribute("data-chip-id") }
-        return node.querySelectorAll(".chip").asList().mapNotNull { node -> (node as HTMLElement).getAttribute("data-chip-id") }
+        return node.querySelectorAll(".chip").asList()
+            .mapNotNull { node -> (node as HTMLElement).getAttribute("data-chip-id") }
     }
 
     /**
@@ -227,15 +244,18 @@ class ChipList(
      * Adds an item to the list by creating a new ChipListItem
      */
     fun addItem(id: String, displayName: String, isEnabled: Boolean = true) {
-        addItem(ChipListItem(
-            node = ChipListItem.createFromTemplate(),
-            id = id,
-            displayName = displayName,
-            sortable = canSort,
-            toggleable = canToggleEnabled,
-            deletable = canDelete,
-            isEnabled = isEnabled
-        ))
+        addItem(
+            ChipListItem(
+                node = ChipListItem.createFromTemplate(),
+                id = id,
+                displayName = displayName,
+                sortable = canSort,
+                toggleable = canToggleEnabled,
+                editable = canEdit,
+                deletable = canDelete,
+                isEnabled = isEnabled
+            )
+        )
     }
 
     /**
@@ -478,15 +498,19 @@ class ChipList(
                     yOffset < accumulator.yOffset -> {
                         Closest(anchorPoint, xOffset, yOffset)
                     }
+
                     yOffset > accumulator.yOffset -> {
                         accumulator
                     }
+
                     xOffset < accumulator.xOffset -> {
                         Closest(anchorPoint, xOffset, yOffset)
                     }
+
                     xOffset > accumulator.xOffset -> {
                         accumulator
                     }
+
                     else -> accumulator
                 }
 
