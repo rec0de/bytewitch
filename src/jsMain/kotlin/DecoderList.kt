@@ -1,4 +1,6 @@
 import kotlinx.browser.document
+import kotlinx.dom.addClass
+import org.w3c.dom.DOMRect
 import org.w3c.dom.DocumentFragment
 import org.w3c.dom.DragEvent
 import org.w3c.dom.HTMLDivElement
@@ -30,7 +32,7 @@ data class ChipListItem(
     var toggleCallback: ((String) -> Unit)? = null
 
     companion object {
-        fun createFromTemplate() : HTMLDivElement {
+        fun createFromTemplate(): HTMLDivElement {
             val template = document.getElementById("decoder-chip-template") as HTMLTemplateElement
             val cloned = template.content.cloneNode(true) as DocumentFragment
             return cloned.querySelector(".chip") as HTMLDivElement
@@ -54,7 +56,6 @@ data class ChipListItem(
 
         if (toggleable) {
             enableButton.onclick = { event ->
-                console.log("enableButton.onclick")
                 onToggleClick()
             }
         } else {
@@ -63,7 +64,6 @@ data class ChipListItem(
 
         if (deletable) {
             deleteButton.onclick = { event ->
-                console.log("deleteButton.onclick")
                 onDeleteClick()
             }
         } else {
@@ -126,42 +126,6 @@ data class ChipListItem(
         setStatus(!isEnabled)
     }
 
-    /*
-    fun renderHTML(
-        canDelete: Boolean = false,
-        canToggleEnabled: Boolean = false,
-        canSort: Boolean = false
-    ): String {
-        val enabledClass = if (isEnabled) "chip-enabled" else "chip-disabled"
-        val sortableAttr = if (canSort) "draggable=\"true\"" else ""
-        val dataId = "data-chip-id=\"$id\""
-
-        val buttonsHtml = buildString {
-            if (canToggleEnabled || canDelete) {
-                append("<div class=\"chip-separator\"></div>")
-                append("<div class=\"chip-buttons\">")
-
-                if (canToggleEnabled) {
-                    val toggleText = if (isEnabled) "Disable" else "Enable"
-                    val toggleClass = if (isEnabled) "disable-btn" else "enable-btn"
-                    append("<button class=\"chip-btn $toggleClass\" onclick=\"chipList.toggleItem('$id')\">$toggleText</button>")
-                }
-
-                if (canDelete) {
-                    append("<button class=\"chip-btn delete-btn\" onclick=\"chipList.deleteItem('$id')\">×</button>")
-                }
-
-                append("</div>")
-            }
-        }
-
-        return """
-            <div class="chip $enabledClass" $dataId $sortableAttr>
-                <span class="chip-name" ${if (canSort) "style=\"cursor: move;\"" else ""}>$displayName</span>
-                $buttonsHtml
-            </div>
-        """.trimIndent()
-    }*/
 }
 
 
@@ -182,10 +146,11 @@ class ChipList(
     var container = node
     var draggedElement: HTMLElement? = null
     var placeholder: HTMLElement? = null
+    var linebreaker: HTMLElement? = null
     var isDragging = false
-    
+
     companion object {
-        fun createFromTemplate() : DocumentFragment {
+        fun createFromTemplate(): DocumentFragment {
             val template = document.getElementById("decoder-list-template") as HTMLTemplateElement
             return template.content.cloneNode(true) as DocumentFragment
         }
@@ -195,44 +160,34 @@ class ChipList(
         node.classList.toggle("sortable", canSort)
 
         node.ondragstart = { event ->
-            console.log("ChipList.ondragstart", event)
             handleDragStart(event)
         }
         node.ondragend = { event ->
-            console.log("ChipList.ondragend", event)
             handleDragEnd(event)
         }
         node.ondragover = { event ->
-            //console.log("ChipList.ondragover", event)
             handleDragOver(event)
         }
         node.ondragenter = { event ->
-            //console.log("ChipList.ondragenter", event)
             handleDragEnter(event)
         }
         node.ondrop = { event ->
-            console.log("ChipList.ondrop", event)
             handleDrop(event)
         }
     }
 
     fun handleDragStart(event: DragEvent) {
+        draggedElement = event.target as HTMLElement
+        if (draggedElement == null || !draggedElement!!.classList.contains("chip")) return
 
-        //if (!event.target?.classList.contains("chip")) return
+        isDragging = true
+        draggedElement!!.classList.add("dragging")
+        container.classList.add("drag-active")
 
-        this.draggedElement = event.target as HTMLElement
-        this.isDragging = true
+        createPlaceholder()
 
-        // Add visual feedback
-        this.draggedElement?.classList?.add("dragging")
-        this.container.classList.add("drag-active")
-
-        // Create placeholder
-        this.createPlaceholder()
-
-        // Set drag data
         event.dataTransfer?.effectAllowed = "move"
-        event.dataTransfer?.setData("text/html", this.draggedElement!!.outerHTML)
+        event.dataTransfer?.setData("text/html", draggedElement!!.outerHTML)
     }
 
     fun handleDragEnd(event: DragEvent) {
@@ -246,26 +201,29 @@ class ChipList(
 
         // Remove placeholder
         removePlaceholder()
+        removeLinebreaker()
 
         draggedElement = null
     }
 
     fun handleDragOver(event: DragEvent) {
-        if (!this.isDragging) return
+        if (!isDragging) return
 
         event.preventDefault()
         event.dataTransfer?.dropEffect = "move"
 
         // Find the closest chip element
-        val afterElement = getDragAfterElement(event.clientX, event.clientY)
-        val draggedElement = draggedElement
-
-        if (afterElement == null) {
-            // Append to the end
-            this.container.appendChild(placeholder!!)
+        val anchorPoint = getBestAnchorPoint(event.clientX, event.clientY)
+        // Insert placeholder
+        removeLinebreaker()
+        if (anchorPoint.rightElement == null) {
+            container.appendChild(placeholder!!)
         } else {
-            // Insert before the found element
-            this.container.insertBefore(placeholder!!, afterElement)
+            if (anchorPoint.isOnNewLine) {
+                createLinebreaker()
+                container.insertBefore(linebreaker!!, anchorPoint.rightElement)
+            }
+            container.insertBefore(placeholder!!, anchorPoint.rightElement)
         }
     }
 
@@ -281,6 +239,7 @@ class ChipList(
         // Replace placeholder with the dragged element
         placeholder?.parentNode?.insertBefore(draggedElement!!, placeholder)
         removePlaceholder()
+        removeLinebreaker()
 
         // Trigger custom event for order change
         onOrderChange()
@@ -297,55 +256,120 @@ class ChipList(
         placeholder = p
     }
 
+    fun createLinebreaker() {
+        val lb = document.createElement("div") as HTMLDivElement
+        lb.className = "linebreaker"
+        lb.style.width = "100%"
+        linebreaker = lb
+    }
+
     fun removePlaceholder() {
         placeholder?.parentNode?.removeChild(placeholder!!)
         placeholder = null
     }
 
-    fun getDragAfterElement(x: Int, y: Int): HTMLElement? {
-        val draggableElements = container.querySelectorAll(".chip").asList()
+    fun removeLinebreaker() {
+        linebreaker?.parentNode?.removeChild(linebreaker!!)
+        linebreaker = null
+    }
 
-        draggableElements.forEach { element ->
-            val child = element as HTMLElement
-            val childId = child.getAttribute("data-chip-id")
-            val box = child.getBoundingClientRect()
-            val childCenterX = box.right - (box.width / 2)
-            val childCenterY = box.top + (box.height / 2)
-            val xOffset = abs(x - childCenterX)
-            val yOffset = abs(y - childCenterY)
-            val cursorInRowOfElement = y >= box.top && y <= box.bottom
-            //console.log("$childId: ($xOffset, $yOffset)", cursorInRowOfElement)
+    private data class Point(val x: Double, val y: Double)
+    private data class AnchorPoint(
+        val point: Point,
+        val leftElement: HTMLElement?,
+        val rightElement: HTMLElement?,
+        val isOnNewLine: Boolean = false
+    )
+
+    private fun getBestAnchorPoint(x: Int, y: Int): AnchorPoint {
+        var draggableElements = container.querySelectorAll(".chip").asList()
+
+        // remove all elements with class "debug-dot"
+        /*document.querySelectorAll(".debug-dot").asList().forEach {
+            it.parentNode?.removeChild(it)
+        }*/
+
+        val anchorPoints: MutableList<AnchorPoint> = mutableListOf()
+        fun renderDot(p: Point, color: String = "red") {
+            val dot = document.createElement("div") as HTMLDivElement
+            dot.addClass("debug-dot")
+            dot.style.display = "block"
+            dot.style.position = "absolute"
+            dot.style.width = "6px"
+            dot.style.height = "6px"
+            dot.style.backgroundColor = color
+            dot.style.borderRadius = "3px"
+            dot.style.left = "${p.x - 3}px"
+            dot.style.top = "${p.y - 3}px"
+            dot.style.zIndex = "1000"
+            document.body!!.appendChild(dot)
         }
 
-        data class Closest(val element: HTMLElement?, val xOffset: Double, val yOffset: Double)
-        //data class Closest(val element: HTMLElement?, val offset: Double)
-
-        val closest = draggableElements.fold(Closest(null, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)) {
-        //val closest = draggableElements.fold(Closest(null, Double.NEGATIVE_INFINITY)) {
-            accumulator, element ->
-            val child = element as HTMLElement
-            val childId = child.getAttribute("data-chip-id")
-            val box = child.getBoundingClientRect()
-            val childCenterX = box.right - (box.width / 2)
-            val childCenterY = box.top + (box.height / 2)
-            val xOffset = abs(x - childCenterX)
-            val yOffset = abs(y - childCenterY)
-
-            val cursorInCurrentRow = y >= box.top && y <= box.bottom
-            if (cursorInCurrentRow) {
-                //console.log("cursor is in row of", childId)
-
+        for (i in -1 until draggableElements.size) {
+            val leftNode = draggableElements.getOrNull(i) as? HTMLElement
+            val rightNode = draggableElements.getOrNull(i + 1) as? HTMLElement
+            val leftBox: DOMRect = leftNode?.getBoundingClientRect() ?: run {
+                val rightBox = rightNode!!.getBoundingClientRect()
+                DOMRect(rightBox.left, rightBox.top, 0.0, rightBox.height)
             }
+            val rightBox: DOMRect = rightNode?.getBoundingClientRect() ?: run {
+                val leftBox = leftNode!!.getBoundingClientRect()
+                DOMRect(leftBox.right, leftBox.top, 0.0, leftBox.height)
+            }
+            val leftCenter = Point(leftBox.right - (leftBox.width / 2), leftBox.top + (leftBox.height / 2))
+            val rightCenter = Point(rightBox.right - (rightBox.width / 2), rightBox.top + (rightBox.height / 2))
 
+            val inSameRow = leftCenter.y > rightBox.top && leftCenter.y < rightBox.bottom
+            // || rightCenter.y > leftBox.top && rightCenter.y < leftBox.bottom
+
+            // midpoint between the two elements
+            if (inSameRow) {
+                val midPoint = Point(
+                    (leftBox.right + rightBox.left) / 2,
+                    (leftCenter.y + rightCenter.y) / 2
+                )
+                anchorPoints.add(AnchorPoint(midPoint, leftNode, rightNode, false))
+            } else {
+                // since the left and right elements are not in the same row, we create two midpoints
+                // end of first row
+                val midPoint1 = Point(
+                    leftBox.right,
+                    leftCenter.y
+                )
+                // start of second row
+                val midPoint2 = Point(
+                    rightBox.left,
+                    rightCenter.y
+                )
+                anchorPoints.add(AnchorPoint(midPoint1, leftNode, rightNode, false))
+                anchorPoints.add(AnchorPoint(midPoint2, leftNode, rightNode, true))
+            }
+            //renderDot(rightCenter, "green")
+        }
+        /*anchorPoints.forEach { midPoint ->
+            renderDot(midPoint.point, if (midPoint.isOnNewLine) "blue" else "yellow")
+        }*/
+
+        data class Closest(val anchorPoint: AnchorPoint?, val xOffset: Double, val yOffset: Double)
+
+        val closest = anchorPoints.fold(
+            Closest(
+                null,
+                Double.POSITIVE_INFINITY,
+                Double.POSITIVE_INFINITY
+            )
+        ) { accumulator, anchorPoint ->
+            val xOffset = abs(x - anchorPoint.point.x)
+            val yOffset = abs(y - anchorPoint.point.y)
             when {
                 yOffset < accumulator.yOffset -> {
-                    Closest(child, xOffset, yOffset)
+                    Closest(anchorPoint, xOffset, yOffset)
                 }
                 yOffset > accumulator.yOffset -> {
                     accumulator
                 }
                 xOffset < accumulator.xOffset -> {
-                    Closest(child, xOffset, yOffset)
+                    Closest(anchorPoint, xOffset, yOffset)
                 }
                 xOffset > accumulator.xOffset -> {
                     accumulator
@@ -353,52 +377,12 @@ class ChipList(
                 else -> accumulator
             }
 
-            /*
-            if (x < box.left) {
-                console.log("grabbed element is left of", childId)
-            }
-            if (x > box.left) {
-                console.log("grabbed element is right of", childId)
-            }
-            if (y < box.top) {
-                console.log("grabbed element is above of", childId)
-            }
-            if (y > box.top) {
-                console.log("grabbed element is below of", childId)
-            }*/
-
-            /*
-            when {
-                y < box.top -> {
-                    // Mouse is above this element -> prev row
-                    Closest(child, offset)
-                }
-                y > box.bottom -> {
-                    // Mouse is below this element -> next row
-                    accumulator
-                }
-                offset < 0 && offset > accumulator.offset -> {
-                    Closest(child, offset)
-                }
-                else -> accumulator
-            }
-             */
         }
-        var closestElement = closest.element
-        val box = closestElement!!.getBoundingClientRect()
-        val closestCenterX = box.right - (box.width / 2)
-        val rightOfCenter = x > closestCenterX
-        val cursorBelowCurrentRow = y > box.bottom
 
-        if (rightOfCenter) {
-            closestElement = closestElement.nextElementSibling as? HTMLElement
-        }
-        //return closest.element
-        val cursorBreak = !cursorBelowCurrentRow
-        //console.log("rightOfCenter: $rightOfCenter", "cursorBelowCurrentRow: $cursorBelowCurrentRow")
-        return closestElement
+        //renderDot(closest.anchorPoint!!.point, "red")
+        return closest.anchorPoint!!
     }
-    
+
     fun onOrderChange() {
         // Get the current order of chip IDs
         val chips = container.querySelectorAll(".chip")
@@ -568,23 +552,5 @@ class ChipList(
      */
     val isEmpty: Boolean
         get() = _items.isEmpty()
-
-
-    /**
-     * Handles the drop event for drag and drop sorting
-     * This method would be called from JavaScript
-     */
-    fun handleDrop(draggedItemId: String, targetItemId: String): Boolean {
-        if (!canSort) return false
-
-        val draggedIndex = _items.indexOfFirst { it.id == draggedItemId }
-        val targetIndex = _items.indexOfFirst { it.id == targetItemId }
-
-        return if (draggedIndex != -1 && targetIndex != -1 && draggedIndex != targetIndex) {
-            moveItem(draggedIndex, targetIndex)
-        } else {
-            false
-        }
-    }
 
 }

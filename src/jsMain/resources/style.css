@@ -772,11 +772,9 @@ button:hover {
 .chip-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
     padding: 12px;
     background-color: #f5f5f5;
-    border-radius: 8px;
-    min-height: 40px;
+    border-radius: 4px;
 }
 
 .chip-list.sortable {
@@ -786,6 +784,7 @@ button:hover {
 .chip {
     display: inline-flex;
     align-items: center;
+    margin: 4px;
     background-color: #e3f2fd;
     border: 1px solid #90caf9;
     border-radius: 0.3rem;
