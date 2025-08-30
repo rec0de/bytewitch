@@ -874,7 +874,7 @@ button:hover {
     background-color: #f0f8ff;
 }
 
-.drop-indicator {
+.chip-drop-placeholder {
     width: 2px;
     height: 32px;
     background-color: #2196f3;
@@ -884,6 +884,19 @@ button:hover {
     margin: 0 4px;
 }
 
-.drop-indicator.active {
+.chip-drop-placeholder.active {
     opacity: 1;
+}
+
+.chip-drop-linebreaker {
+    width: 100%
+}
+
+.debug-dot {
+    display: block;
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    z-index: 100;
 }

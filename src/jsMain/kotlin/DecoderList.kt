@@ -18,6 +18,7 @@ data class ChipListItem(
     val sortable: Boolean,
     val toggleable: Boolean,
     val deletable: Boolean,
+    var isEnabled: Boolean = true
 ) {
     //val divElement = node.querySelector(".chip") as HTMLDivElement
     val divElement = node
@@ -27,7 +28,6 @@ data class ChipListItem(
     val enableButton = node.querySelector(".chip-enable-btn") as HTMLDivElement
     val deleteButton = node.querySelector(".chip-delete-btn") as HTMLDivElement
 
-    var isEnabled: Boolean = true
 
     var deleteCallback: ((String) -> Unit)? = null
     var toggleCallback: ((String) -> Unit)? = null
@@ -234,6 +234,7 @@ class ChipList(
             sortable = canSort,
             toggleable = canToggleEnabled,
             deletable = canDelete,
+            isEnabled = isEnabled
         ))
     }
 
@@ -261,9 +262,9 @@ class ChipList(
     /**
      * Sets the enabled state of an item
      */
-    fun setItemEnabled(id: String, enabled: Boolean): Boolean {
+    fun setItemStatus(id: String, status: Boolean): Boolean {
         return itemStore[id]?.let {
-            it.setStatus(enabled)
+            it.setStatus(status)
             true
         } ?: false
     }
@@ -377,19 +378,13 @@ class ChipList(
 
         private fun createPlaceholder() {
             val p = document.createElement("div") as HTMLDivElement
-            p.className = "drop-indicator active"
-            p.style.width = "2px"
-            p.style.height = "32px"
-            p.style.backgroundColor = "#2196f3"
-            p.style.borderRadius = "1px"
-            p.style.margin = "0 4px"
+            p.className = "chip-drop-placeholder active"
             placeholder = p
         }
 
         private fun createLinebreaker() {
             val lb = document.createElement("div") as HTMLDivElement
-            lb.className = "linebreaker"
-            lb.style.width = "100%"
+            lb.className = "chip-drop-linebreaker"
             linebreaker = lb
         }
 
@@ -403,6 +398,15 @@ class ChipList(
             linebreaker = null
         }
 
+        private fun renderDot(p: Point, color: String = "red") {
+            val dot = document.createElement("div") as HTMLDivElement
+            dot.addClass("debug-dot")
+            dot.style.backgroundColor = color
+            dot.style.left = "${p.x - 3}px"
+            dot.style.top = "${p.y - 3}px"
+            document.body!!.appendChild(dot)
+        }
+
         private fun getBestAnchorPoint(x: Int, y: Int): AnchorPoint {
             var draggableElements = container.querySelectorAll(".chip").asList()
 
@@ -412,20 +416,7 @@ class ChipList(
             }*/
 
             val anchorPoints: MutableList<AnchorPoint> = mutableListOf()
-            fun renderDot(p: Point, color: String = "red") {
-                val dot = document.createElement("div") as HTMLDivElement
-                dot.addClass("debug-dot")
-                dot.style.display = "block"
-                dot.style.position = "absolute"
-                dot.style.width = "6px"
-                dot.style.height = "6px"
-                dot.style.backgroundColor = color
-                dot.style.borderRadius = "3px"
-                dot.style.left = "${p.x - 3}px"
-                dot.style.top = "${p.y - 3}px"
-                dot.style.zIndex = "1000"
-                document.body!!.appendChild(dot)
-            }
+
 
             for (i in -1 until draggableElements.size) {
                 val leftElement = draggableElements.getOrNull(i) as? HTMLElement
