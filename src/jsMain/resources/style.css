@@ -780,9 +780,10 @@ button:hover {
 .chip-list {
     display: flex;
     flex-wrap: wrap;
-    padding: 12px;
-    background-color: #f5f5f5;
+    padding: 4px 4px;
+    background-color: white;
     border-radius: 4px;
+    align-items: center;
 }
 
 .chip-list.sortable {
@@ -795,27 +796,27 @@ button:hover {
     margin: 4px;
     background-color: #e3f2fd;
     border: 1px solid #90caf9;
+    color: #1976d2;
     border-radius: 0.3rem;
     padding: 0 0.4rem;
-    transition: all 0.2s ease;
 }
 
-.chip.chip-enabled {
-    background-color: #e3f2fd;
-    border-color: #90caf9;
-    color: #1976d2;
+.chip:hover:not(.dragging) {
+    background-color: #cce7ff;
+    border-color: #80bfff;
+    transform: scale(105%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .chip.chip-disabled {
     background-color: #f5f5f5;
-    border-color: #bdbdbd;
-    color: #757575;
+    border-color: #e0e0e0;
+    color: #9e9e9e;
     opacity: 0.7;
 }
 
-.chip:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.chip.chip-disabled:hover {
+    background-color: #eeeeee;
 }
 
 .chip[draggable="true"] {
@@ -848,6 +849,11 @@ button:hover {
     transition: background-color 0.2s ease;
 }
 
+.chip-btn.icon {
+    width: 24px;
+    height: 24px;
+}
+
 .chip-btn.delete-btn {
     color: #d32f2f;
     font-weight: bold;
@@ -873,23 +879,27 @@ button:hover {
     background-color: #e8f5e8;
 }
 
-.chip:hover:not(.dragging) {
-    background-color: #bbdefb;
-    transform: translateY(-1px);
-}
 
 .chip-list.drag-active {
     background-color: #f0f8ff;
 }
 
 .chip-drop-placeholder {
-    width: 2px;
-    height: 32px;
-    background-color: #2196f3;
-    border-radius: 1px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    margin: 0 4px;
+    width: 0px;
+    opacity: 1;
+    margin: 0px;
+    position: relative;
+}
+
+.chip-drop-placeholder.active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 24px;
+    border-left: 2px dotted #2196f3;
+    translate: -50% -50%;
 }
 
 .chip-drop-placeholder.active {
@@ -897,14 +907,14 @@ button:hover {
 }
 
 .chip-drop-linebreaker {
-    width: 100%
+    width: 101%
 }
 
 .debug-dot {
     display: block;
     position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
+    width: 2px;
+    height: 32px;
     z-index: 100;
+    translate: -50% -50%;
 }
