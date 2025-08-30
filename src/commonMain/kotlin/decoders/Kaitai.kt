@@ -1031,6 +1031,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
                     return Pair(TokenType.BOOLEAN, true)
                 }
+            } else if (op1.first == TokenType.ENUM && op2.first == TokenType.ENUM) {
+                val result: Pair<TokenType, Boolean> = Pair(
+                    TokenType.BOOLEAN,
+                    // This condition is not necessary according to the kaitai user guide, but can be used to enforce a stricter enum comparison
+                    // (op1.second as Pair<KTEnum, String>).first === (op2.second as Pair<KTEnum, String>).first &&
+                    (op1.second as Pair<KTEnum, String>).second == (op2.second as Pair<KTEnum, String>).second
+                )
+
+                return result
             } else {
                 val result: Pair<TokenType, Boolean> = Pair(
                     TokenType.BOOLEAN,
@@ -1468,6 +1477,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             } else {
                 if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
                     enum = false
+                    tokensWithEnums.add(token)
                 } else {
                     val tempEnum: String = tokensWithEnums.last().second
                     tokensWithEnums.removeLast()
@@ -1990,7 +2000,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         offsetInDatastreamInBits: Int,
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int
-    ): Triple<KaitaiElement, Int, Int> {
+    ): Triple<KaitaiElement?, Int, Int> {
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null)
+        if (!expressionParser.parseExpression(seqElement.ifCondition.toString())) {
+            return Triple(null, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
+        }
+
         return if (seqElement.repeat != null) {
             processManySeqElements(
                 elementId,
@@ -2028,7 +2043,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         ioStream: BooleanArray,
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
-    ): Triple<KaitaiElement, Int, Int> {
+    ): Triple<KaitaiElement?, Int, Int> {
         throw Exception("Instances are not properly implemented yet. Please come back later.")
         // TODO what to do with value?
         /*val value = instance.value?.let {
@@ -2053,7 +2068,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             ioStream,
             offsetInDatastreamInBits,
             sourceOffsetInBits,
-            dataSizeOfSequenceInBits
+            dataSizeOfSequenceInBits,
         )
     }
 
@@ -2096,7 +2111,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     dataSizeOfSequenceInBits
                 )
 
-                bytesListTree.add(triple.first)
+                if (triple.first != null) {
+                    bytesListTree.add(triple.first!!)
+                }
+
                 offsetInDatastreamInBits = triple.second
                 dataSizeOfSequenceInBits = triple.third
             }
@@ -2118,7 +2136,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             for ((id, instance) in currentScopeStruct.instances) {
                 val triple = processInstance(id, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, sourceOffsetInBits, dataSizeOfSequenceInBits)
 
-                bytesListTree.add(triple.first)
+                if (triple.first != null) {
+                    bytesListTree.add(triple.first!!)
+                }
+
                 dataSizeOfSequenceInBits = triple.third
             }
         }

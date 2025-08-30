@@ -1,9 +1,17 @@
 package kaitai
 
+import bitmage.booleanArrayOfInts
+import bitmage.byteArrayOfInts
 import kotlin.test.Test
 import decoders.Kaitai
 import decoders.MutableKaitaiTree
 import decoders.Kaitai.TokenType
+import decoders.KaitaiBytes
+import decoders.KaitaiEnum
+import decoders.KaitaiResult
+import kaitai.KaitaiTestUtils.checkElement
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToDynamic
 
 class KaitaiExpressionTests {
     @Test
@@ -77,9 +85,9 @@ class KaitaiExpressionTests {
         expected = Pair(TokenType.STRING, "   ")
         check(result[0] == expected) {"The expected token is $expected, actual token is ${result[0]}"}
 
-        expression = "some_type::some_enum::some_value"
+        expression = "some_type::some_enum::some_value & something_else"
         result = expressionParser.tokenizeExpression(expression)
-        check(result.size == 1) {"The expected size is 1, actual size is ${result.size}"}
+        check(result.size == 3) {"The expected size is 3, actual size is ${result.size}"}
         expected = Pair(TokenType.ENUMCALL, "some_type::some_enum::some_value")
         check(result[0] == expected) {"The expected token is $expected, actual token is ${result[0]}"}
 
@@ -330,9 +338,65 @@ class KaitaiExpressionTests {
         }
     }
 
-    /*@Test
-    fun identifierTest() {
+    @Test
+    fun simpleIdentifierTest() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "a", type = KTType.Primitive("u1")),
+                KTSeq(id = "b", type = KTType.Primitive("u1")),
+                KTSeq(id = "c", size = StringOrInt.StringValue("a")),
+                KTSeq(id = "d", size = StringOrInt.StringValue("b"), repeat = KTRepeat.EXPR, repeatExpr = "2")
+            ),
+        )
 
-    }*/
+        val data = byteArrayOfInts(
+            0x01,  // a
+            0x02,  // b
+            0x03, 0x04,
+        )
+    }
 
+    @Test
+    fun EnumTest() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "protocol", type = KTType.Primitive("u1"), enum = "ip_protocols"),
+                KTSeq(id = "test_true", size = StringOrInt.StringValue("protocol==ip_protocols::udp?4:2")),
+                KTSeq(id = "test_false", size = StringOrInt.StringValue("protocol==ip_protocols::icmp?4:2")),
+            ),
+            enums = mapOf(
+                Pair(
+                    "ip_protocols",
+                    KTEnum(
+                        mapOf(
+                            Pair(1, KTEnumValue(id = StringOrBoolean.StringValue("icmp"))),
+                            Pair(6, KTEnumValue(id = StringOrBoolean.StringValue("tcp"))),
+                            Pair(17, KTEnumValue(id = StringOrBoolean.StringValue("udp"))),
+                        )
+                    )
+                ),
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x11, // ip_protcols: 17 -> udp
+            0x11, 0x22, 0x33, 0x44,
+            0x11, 0x22, 0x33, 0x44
+        )
+
+        val decoder = Kaitai("enums", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        var element = result.bytesListTree["test_true"]
+        checkElement(element, id="test_true", elementClass=KaitaiBytes::class, sourceByteRange=Pair(1, 5), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11, 0x22, 0x33, 0x44,))
+        element = result.bytesListTree["test_false"]
+        checkElement(element, id="test_false", elementClass=KaitaiBytes::class, sourceByteRange=Pair(5, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11, 0x22,))
+    }
+
+    @Test
+    fun methodsTest() {
+
+    }
 }
