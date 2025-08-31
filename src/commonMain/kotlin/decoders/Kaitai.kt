@@ -150,6 +150,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int,
         val repeatIndex: Int?,
+        val currentRepeatElement: KaitaiElement?,
     ) {
     //******************************************************************************************************************
     //*                                                 methods                                                        *
@@ -553,7 +554,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 is KaitaiResult -> Pair(TokenType.KAITAITREE, targetElement.bytesListTree)
                 is KaitaiBinary -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
                 is KaitaiString -> Pair(TokenType.STRING, targetElement.value.toByteArray().toUTF8String())
-                is KaitaiSignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
+                is KaitaiSignedInteger -> {
+                    val byteArray = targetElement.value.toByteArray()
+                    val result = when (byteArray.size) {
+                        1 -> byteArray[0].toLong()
+                        2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                        4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                        8 -> Long.fromBytes(byteArray, ByteOrder.BIG)
+                        else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+                    }
+                    Pair(TokenType.INTEGER, result)
+                }
                 is KaitaiUnsignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
                 is KaitaiFloat -> Pair(TokenType.FLOAT, Float.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
                 is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.enum)
@@ -581,6 +592,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         fun parseIdentifier(token: Pair<TokenType, String>): Pair<TokenType, dynamic> {
             return when (token.second) {
+                "_" -> {
+                    val targetElement = currentRepeatElement
+                    if (targetElement != null) {
+                        parseReferenceHelper(targetElement)
+                    } else {
+                        throw RuntimeException("The identifier _ cannot be used outside of repeat.")
+                    }
+                }
+
                 "_io" -> {
                     Pair(TokenType.STREAM, ioStream)
                 }
@@ -603,11 +623,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                 else -> {
                     val targetElement = bytesListTree[token.second]
-                    if (targetElement != null) {
-                        parseReferenceHelper(targetElement)
-                    } else {
-                        throw RuntimeException("The identifier ${token.second} does not exist.")
-                    }
+                    parseReferenceHelper(targetElement)
                 }
             }
         }
@@ -718,7 +734,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 if ((op1.second as List<Pair<TokenType, dynamic>>)[0].first == TokenType.INTEGER && (op1.second as List<Pair<TokenType, Long>>).all { it.second in 0L..255L }) {
                     // the array might have been intended as a bytearray but was parsed as an array of integers. Therefore, the functions length and to_s are allowed.
                     if (op2.second == "length") {
-                        println("HI")
                         return expressionLength(op1)
                     } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).first.second == "to_s") { // in this case op2 is a function token containing a pair of an identifier token which contains the function name and a parenthesis token with the function params. Therefore op2.second.first is the identifier token
                         return expressionToString(
@@ -1798,7 +1813,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex)
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, null)
 
         if (seqElement.pos != null) {
             offsetInDatastreamInBits = if (seqElement.pos is StringOrInt.IntValue) {
@@ -2020,8 +2035,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 }
             } else if (seqElement.repeat == KTRepeat.UNTIL) {
                 checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
-                throw Exception("repeat-until is not supported yet")
-                // TODO: implement repeat until, needs expression parsing to work
+                val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
+                if (expressionParser.parseExpression(seqElement.repeatUntil)) {
+                    break
+                }
             }
         }
 
@@ -2050,7 +2067,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int
     ): Triple<KaitaiElement?, Int, Int> {
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null)
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
         if (!expressionParser.parseExpression(seqElement.ifCondition.toString())) {
             return Triple(null, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
         }

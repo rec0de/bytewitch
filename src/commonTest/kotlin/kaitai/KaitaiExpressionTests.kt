@@ -11,6 +11,7 @@ import decoders.KaitaiBytes
 import decoders.KaitaiEnum
 import decoders.KaitaiList
 import decoders.KaitaiResult
+import decoders.KaitaiSignedInteger
 import decoders.KaitaiUnsignedInteger
 import kaitai.KaitaiTestUtils.checkElement
 import kotlinx.serialization.json.Json
@@ -20,7 +21,7 @@ class KaitaiExpressionTests {
     @Test
     fun tokenizerTest() {
         val kaitai = Kaitai("tokenizer", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "13_37  "
         var result:  MutableList<Pair<Kaitai.TokenType, dynamic>> = expressionParser.tokenizeExpression(expression)
@@ -198,7 +199,7 @@ class KaitaiExpressionTests {
     @Test
     fun operationsTest() {
         val kaitai = Kaitai("operations", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "-5 + 6 + 3.3 + -2.0"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -344,7 +345,7 @@ class KaitaiExpressionTests {
     @Test
     fun arrayTest() {
         val kaitai = Kaitai("array", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "[3, 3+1, 3 << 2, 7 / 2, ]"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -375,16 +376,18 @@ class KaitaiExpressionTests {
                 KTSeq(id = "f0", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[0] == [0x08]")),  // false
                 KTSeq(id = "f1", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[1] == [0x08]")),  // true
                 KTSeq(id = "f2", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[2][1] == 0x10")),  // true
+                KTSeq(id = "g", type = KTType.Primitive("s1"), repeat = KTRepeat.UNTIL, repeatUntil = "_ == -1"),
             ),
         )
 
         val data = byteArrayOfInts(
             0x01,  // a
             0x02,  // b
-            0x03, // c
-            0x04, 0x05, 0x06, 0x07, // d
-            0x08, 0x09, 0x10, // e
-            0x11, 0x12, // f
+            0x03,  // c
+            0x04, 0x05, 0x06, 0x07,  // d
+            0x08, 0x09, 0x10,  // e
+            0x11, 0x12,  // f
+            0x13, 0x14, 0xff,  // g
         )
 
         val decoder = Kaitai("simpleIdentifier", struct)
@@ -421,6 +424,22 @@ class KaitaiExpressionTests {
         checkElement(f1, "f1", KaitaiBytes::class, Pair(10, 11), Pair(0,0), booleanArrayOfInts(0x11))
         val f2 = result.bytesListTree["f2"]
         checkElement(f2, "f2", KaitaiBytes::class, Pair(11, 12), Pair(0,0), booleanArrayOfInts(0x12))
+
+        val g = result.bytesListTree["g"]
+        checkElement(g, "g", KaitaiList::class, Pair(12, 15), Pair(0,0), booleanArrayOfInts(0x13, 0x14, 0xff))
+        val g0 = g.bytesListTree!![0]
+        checkElement(g0, "g", KaitaiSignedInteger::class, Pair(12, 13), Pair(0,0), booleanArrayOfInts(0x13))
+        val g1 = g.bytesListTree!![1]
+        checkElement(g1, "g", KaitaiSignedInteger::class, Pair(13, 14), Pair(0,0), booleanArrayOfInts(0x14))
+        val g2 = g.bytesListTree!![2]
+        checkElement(g2, "g", KaitaiSignedInteger::class, Pair(14, 15), Pair(0,0), booleanArrayOfInts(0xff))
+        try {
+            g.bytesListTree!![3]
+            check(false)
+        } catch (e: Exception) {
+            check(e is IndexOutOfBoundsException) {"IndexOutOfBoundsException was expected but $e was thrown."}
+        }
+
     }
 
     @Test
@@ -466,7 +485,7 @@ class KaitaiExpressionTests {
         val result = kaitai.decode(data, 0)
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
-        val expressionParser = kaitai.ExpressionParser(result.bytesListTree, struct, null, data.toBooleanArray(), 0, null)
+        val expressionParser = kaitai.ExpressionParser(result.bytesListTree, struct, null, data.toBooleanArray(), 0, null, null)
 
         var expressionResult = expressionParser.parseExpression("u1")
         check(expressionResult is Long) {"Expected type of u1 to be Long, got ${expressionResult::class.simpleName}" }
@@ -665,64 +684,64 @@ class KaitaiExpressionTests {
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
         var element = result.bytesListTree["intToString"]
-        checkElement(element, id="intToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11,))
+        checkElement(element, id="intToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11))
         element = result.bytesListTree["floatToInt"]
-        checkElement(element, id="floatToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x22,))
+        checkElement(element, id="floatToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x22))
         element = result.bytesListTree["byteArrayLength"]
-        checkElement(element, id="byteArrayLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x33,))
+        checkElement(element, id="byteArrayLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x33))
         element = result.bytesListTree["byteArrayToString"]
-        checkElement(element, id="byteArrayToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(7, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x44,))
+        checkElement(element, id="byteArrayToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(7, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x44))
         element = result.bytesListTree["stringLength"]
-        checkElement(element, id="stringLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(8, 9), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x55,))
+        checkElement(element, id="stringLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(8, 9), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x55))
         element = result.bytesListTree["stringReverse"]
-        checkElement(element, id="stringReverse", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(9, 10), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x66,))
+        checkElement(element, id="stringReverse", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(9, 10), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x66))
         element = result.bytesListTree["stringSubstring"]
-        checkElement(element, id="stringSubstring", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(10, 11), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x77,))
+        checkElement(element, id="stringSubstring", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(10, 11), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x77))
         element = result.bytesListTree["stringToInt"]
-        checkElement(element, id="stringToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(11, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x88,))
+        checkElement(element, id="stringToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(11, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x88))
         element = result.bytesListTree["stringToIntWithRadix"]
-        checkElement(element, id="stringToIntWithRadix", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(12, 13), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x99,))
+        checkElement(element, id="stringToIntWithRadix", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(12, 13), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x99))
         element = result.bytesListTree["enumToInt"]
-        checkElement(element, id="enumToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(13, 14), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa,))
+        checkElement(element, id="enumToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(13, 14), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa))
         element = result.bytesListTree["booleanToInt"]
-        checkElement(element, id="booleanToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(14, 15), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb,))
+        checkElement(element, id="booleanToInt", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(14, 15), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb))
 
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtype"] as KaitaiResult).bytesListTree["parent"]
-        checkElement(element, id="parent", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(23, 24), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc,))
+        checkElement(element, id="parent", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(23, 24), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtype"] as KaitaiResult).bytesListTree["root"]
-        checkElement(element, id="root", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(24, 25), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xdd,))
+        checkElement(element, id="root", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(24, 25), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xdd))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtype"] as KaitaiResult).bytesListTree["ioEof"]
-        checkElement(element, id="ioEof", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(25, 26), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xee,))
+        checkElement(element, id="ioEof", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(25, 26), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xee))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtype"] as KaitaiResult).bytesListTree["ioSize"]
-        checkElement(element, id="ioSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(26, 27), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff,))
+        checkElement(element, id="ioSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(26, 27), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtype"] as KaitaiResult).bytesListTree["ioPos"]
-        checkElement(element, id="ioPos", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(27, 28), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11,))
+        checkElement(element, id="ioPos", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(27, 28), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11))
 
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtypeAndSize"] as KaitaiResult).bytesListTree["ioEof"]
-        checkElement(element, id="ioEof", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(28, 29), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x22,))
+        checkElement(element, id="ioEof", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(28, 29), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x22))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtypeAndSize"] as KaitaiResult).bytesListTree["ioSize"]
-        checkElement(element, id="ioSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(29, 30), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x33,))
+        checkElement(element, id="ioSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(29, 30), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x33))
         element = ((result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["subElementWithSubtypeAndSize"] as KaitaiResult).bytesListTree["ioPos"]
-        checkElement(element, id="ioPos", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(30, 31), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x44,))
+        checkElement(element, id="ioPos", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(30, 31), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x44))
 
         element = (result.bytesListTree["elementWithSubtype"] as KaitaiResult).bytesListTree["ioOfElementSize"]
-        checkElement(element, id="ioOfElementSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(31, 32), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x55,))
+        checkElement(element, id="ioOfElementSize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(31, 32), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x55))
 
         element = result.bytesListTree["arrayFirst"]
-        checkElement(element, id="arrayFirst", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(32, 33), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x66,))
+        checkElement(element, id="arrayFirst", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(32, 33), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x66))
         element = result.bytesListTree["arrayLast"]
-        checkElement(element, id="arrayLast", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(33, 34), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x77,))
+        checkElement(element, id="arrayLast", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(33, 34), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x77))
         element = result.bytesListTree["arraySize"]
-        checkElement(element, id="arraySize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(34, 35), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x88,))
+        checkElement(element, id="arraySize", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(34, 35), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x88))
         element = result.bytesListTree["arrayMin"]
-        checkElement(element, id="arrayMin", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(35, 36), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x99,))
+        checkElement(element, id="arrayMin", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(35, 36), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x99))
         element = result.bytesListTree["arrayMax"]
-        checkElement(element, id="arrayMax", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(36, 37), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa,))
+        checkElement(element, id="arrayMax", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(36, 37), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa))
         element = result.bytesListTree["arrayIndex"]
-        checkElement(element, id="arrayIndex", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(37, 38), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb,))
+        checkElement(element, id="arrayIndex", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(37, 38), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb))
         element = result.bytesListTree["arrayLength"]
-        checkElement(element, id="arrayLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(38, 39), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc,))
+        checkElement(element, id="arrayLength", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(38, 39), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
         element = result.bytesListTree["arrayToString"]
-        checkElement(element, id="arrayToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(39, 40), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xdd,))
+        checkElement(element, id="arrayToString", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(39, 40), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xdd))
     }
 }
