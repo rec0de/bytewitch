@@ -8,7 +8,6 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLSpanElement
 import org.w3c.dom.HTMLTemplateElement
 import org.w3c.dom.asList
-import org.w3c.dom.events.Event
 import kotlin.math.abs
 
 data class ChipListItem(
@@ -138,6 +137,7 @@ data class ChipListItem(
 
 }
 
+typealias EventListener = (List<String>) -> Unit
 
 /**
  * A customizable list of chip elements with support for sorting, deletion, and enabling/disabling
@@ -154,6 +154,7 @@ class ChipList(
     private var itemDeleteCallback: ((String) -> Unit)? = null
     private val dragAndDropHandler = DragAndDropHandler()
     private val noDecodersMessage: HTMLDivElement
+    private val eventListeners: MutableMap<String, MutableSet<EventListener>> = mutableMapOf()
 
 
     companion object {
@@ -189,14 +190,6 @@ class ChipList(
         node.ondrop = { event ->
             dragAndDropHandler.handleDrop(event)
         }
-    }
-
-
-    fun onOrderChange() {
-        // Get the current order of chip IDs
-        node.dispatchEvent(
-            Event("orderChanged")
-        )
     }
 
     fun setItemToggleCallback(callback: (String, Boolean) -> Unit) {
@@ -238,14 +231,12 @@ class ChipList(
     fun addItem(item: ChipListItem) {
         if (canDelete) {
             item.setDeleteCallback { itemId ->
-                console.log("ChipList Lambda deleteItem", itemId)
                 deleteItem(itemId)
             }
         }
 
         if (canToggleEnabled) {
             item.setToggleCallback { itemId ->
-                console.log("ChipList Lambda toggleItem", itemId)
                 toggleItem(itemId)
             }
         }
@@ -256,6 +247,7 @@ class ChipList(
         if (node.contains(noDecodersMessage)) {
             node.removeChild(noDecodersMessage)
         }
+        dispatchEvents("itemAdded", affectedIds = listOf(item.id))
     }
 
     /**
@@ -285,6 +277,7 @@ class ChipList(
             if (itemStore.isEmpty()) {
                 node.appendChild(noDecodersMessage)
             }
+            dispatchEvents("itemRemoved", affectedIds = listOf(id))
             itemDeleteCallback?.invoke(id)
             true
         } ?: false
@@ -329,8 +322,10 @@ class ChipList(
         allItems.forEach { item ->
             node.removeChild(item.node)
         }
+        val affectedIds = getItemKeysOrdered()
         itemStore.clear()
         node.appendChild(noDecodersMessage)
+        dispatchEvents("listCleared", affectedIds = affectedIds)
     }
 
     /**
@@ -344,6 +339,32 @@ class ChipList(
      */
     val isEmpty: Boolean
         get() = itemStore.isEmpty()
+
+    private fun dispatchEvents(vararg eventTypes: String, affectedIds: List<String> = listOf()) {
+        /*
+        Supported event types:
+        - itemAdded
+        - itemRemoved
+        - listCleared
+        - orderChanged
+         */
+        eventTypes.forEach { eventType ->
+            eventListeners[eventType]?.forEach { listener ->
+                listener(affectedIds)
+            }
+        }
+    }
+
+    fun addEventListener(eventType: String, listener: EventListener) {
+        if (eventListeners[eventType] == null) {
+            eventListeners[eventType] = mutableSetOf()
+        }
+        eventListeners[eventType]?.add(listener)
+    }
+
+    fun removeEventListener(eventType: String, listener: EventListener) {
+        eventListeners[eventType]?.remove(listener)
+    }
 
     private data class Point(val x: Double, val y: Double)
     private data class AnchorPoint(
@@ -420,7 +441,7 @@ class ChipList(
             removePlaceholder()
             removeLinebreaker()
 
-            onOrderChange()
+            dispatchEvents("orderChanged", affectedIds = getItemKeysOrdered())
         }
 
         private fun createPlaceholder() {
