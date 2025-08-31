@@ -4,14 +4,13 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 
 object DecoderListManager {
-    val builtinList: ChipList
     val builtinKaitaiList: ChipList
     val userKaitaiList: ChipList
 
     init {
         // Builtin decoder list
         val builtinListElement = document.getElementById("builtin-decoder-list") as HTMLDivElement
-        builtinList = ChipList(builtinListElement, canEdit = false, canDelete = false)
+        val builtinList = ChipList(builtinListElement, canEdit = false, canDelete = false)
         setupDecoderList(
             builtinList,
             ByteWitch.builtinDecoderListManager,
