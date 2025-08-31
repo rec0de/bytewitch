@@ -244,9 +244,6 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
-        // remember if this textarea has plain hex input so we can enable selection highlighting
-        textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
-
         // only decode text area if input changed or the Kaitai struct changed
         val inputChanged = lastInputBytes[i]?.contentEquals(bytes)?.not() ?: true
         if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged) {
@@ -254,6 +251,8 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
             lastInputBytes[i] = bytes
             decodeBytes(bytes, i)
         }
+        //console.log("textarea $i: force=$force, hasChangedSinceLastDecode=${KaitaiUI.hasChangedSinceLastDecode()}, inputChanged=$inputChanged")
+
     }
 
     KaitaiUI.setChangedSinceLastDecode(false)

@@ -60,8 +60,12 @@ fun appendTextArea(content: String = "") {
         if(liveDecodeEnabled)
             decode(true)
 
+        // update byte size label
         val bytes = ByteWitch.getBytesFromInputEncoding(textarea.value)
         (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+
+        // update "plain hex" attribute on textarea
+        textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
     }
 
     textarea.addEventListener("selectionchange", {
