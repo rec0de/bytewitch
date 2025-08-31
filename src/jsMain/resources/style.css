@@ -798,7 +798,7 @@ button:hover {
     background-color: white;
     border-radius: 4px;
     align-items: center;
-    min-height: 48px;
+    min-height: 24px;
 }
 
 .chip-list.sortable {

@@ -87,7 +87,7 @@
         </h2>
         <div class="decoder-list-container">
             <div class="decoder-list-header">
-                <p>builtin decoders</p>
+                <p>Builtin Decoders</p>
                 <div style="flex-grow: 1"></div>
                 <button id="builtin-decoders-disable-all">disable all</button>
                 <button id="builtin-decoders-enable-all">enable all</button>
@@ -109,18 +109,29 @@
 
         <div class="decoder-list-container">
             <div class="decoder-list-header">
-                <p>builtin Kaitai decoders</p>
+                <p>Builtin Kaitai Decoders</p>
                 <div style="flex-grow: 1"></div>
                 <button id="builtin-kaitai-decoders-disable-all">disable all</button>
                 <button id="builtin-kaitai-decoders-enable-all">enable all</button>
             </div>
             <div class="decoder-list" id="builtin-kaitai-decoder-list"></div>
         </div>
-        <div id="kaitai-bundled-legend" class="legend" style="color: black">
-            <div>Bundled Kaitai parsers:</div>
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
+                <p>User Kaitai Decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="user-kaitai-decoders-disable-all">disable all</button>
+                <button id="user-kaitai-decoders-enable-all">enable all</button>
+            </div>
+            <div class="decoder-list" id="user-kaitai-decoder-list"></div>
         </div>
-        <div id="kaitai-legend" class="legend" style="color: black">
-            <div>Kaitai parsers:</div>
+        <div style="display: none">
+            <div id="kaitai-bundled-legend" class="legend" style="color: black">
+                <div>Bundled Kaitai parsers:</div>
+            </div>
+            <div id="kaitai-legend" class="legend" style="color: black">
+                <div>Kaitai parsers:</div>
+            </div>
         </div>
         <div class="textareaContainer">
             <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
