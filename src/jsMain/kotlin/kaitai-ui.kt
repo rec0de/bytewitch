@@ -89,6 +89,10 @@ object KaitaiUI {
         nameInput.value = id
     }
 
+    fun removeUserKaitai(id: String) {
+        KaitaiStorage.deleteStruct(id)
+    }
+
     fun loadKaitaiStructsFromStorage() {
         val names = KaitaiStorage.listStructNames()
         for (kaitaiName in names) {

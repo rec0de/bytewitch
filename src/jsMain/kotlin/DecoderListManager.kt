@@ -15,7 +15,6 @@ object DecoderListManager {
             builtinList,
             ByteWitch.builtinDecoderListManager,
             "builtin",
-            deletable = false
         )
         val builtinDecoders = ByteWitch.builtinDecoderListManager.getAllDecoderNames()
         builtinDecoders.forEach { decoder ->
@@ -29,7 +28,6 @@ object DecoderListManager {
             builtinKaitaiList,
             ByteWitch.builtinKaitaiDecoderListManager,
             "builtin-kaitai",
-            deletable = false
         )
 
         // User Kaitai decoder list
@@ -39,9 +37,13 @@ object DecoderListManager {
             userKaitaiList,
             ByteWitch.userKaitaiDecoderListManager,
             "user-kaitai",
-            deletable = true
         )
 
+        userKaitaiList.addEventListener("itemRemoved") { ids ->
+            ByteWitch.userKaitaiDecoderListManager.removeDecoder(ids.first())
+            KaitaiUI.removeUserKaitai(ids.first())
+            decode(false, force = true)
+        }
         userKaitaiList.addEventListener("itemEdited", { ids ->
             KaitaiUI.editUserKaitai(ids.first())
         })
@@ -50,8 +52,7 @@ object DecoderListManager {
     private fun <DecoderType : ByteWitchDecoder> setupDecoderList(
         list: ChipList,
         listManager: ByteWitch.DecoderListManager<DecoderType>,
-        prefix: String,
-        deletable: Boolean
+        prefix: String
     ) {
         list.addEventListener("orderChanged", {orderedIds ->
             listManager.setDecoderOrder(orderedIds)
@@ -65,13 +66,6 @@ object DecoderListManager {
         list.addEventListener("itemDisabled") { ids ->
             listManager.setDecoderEnabled(ids.first(), false)
             decode(false, force = true)
-        }
-
-        if (deletable) {
-            list.addEventListener("itemRemoved") { ids ->
-                listManager.removeDecoder(ids.first())
-                decode(false, force = true)
-            }
         }
 
         val enableAllBtn = document.getElementById("$prefix-decoders-enable-all") as HTMLButtonElement
