@@ -16,6 +16,10 @@ var currentHighlight: Element? = null
 var lastSelectionEvent: Double? = null
 var tryhard = false
 
+// track input changes to avoid unnecessary re-decodes
+var lastInputBytes = mutableMapOf<Int, ByteArray>()
+
+var ssfEnabled = false
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 
@@ -32,10 +36,9 @@ fun main() {
         }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
-        // Initialize the layout manager
+        // Initialize managers
         LayoutManager
-
-        // Initialize the tag manager
+        SettingsManager
         DecoderListManager
 
         val dataContainer = document.getElementById("data_container")!!
@@ -174,7 +177,9 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
             messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
 
-        messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+        if (ssfEnabled) {
+            messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+        }
     } else {
         messageBox?.remove()
         noDecodeYet.style.display = "block"
@@ -243,31 +248,34 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
         textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
 
         // only decode text area if input changed or the Kaitai struct changed
-        val oldBytes = parsedMessages[i]?.bytes
-        if (force || KaitaiUI.hasChangedSinceLastDecode() || oldBytes == null || !oldBytes.contentEquals(bytes)) {
+        val inputChanged = lastInputBytes[i]?.contentEquals(bytes)?.not() ?: true
+        if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+            lastInputBytes[i] = bytes
             decodeBytes(bytes, i)
         }
     }
 
     KaitaiUI.setChangedSinceLastDecode(false)
 
-    // refine ssf fields and rerender html content
-    val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
-    refined.forEach { msg ->
-        parsedMessages[msg.msgIndex] = msg
-        rerenderSSF(msg.msgIndex, msg)
-    }
-
-    // for sequence alignment
-    if (tryhard && !isLiveDecoding) {
-        if (showSegmentWiseAlignment) {
-            val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
-            attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
-        } else {
-            val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
-            attachByteWiseSequenceAlignmentListeners(alignedSegment)
+    if (ssfEnabled) {
+        // refine ssf fields and rerender html content
+        val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+        refined.forEach { msg ->
+            parsedMessages[msg.msgIndex] = msg
+            rerenderSSF(msg.msgIndex, msg)
         }
 
+        // for sequence alignment
+        if (tryhard && !isLiveDecoding) {
+            if (showSegmentWiseAlignment) {
+                val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
+                attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
+            } else {
+                val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+                attachByteWiseSequenceAlignmentListeners(alignedSegment)
+            }
+
+        }
     }
 }
