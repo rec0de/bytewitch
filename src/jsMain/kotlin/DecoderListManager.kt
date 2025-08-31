@@ -43,8 +43,7 @@ object DecoderListManager {
         )
 
         userKaitaiList.addEventListener("itemEdited", { ids ->
-            console.log("User kaitai has been edited ${ids.first()}")
-            // TODO: implement
+            KaitaiUI.editUserKaitai(ids.first())
         })
     }
 

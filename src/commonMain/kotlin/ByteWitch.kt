@@ -105,7 +105,7 @@ object ByteWitch {
         }
     }
 
-    fun registerBundledKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
+    fun registerBuiltinKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         val struct = KaitaiParser.parseYaml(kaitaiStruct)
         if (struct == null) {
             Logger.log("Failed to parse Kaitai struct for $name")
@@ -118,13 +118,7 @@ object ByteWitch {
         return true
     }
 
-    fun registerKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
-        // TODO: Do we want to allow overwriting existing decoders?
-        if (userKaitaiDecoderListManager.hasDecoder(name)) {
-            Logger.log("Kaitai decoder for $name already registered, skipping.")
-            return false
-        }
-
+    fun registerUserKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         val struct = KaitaiParser.parseYaml(kaitaiStruct)
         if (struct == null) {
             Logger.log("Failed to parse Kaitai struct for $name")
