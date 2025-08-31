@@ -60,7 +60,6 @@ data class ChipListItem(
 
         if (editable) {
             editButton.onclick = { event ->
-                console.log("editButton.onclick")
                 onEditClick()
             }
         } else {
@@ -79,6 +78,10 @@ data class ChipListItem(
             separatorElement.style.display = "none"
             buttonDivElement.style.display = "none"
         }
+    }
+
+    fun setEditCallback(callback: (String) -> Unit) {
+        editCallback = callback
     }
 
     /**
@@ -150,19 +153,9 @@ class ChipList(
     private val canToggleEnabled: Boolean = true
 ) {
     private val itemStore = mutableMapOf<String, ChipListItem>()
-    private var itemToggleCallback: ((String, Boolean) -> Unit)? = null
-    private var itemDeleteCallback: ((String) -> Unit)? = null
     private val dragAndDropHandler = DragAndDropHandler()
     private val noDecodersMessage: HTMLDivElement
     private val eventListeners: MutableMap<String, MutableSet<EventListener>> = mutableMapOf()
-
-
-    companion object {
-        fun createFromTemplate(): DocumentFragment {
-            val template = document.getElementById("decoder-list-template") as HTMLTemplateElement
-            return template.content.cloneNode(true) as DocumentFragment
-        }
-    }
 
     init {
         node.classList.toggle("sortable", canSort)
@@ -190,14 +183,6 @@ class ChipList(
         node.ondrop = { event ->
             dragAndDropHandler.handleDrop(event)
         }
-    }
-
-    fun setItemToggleCallback(callback: (String, Boolean) -> Unit) {
-        itemToggleCallback = callback
-    }
-
-    fun setItemDeleteCallback(callback: (String) -> Unit) {
-        itemDeleteCallback = callback
     }
 
     private fun getItemKeysOrdered(): List<String> {
@@ -229,6 +214,12 @@ class ChipList(
      * Adds an item to the list
      */
     fun addItem(item: ChipListItem) {
+        if (canEdit) {
+            item.setEditCallback { itemId ->
+                dispatchEvents("itemEdited", affectedIds = listOf(itemId))
+            }
+        }
+
         if (canDelete) {
             item.setDeleteCallback { itemId ->
                 deleteItem(itemId)
@@ -278,7 +269,6 @@ class ChipList(
                 node.appendChild(noDecodersMessage)
             }
             dispatchEvents("itemRemoved", affectedIds = listOf(id))
-            itemDeleteCallback?.invoke(id)
             true
         } ?: false
     }
@@ -289,7 +279,10 @@ class ChipList(
     fun toggleItem(id: String): Boolean {
         return itemStore[id]?.let {
             it.statusToggle()
-            itemToggleCallback?.invoke(id, it.isEnabled)
+            when (it.isEnabled) {
+                true -> dispatchEvents("itemEnabled", affectedIds = listOf(id))
+                false -> dispatchEvents("itemDisabled", affectedIds = listOf(id))
+            }
             true
         } ?: false
     }
@@ -345,6 +338,9 @@ class ChipList(
         Supported event types:
         - itemAdded
         - itemRemoved
+        - itemEnabled
+        - itemDisabled
+        - itemEdited
         - listCleared
         - orderChanged
          */

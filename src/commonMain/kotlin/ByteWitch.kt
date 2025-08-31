@@ -25,11 +25,15 @@ object ByteWitch {
         builtinDecoderListManager.setDecoders(
             decoders.associateBy { it.name },
         )
+        builtinDecoderListManager.setDecoderOrder(
+            decoders.map { it.name }
+        )
     }
 
     class DecoderListManager<DecoderType : ByteWitchDecoder> {
         private var decoders: MutableMap<String, DecoderType> = mutableMapOf()
-        private var disabledDecoderNames = mutableSetOf<String>()
+        private var disabledDecoderIds = mutableSetOf<String>()
+        private var orderedDecoderIds = mutableListOf<String>()
         private var activeOrderedDecoders = mutableListOf<DecoderType>()
 
         fun setDecoders(decoders: Map<String, DecoderType>) {
@@ -39,6 +43,9 @@ object ByteWitch {
 
         fun setDecoder(id: String, decoder: DecoderType) {
             decoders[id] = decoder
+            if (!orderedDecoderIds.contains(id)) {
+                orderedDecoderIds.add(id)
+            }
             updateActiveOrderedDecoders()
         }
 
@@ -48,6 +55,8 @@ object ByteWitch {
 
         fun removeDecoder(id: String) {
             decoders.remove(id)
+            orderedDecoderIds.remove(id)
+            disabledDecoderIds.remove(id)
             updateActiveOrderedDecoders()
         }
 
@@ -59,21 +68,26 @@ object ByteWitch {
 
         fun setAllDecodersEnabled(enabled: Boolean) {
             if (enabled) {
-                disabledDecoderNames.clear()
+                disabledDecoderIds.clear()
             } else {
-                disabledDecoderNames.addAll(
+                disabledDecoderIds.addAll(
                     decoders.map { it.key }
                 )
             }
             updateActiveOrderedDecoders()
         }
 
-        fun setDecoderEnabled(name: String, enabled: Boolean) {
+        fun setDecoderEnabled(id: String, enabled: Boolean) {
             if (enabled) {
-                disabledDecoderNames.remove(name)
+                disabledDecoderIds.remove(id)
             } else {
-                disabledDecoderNames.add(name)
+                disabledDecoderIds.add(id)
             }
+            updateActiveOrderedDecoders()
+        }
+
+        fun setDecoderOrder(orderedIds: List<String>) {
+            orderedDecoderIds = orderedIds.toMutableList()
             updateActiveOrderedDecoders()
         }
 
@@ -84,9 +98,9 @@ object ByteWitch {
         private fun updateActiveOrderedDecoders() {
             activeOrderedDecoders.clear()
             activeOrderedDecoders.addAll(
-                decoders
-                    .filter { entry -> !disabledDecoderNames.contains(entry.key) }
-                    .map { it.value }
+                orderedDecoderIds
+                    .filter { id -> !disabledDecoderIds.contains(id) }
+                    .mapNotNull { id -> decoders[id] }
             )
         }
     }

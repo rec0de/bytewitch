@@ -1,112 +1,92 @@
+import decoders.ByteWitchDecoder
 import kotlinx.browser.document
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 
 object DecoderListManager {
-    val builtinKaitaiList : ChipList
-    val userKaitaiList : ChipList
+    val builtinList: ChipList
+    val builtinKaitaiList: ChipList
+    val userKaitaiList: ChipList
 
     init {
-        setupBuiltinDecoder()
+        // Builtin decoder list
+        val builtinListElement = document.getElementById("builtin-decoder-list") as HTMLDivElement
+        builtinList = ChipList(builtinListElement, canEdit = false, canDelete = false)
+        setupDecoderList(
+            builtinList,
+            ByteWitch.builtinDecoderListManager,
+            "builtin",
+            deletable = false
+        )
+        val builtinDecoders = ByteWitch.builtinDecoderListManager.getAllDecoderNames()
+        builtinDecoders.forEach { decoder ->
+            builtinList.addItem(decoder.first, decoder.second, true)
+        }
 
         // Builtin Kaitai decoder list
         val builtinKaitaiListElement = document.getElementById("builtin-kaitai-decoder-list") as HTMLDivElement
         builtinKaitaiList = ChipList(builtinKaitaiListElement, canEdit = false, canDelete = false)
-        setupBuiltinKaitaiDecoder()
+        setupDecoderList(
+            builtinKaitaiList,
+            ByteWitch.builtinKaitaiDecoderListManager,
+            "builtin-kaitai",
+            deletable = false
+        )
 
         // User Kaitai decoder list
         val userKaitaiListElement = document.getElementById("user-kaitai-decoder-list") as HTMLDivElement
         userKaitaiList = ChipList(userKaitaiListElement, canEdit = true, canDelete = true)
-        setupUserKaitaiDecoder()
+        setupDecoderList(
+            userKaitaiList,
+            ByteWitch.userKaitaiDecoderListManager,
+            "user-kaitai",
+            deletable = true
+        )
+
+        userKaitaiList.addEventListener("itemEdited", { ids ->
+            console.log("User kaitai has been edited ${ids.first()}")
+            // TODO: implement
+        })
     }
 
-    fun setupBuiltinDecoder() {
-        val listElement = document.getElementById("builtin-decoder-list") as HTMLDivElement
-        val chipList = ChipList(listElement, canEdit = false, canDelete = false)
+    private fun <DecoderType : ByteWitchDecoder> setupDecoderList(
+        list: ChipList,
+        listManager: ByteWitch.DecoderListManager<DecoderType>,
+        prefix: String,
+        deletable: Boolean
+    ) {
+        list.addEventListener("orderChanged", {orderedIds ->
+            listManager.setDecoderOrder(orderedIds)
+            decode(false, force = true)
+        })
 
-        chipList.setItemToggleCallback { item, enabled ->
-            ByteWitch.builtinDecoderListManager.setDecoderEnabled(item, enabled)
+        list.addEventListener("itemEnabled") { ids ->
+            listManager.setDecoderEnabled(ids.first(), true)
+            decode(false, force = true)
+        }
+        list.addEventListener("itemDisabled") { ids ->
+            listManager.setDecoderEnabled(ids.first(), false)
             decode(false, force = true)
         }
 
-        val decoders = ByteWitch.builtinDecoderListManager.getAllDecoderNames()
-        decoders.forEach { decoder ->
-            chipList.addItem(decoder.first, decoder.second, true)
-        }
-
-        val enableAllBtn = document.getElementById("builtin-decoders-enable-all") as HTMLButtonElement
-        enableAllBtn.onclick = { event ->
-            chipList.setItemStatusForAll(true)
-            ByteWitch.builtinDecoderListManager.setAllDecodersEnabled(true)
-            decode(false, force = true)
-        }
-
-        val disableAllBtn = document.getElementById("builtin-decoders-disable-all") as HTMLButtonElement
-        disableAllBtn.onclick = { event ->
-            chipList.setItemStatusForAll(false)
-            ByteWitch.builtinDecoderListManager.setAllDecodersEnabled(false)
-            decode(false, force = true)
-        }
-
-        val resetOrderBtn = document.getElementById("builtin-decoders-reset-order") as HTMLButtonElement
-        resetOrderBtn.onclick = { event ->
-            val currentItemsEnabled = chipList.allItems.associate { item -> item.id to item.isEnabled }.toMutableMap()
-            chipList.clear()
-
-            decoders.forEach { decoder ->
-                chipList.addItem(decoder.first, decoder.second, currentItemsEnabled[decoder.first]!!)
+        if (deletable) {
+            list.addEventListener("itemRemoved") { ids ->
+                listManager.removeDecoder(ids.first())
+                decode(false, force = true)
             }
         }
-    }
 
-    fun setupBuiltinKaitaiDecoder() {
-        val decoders = ByteWitch.builtinKaitaiDecoderListManager.getAllDecoderNames()
-        decoders.forEach { decoder ->
-            builtinKaitaiList.addItem(decoder.first, decoder.second, true)
-        }
-
-        builtinKaitaiList.setItemToggleCallback { item, enabled ->
-            ByteWitch.builtinKaitaiDecoderListManager.setDecoderEnabled(item, enabled)
-            decode(false, force = true)
-        }
-
-        val enableAllBtn = document.getElementById("builtin-kaitai-decoders-enable-all") as HTMLButtonElement
+        val enableAllBtn = document.getElementById("$prefix-decoders-enable-all") as HTMLButtonElement
         enableAllBtn.onclick = { event ->
-            builtinKaitaiList.setItemStatusForAll(true)
-            ByteWitch.builtinKaitaiDecoderListManager.setAllDecodersEnabled(true)
+            list.setItemStatusForAll(true)
+            listManager.setAllDecodersEnabled(true)
             decode(false, force = true)
         }
 
-        val disableAllBtn = document.getElementById("builtin-kaitai-decoders-disable-all") as HTMLButtonElement
+        val disableAllBtn = document.getElementById("$prefix-decoders-disable-all") as HTMLButtonElement
         disableAllBtn.onclick = { event ->
-            builtinKaitaiList.setItemStatusForAll(false)
-            ByteWitch.builtinKaitaiDecoderListManager.setAllDecodersEnabled(false)
-            decode(false, force = true)
-        }
-    }
-
-    fun setupUserKaitaiDecoder() {
-        userKaitaiList.setItemToggleCallback { item, enabled ->
-            ByteWitch.userKaitaiDecoderListManager.setDecoderEnabled(item, enabled)
-            decode(false, force = true)
-        }
-
-        userKaitaiList.setItemDeleteCallback { item ->
-            ByteWitch.userKaitaiDecoderListManager.removeDecoder(item)
-            decode(false, force = true)
-        }
-
-        val enableAllBtn = document.getElementById("user-kaitai-decoders-enable-all") as HTMLButtonElement
-        enableAllBtn.onclick = { event ->
-            userKaitaiList.setItemStatusForAll(true)
-            ByteWitch.userKaitaiDecoderListManager.setAllDecodersEnabled(true)
-            decode(false, force = true)
-        }
-
-        val disableAllBtn = document.getElementById("user-kaitai-decoders-disable-all") as HTMLButtonElement
-        disableAllBtn.onclick = { event ->
-            userKaitaiList.setItemStatusForAll(false)
-            ByteWitch.userKaitaiDecoderListManager.setAllDecodersEnabled(false)
+            list.setItemStatusForAll(false)
+            listManager.setAllDecodersEnabled(false)
             decode(false, force = true)
         }
     }
