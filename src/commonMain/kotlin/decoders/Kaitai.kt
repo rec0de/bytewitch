@@ -160,15 +160,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 return Pair(TokenType.STRING, input.second.toString())
             }
 
-                TokenType.ARRAY -> {
-                    if (encoding != "UTF-16BE") {
-                        throw RuntimeException("Encodings other than UTF-16BE are not supported.")
+                TokenType.BYTEARRAY, TokenType.ARRAY -> {
+                    if (encoding != "UTF-8" && encoding != "ASCII") {
+                        throw RuntimeException("Encodings other than UTF-8 and ASCII are not supported.") // limited by kotlin js. the js part more specifically
                     }
-                    return Pair(TokenType.STRING, input.second.contentToString())
+
+                    return Pair(TokenType.STRING, (input.second as List<Pair<TokenType, Long>>).map { element -> element.second.toByte() }.toByteArray().toUTF8String())
                 }
 
                 else -> {
-                    throw RuntimeException("Unexpected token type:" + input.first + "for method: to_s.")
+                    throw RuntimeException("Unexpected token type: " + input.first + "for method: to_s.")
                 }
             }
         }
@@ -176,23 +177,28 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         fun expressionToInt(input: Pair<TokenType, dynamic>, radix: Int = 10): Pair<TokenType, Long> {
             when (input.first) {
                 TokenType.FLOAT -> {
-                    return Pair(TokenType.INTEGER, input.second.toLong())
+                    return Pair(TokenType.INTEGER, (input.second as Float).toLong())
                 }
 
                 TokenType.STRING -> {
-                    return Pair(TokenType.INTEGER, input.second.toLong(radix))
+                    val regex = Regex("0[bBoOxX]")
+                    return if (regex.matches((input.second as String).substring(0, 2))) {
+                        Pair(TokenType.INTEGER, (input.second as String).substring(2, input.second.length).toLong(radix))
+                    } else {
+                        Pair(TokenType.INTEGER, (input.second as String).toLong(radix))
+                    }
                 }
 
                 TokenType.ENUM -> {
-                    return Pair(TokenType.INTEGER, getEnumKeyFromValue(input.second.first, input.second.second))
+                    return Pair(TokenType.INTEGER, getEnumKeyFromValue((input.second as Pair<KTEnum, String>).first, (input.second as Pair<KTEnum, String>).second))
                 }
 
                 TokenType.BOOLEAN -> {
-                    return Pair(TokenType.INTEGER, if (input.second) 1 else 0)
+                    return Pair(TokenType.INTEGER, if (input.second as Boolean) 1L else 0L)
                 }
 
                 else -> {
-                    throw RuntimeException("Unexpected token type:" + input.first + "for method: to_i.")
+                    throw RuntimeException("Unexpected token type: " + input.first + "for method: to_i.")
                 }
             }
         }
@@ -208,16 +214,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         fun expressionLength(input: Pair<TokenType, dynamic>): Pair<TokenType, Long> {
             return when (input.first) {
-                TokenType.BYTEARRAY -> {
-                    Pair(TokenType.INTEGER, input.second.size.toLong())
+                TokenType.BYTEARRAY, TokenType.ARRAY -> {
+                    Pair(TokenType.INTEGER, (input.second as List<Pair<TokenType, Long>>).size.toLong())
                 }
 
                 TokenType.STRING -> {
-                    Pair(TokenType.INTEGER, input.second.length.toLong())
+                    Pair(TokenType.INTEGER, (input.second as String).length.toLong())
                 }
 
                 else -> {
-                    throw RuntimeException("Unexpected token type:" + input.first + "for method: length.")
+                    throw RuntimeException("Unexpected token type: " + input.first + "for method: length.")
                 }
             }
         }
@@ -234,7 +240,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             if (input.second.isEmpty()) {
                 throw RuntimeException("The array is empty and therefore has no first element.")
             } else {
-                return Pair(input.second[0].first, input.second.first())
+                return input.second.first()
             }
         }
 
@@ -242,25 +248,21 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             if (input.second.isEmpty()) {
                 throw RuntimeException("The array is empty and therefore has no last element.")
             } else {
-                return Pair(input.second[0].first, input.second.last())
+                return input.second.last()
             }
         }
 
         fun expressionSize(input: Pair<TokenType, dynamic>): Pair<TokenType, Long> {
             return if (input.first == TokenType.ARRAY) {
-                if (input.second.isEmpty()) {
-                    Pair(TokenType.INTEGER, 0)
-                } else {
-                    Pair(TokenType.INTEGER, input.second.size)
-                }
+                Pair(TokenType.INTEGER, (input.second as List<Pair<TokenType, dynamic>>).size.toLong())
             } else if (input.first == TokenType.STREAM) {
-                return Pair(TokenType.INTEGER, input.second.size / 8)
+                return Pair(TokenType.INTEGER, (input.second as BooleanArray).size / 8L)
             } else {
-                throw RuntimeException("Unexpected token type:" + input.first + "for method: size.")
+                throw RuntimeException("Unexpected token type: " + input.first + "for method: size.")
             }
         }
 
-        fun expressionMax(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        fun expressionMax(input: Pair<TokenType, List<Pair<TokenType, dynamic>>>): Pair<TokenType, dynamic> {
             return if (input.second.isEmpty()) {
                 throw RuntimeException("The array is empty and therefore has no max element.")
             } else {
@@ -272,17 +274,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     TokenType.KAITAIELEMENT -> {
                         Pair(
                             TokenType.KAITAIELEMENT,
-                            input.second.maxBy { it -> Long.fromBytes(it.second.value.toByteArray(), ByteOrder.BIG) })
+                            input.second.maxBy { it -> Long.fromBytes((it.second as KaitaiElement).value.toByteArray(), ByteOrder.BIG) })
                     }
 
                     else -> {
-                        Pair(input.second[0].first, input.second.maxBy { it -> it.second })
+                        input.second.maxBy { it -> it.second }
                     }
                 }
             }
         }
 
-        fun expressionMin(input: Pair<TokenType, dynamic>): Pair<TokenType, dynamic> {
+        fun expressionMin(input: Pair<TokenType, List<Pair<TokenType, dynamic>>>): Pair<TokenType, dynamic> {
             return if (input.second.isEmpty()) {
                 throw RuntimeException("The array is empty and therefore has no min element.")
             } else {
@@ -294,11 +296,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     TokenType.KAITAIELEMENT -> {
                         Pair(
                             TokenType.KAITAIELEMENT,
-                            input.second.minBy { it -> Long.fromBytes(it.second.value.toByteArray(), ByteOrder.BIG) })
+                            input.second.minBy { it -> Long.fromBytes((it.second as KaitaiElement).value.toByteArray(), ByteOrder.BIG) })
                     }
 
                     else -> {
-                        Pair(input.second[0].first, input.second.minBy { it -> it.second })
+                        input.second.minBy { it -> it.second }
                     }
                 }
             }
@@ -306,26 +308,30 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         fun expressionEof(input: Pair<TokenType, dynamic>, currentOffset: Int): Pair<TokenType, Boolean> {
             if (input.first == TokenType.STREAM) {
-                return Pair(TokenType.BOOLEAN, currentOffset > (input.second as BooleanArray).size) // TODO
+                return Pair(TokenType.BOOLEAN, currentOffset / 8 > (input.second as BooleanArray).size)
             } else {
-                throw RuntimeException("Unexpected token type:" + input.first + "for method: eof.")
+                throw RuntimeException("Unexpected token type: " + input.first + "for method: eof.")
             }
         }
 
-        fun expressionPos(input: Pair<TokenType, dynamic>, currentOffset: Int): Pair<TokenType, Int> {
+        fun expressionPos(input: Pair<TokenType, dynamic>, currentOffset: Int): Pair<TokenType, Long> {
             if (input.first == TokenType.STREAM) {
                 return Pair(
                     TokenType.INTEGER,
-                    if (currentOffset > (input.second as BooleanArray).size) throw RuntimeException("The current position ${currentOffset} is not in the stream.") else currentOffset
-                ) // TODO
+                    if (currentOffset > (input.second as BooleanArray).size) {
+                        throw RuntimeException("The current position ${currentOffset} is not in the stream.")
+                    } else {
+                        currentOffset / 8.toLong()
+                    }
+                )
             } else {
-                throw RuntimeException("Unexpected token type:" + input.first + "for method: eof.")
+                throw RuntimeException("Unexpected token type: " + input.first + "for method: eof.")
             }
         }
 
         fun expressionCast(input: Pair<TokenType, dynamic>, castType: Pair<TokenType, String>): Pair<TokenType, dynamic> {
             val castAsInt: List<String> = listOf("u1", "u2", "u4", "u8", "s1", "s2", "s4", "s8")
-            val castAsFloat: List<String> = listOf("f1", "f2", "f4", "f8")
+            val castAsFloat: List<String> = listOf("f1", "f2", "f4", "f8")  // TODO f1 and f2 do not exist, while f8 currently doesn't work
             val castAsString: List<String> = listOf("str", "strz")
             when (input.first) {
                 TokenType.INTEGER -> {
@@ -336,7 +342,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     ) {
                         return input
                     } else if (castType.second == "b1" || castType.second == "bool") {
-                        return Pair(TokenType.BOOLEAN, input.second > 0) // TODO idk
+                        return Pair(TokenType.BOOLEAN, input.second == 1) // TODO idk
                     } else if (castType.second in castAsFloat) {
                         return Pair(TokenType.FLOAT, input.second.toFloat())
                     } else if (castType.second in castAsString) {
@@ -356,7 +362,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     ) {
                         return Pair(TokenType.INTEGER, input.second.toLong())
                     } else if (castType.second == "b1" || castType.second == "bool") {
-                        return Pair(TokenType.BOOLEAN, input.second > 0) // TODO idk
+                        return Pair(TokenType.BOOLEAN, input.second == 1) // TODO idk
                     } else if (castType.second in castAsFloat) {
                         return input
                     } else if (castType.second in castAsString) {
@@ -408,7 +414,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
                 }
 
-                TokenType.BYTEARRAY -> {
+                TokenType.BYTEARRAY, TokenType.ARRAY -> {
                     if (castType.second in castAsInt ||
                         (castType.second[0] == 'b' &&
                                 castType.second.substring(1).all { it.isDigit() } &&
@@ -551,7 +557,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 is KaitaiUnsignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
                 is KaitaiFloat -> Pair(TokenType.FLOAT, Float.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
                 is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.enum)
-                is KaitaiBytes -> Pair(TokenType.BYTEARRAY, targetElement.value.toByteArray())
+                is KaitaiBytes -> {
+                    val byteArray = targetElement.value.toByteArray()
+                    val array: MutableList<Pair<TokenType, Long>> = mutableListOf()
+                    for (byte in byteArray) {
+                        array.add(Pair(TokenType.INTEGER, byte.toLong()))
+                    }
+                    Pair(TokenType.BYTEARRAY, array.toList())
+                }
                 is KaitaiList -> {
                     val kaitaiTree: MutableKaitaiTree = targetElement.bytesListTree
                     val array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
@@ -621,11 +634,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
 
                     "size" -> {
-                        return expressionSize(op2)
+                        return expressionSize(op1)
                     }
 
                     "pos" -> {
-                        return expressionPos(op2, offsetInCurrentIoStream)
+                        return expressionPos(op1, offsetInCurrentIoStream)
                     }
                 }
             } else if (op1.first == TokenType.INTEGER) {
@@ -643,10 +656,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             } else if (op1.first == TokenType.BYTEARRAY) {
                 if (op2.second == "length") {
                     return expressionLength(op1)
-                } else if (op2.second.first.second == "to_s") { // in this case op2 is a function token containing a pair of an identifier token which contains the function name and a parenthesis token with the function params. Therefore op2.second.first is the identifier token
+                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).first.second == "to_s") { // in this case op2 is a function token containing a pair of an identifier token which contains the function name and a parenthesis token with the function params. Therefore op2.second.first is the identifier token
                     return expressionToString(
                         op1,
-                        op2.second.second.second
+                        (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).second.second
                     ) // and op2.second.second is the parenthesis token. .second on top of that in both cases just returns the values of these tokens. See the last for loop in the function tokenizeExpression for more information.
                 } else if (op2.first == TokenType.CAST) {
                     return expressionCast(op1, op2)
@@ -658,9 +671,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     return expressionReverse(op1)
                 } else if (op2.second == "to_i") {
                     return expressionToInt(op1)
-                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).first.second == "to_i") {
-                    return expressionToInt(op1, op2.second.second.second)
-                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).first.second == "substring") {
+                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, dynamic>>).first.second == "to_i") {
+                    val radix: Long = parseExpression((op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).second.second)
+                    return expressionToInt(op1, radix.toInt())
+                } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, dynamic>>).first.second == "substring") {
                     val range =
                         parseArray( // the params from and to for substring can also be any expression. since at this point the content of the parentheses is just a string and the two params are seperated via a comma
                             Pair(TokenType.ARRAY, (op2.second as Pair<Pair<TokenType, dynamic>, Pair<TokenType, dynamic>>).second.second) // I just use the parseArray function to give me an integer array of length 2 which I later index accordingly.
@@ -701,22 +715,36 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         return expressionMax(op1)
                     }
                 }
+                if ((op1.second as List<Pair<TokenType, dynamic>>)[0].first == TokenType.INTEGER && (op1.second as List<Pair<TokenType, Long>>).all { it.second in 0L..255L }) {
+                    // the array might have been intended as a bytearray but was parsed as an array of integers. Therefore, the functions length and to_s are allowed.
+                    if (op2.second == "length") {
+                        println("HI")
+                        return expressionLength(op1)
+                    } else if (op2.first == TokenType.FUNCTION && (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).first.second == "to_s") { // in this case op2 is a function token containing a pair of an identifier token which contains the function name and a parenthesis token with the function params. Therefore op2.second.first is the identifier token
+                        return expressionToString(
+                            op1,
+                            (op2.second as Pair<Pair<TokenType, String>, Pair<TokenType, String>>).second.second
+                        ) // and op2.second.second is the parenthesis token. .second on top of that in both cases just returns the values of these tokens. See the last for loop in the function tokenizeExpression for more information.
+                    } else if (op2.first == TokenType.CAST) {
+                        return expressionCast(op1, op2)
+                    }
+                }
             } else if (op1.first == TokenType.KAITAITREE) {
                 return when (op2.second) {
                     "_parent" -> {
-                        Pair(TokenType.KAITAITREE, op1.second.parent)
+                        Pair(TokenType.KAITAITREE, (op1.second as MutableKaitaiTree).parent)
                     }
 
                     "_root" -> {
-                        Pair(TokenType.KAITAITREE, op1.second.root)
+                        Pair(TokenType.KAITAITREE, (op1.second as MutableKaitaiTree).root)
                     }
 
                     "_io" -> {
-                        Pair(TokenType.STREAM, null) // TODO
+                        Pair(TokenType.STREAM, (op1.second as MutableKaitaiTree).ioStream)
                     }
 
                     else -> {
-                        val targetElement: KaitaiElement = op1.second[op2.second]
+                        val targetElement: KaitaiElement = (op1.second as MutableKaitaiTree)[op2.second as String]
                         parseReferenceHelper(targetElement)
                     }
                 }
@@ -726,7 +754,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 } else if (op2.second == "_root") {
                     Pair(TokenType.KAITAITREE, op1.second.bytesListTree.root)
                 } else if (op2.second == "_io") {
-                    Pair(TokenType.STREAM, null) // TODO
+                    Pair(TokenType.STREAM, (op1.second as KaitaiElement).ioStream)
                 } else if (op2.first == TokenType.CAST) {
                     expressionCast(
                         op1,
@@ -996,37 +1024,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
             if ((op1.first == TokenType.BYTEARRAY || op1.first == TokenType.ARRAY) && (op2.first == TokenType.BYTEARRAY || op2.first == TokenType.ARRAY)) {
-                if (op1.second.size != op2.second.size) {
+                if ((op1.second as List<Pair<TokenType, dynamic>>).size != (op2.second as List<Pair<TokenType, dynamic>>).size) {
                     return Pair(TokenType.BOOLEAN, false)
                 } else {
-                    for (i in op1.second.size) {
-                        if (op1.first == TokenType.ARRAY && (op1.second[i].first == TokenType.ARRAY || op1.second[i].first == TokenType.BYTEARRAY)) {
-                            if (op2.first == TokenType.ARRAY && (op2.second[i].first == TokenType.ARRAY || op2.second[i].first == TokenType.BYTEARRAY)) {
-                                if (!parseEqual(
-                                        op1.second[i].second,
-                                        op2.second[i].second
-                                    ).second
-                                ) {
-                                    return Pair(TokenType.BOOLEAN, false)
-                                }
-                            } else
-                                return Pair(TokenType.BOOLEAN, false)
-                        } else if (op2.first == TokenType.ARRAY && (op2.second[i].first == TokenType.ARRAY || op2.second[i].first == TokenType.BYTEARRAY)) {
-                            return Pair(TokenType.BOOLEAN, false)
-                        } else {
-                            val left = if (op1.first == TokenType.BYTEARRAY) {
-                                op1.second[i].toLong()
-                            } else {
-                                op1.second[i].second.toLong()
-                            }
-                            val right = if (op2.first == TokenType.BYTEARRAY) {
-                                op2.second[i].toLong()
-                            } else {
-                                op2.second[i].second.toLong()
-                            }
-                            if (left != right) {
-                                return Pair(TokenType.BOOLEAN, false)
-                            }
+                    for (i in 0..op1.second.size) {
+                        val elementResult: Pair<TokenType, Boolean> = parseEqual(mutableListOf(op1.second[i]), mutableListOf(op2.second[i]))
+                        if (!elementResult.second) {
+                            return elementResult
                         }
                     }
                     return Pair(TokenType.BOOLEAN, true)
@@ -1040,14 +1044,59 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 )
 
                 return result
-            } else {
+            } else if (op1.first == TokenType.STRING && op2.first == TokenType.STRING){
                 val result: Pair<TokenType, Boolean> = Pair(
                     TokenType.BOOLEAN,
-                    op1.second == op2.second
+                    op1.second as String == op2.second as String
                 )
 
                 return result
+            } else if (op1.first == TokenType.INTEGER && op2.first == TokenType.INTEGER){
+                val result: Pair<TokenType, Boolean> = Pair(
+                    TokenType.BOOLEAN,
+                    (op1.second as Long).toString() == (op2.second as Long).toString()
+                ) // The cast to String is necessary as Kotlin JS just forgets that the longs are Kotlin longs because they are dynamics for a short time
+                // even though the Kotlin class is still Long in both cases.
+                // unsafeCast<Long>() also does not work.
+
+                return result
+            } else if (op1.first == TokenType.FLOAT && op2.first == TokenType.FLOAT){
+                val result: Pair<TokenType, Boolean> = Pair(
+                    TokenType.BOOLEAN,
+                    op1.second as Float == op2.second as Float
+                )
+
+                return result
+            } else if (op1.first == TokenType.BOOLEAN && op2.first == TokenType.BOOLEAN){
+                val result: Pair<TokenType, Boolean> = Pair(
+                    TokenType.BOOLEAN,
+                    op1.second as Boolean == op2.second as Boolean
+                )
+
+                return result
+            }else {
+                // this approach does not work as kotlin does not support comparing different values
+                /*val left = when (op1.first) {
+                    TokenType.INTEGER -> op1.second as Long
+                    TokenType.FLOAT -> op1.second as Float
+                    TokenType.STRING -> op1.second as String
+                    TokenType.BOOLEAN -> op1.second as Boolean
+                    else -> throw RuntimeException("Cannot compare ${op1.first}")
+                }
+                val right = when (op2.first) {
+                    TokenType.INTEGER -> op2.second as Long
+                    TokenType.FLOAT -> op2.second as Float
+                    TokenType.STRING -> op2.second as String
+                    TokenType.BOOLEAN -> op2.second as Boolean
+                    else -> throw RuntimeException("Cannot compare ${op2.first}")
+                }
+
+                return Pair(TokenType.BOOLEAN, left == right)*/
+
+                throw RuntimeException("Cannot compare ${op1.first} wih ${op2.first}")
+                // return Pair(TokenType.BOOLEAN, false)  would also be possible
             }
+
         }
 
         fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, Boolean> {
@@ -1197,7 +1246,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // but this is handled by parseDot.
             if (tokens.last().first == TokenType.INDEX) {
                 return parseIndex(
-                    tokens.subList(0, tokens.size - 2),
+                    tokens.subList(0, tokens.size - 1),
                     tokens.last()
                 )
             } else if (tokens[tokens.size - 2].first == TokenType.DOT) {
@@ -1749,7 +1798,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, booleanArrayOf(), 0, repeatIndex)
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex)
 
         if (seqElement.pos != null) {
             offsetInDatastreamInBits = if (seqElement.pos is StringOrInt.IntValue) {
