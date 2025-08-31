@@ -115,13 +115,15 @@ fun main() {
         // (as do specific keystrokes, but we'll see if we want to worry about those)
         document.onclick = {
             // avoid immediately clearing selection from click associated with select event
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
+            if(deltaTimeMs > 250) {
                 clearSelections()
             }
         }
 
         document.onkeydown = {
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
+            if(deltaTimeMs > 250 && it.keyCode !in listOf(16, 17, 20)) {
                 clearSelections()
             }
         }
@@ -130,7 +132,6 @@ fun main() {
 }
 
 fun clearSelections() {
-    lastSelectionEvent = null
     console.log("decode(tryhard=$tryhard)")
     val inputs = document.querySelectorAll("#data_container .input_area")
     inputs.asList().forEach {
@@ -241,7 +242,6 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
         val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         val inputText = textarea.value.trim()
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
-        (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
         // remember if this textarea has plain hex input so we can enable selection highlighting

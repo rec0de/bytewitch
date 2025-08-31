@@ -50,7 +50,7 @@ fun appendTextArea(content: String = "") {
     val sizeLabel = document.createElement("div") as HTMLDivElement
     sizeLabel.className = "sizeLabel"
     sizeLabel.appendChild(sizeText)
-    sizeLabel.appendChild(document.createElement("span"))
+    sizeLabel.appendChild(document.createElement("span")) // selection info
 
     wrapper.appendChild(textarea)
     wrapper.appendChild(sizeLabel)
@@ -59,33 +59,42 @@ fun appendTextArea(content: String = "") {
     textarea.oninput = {
         if(liveDecodeEnabled)
             decode(true)
+
+        val bytes = ByteWitch.getBytesFromInputEncoding(textarea.value)
+        (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
     }
 
-    textarea.onselect = {
+    textarea.addEventListener("selectionchange", {
         lastSelectionEvent = Date().getTime()
 
         // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
-        if(textarea.getAttribute("data-plainhex") == "true") {
-            clearSelections()
-            Logger.log("selected ${textarea.selectionStart} to ${textarea.selectionEnd}")
+        if (textarea.getAttribute("data-plainhex") == "true") {
+            val selectionStart = textarea.selectionStart!!
+            val selectionEnd = textarea.selectionEnd!!
 
-            val prefix = textarea.value.substring(0, textarea.selectionStart!!)
+            clearSelections()
+            if (selectionStart == selectionEnd) {
+                return@addEventListener
+            }
+            Logger.log("selected ${selectionStart} to ${selectionEnd}")
+
+            val prefix = textarea.value.substring(0, selectionStart)
             val sizeLabel = textarea.nextElementSibling as HTMLDivElement
 
             val r = Regex("#[^\n]*$")
-            if(r.containsMatchIn(prefix))
+            if (r.containsMatchIn(prefix))
                 sizeLabel.innerText = "" // selection starts in a comment
             else {
-                val selection = textarea.value.substring(textarea.selectionStart!!, textarea.selectionEnd!!)
-                val offset = ByteWitch.stripCommentsAndFilterHex(prefix).length.toDouble()/2
-                val range = ByteWitch.stripCommentsAndFilterHex(selection).length.toDouble()/2
+                val selection = textarea.value.substring(selectionStart, selectionEnd)
+                val range = ByteWitch.stripCommentsAndFilterHex(selection).length.toDouble() / 2
+                val offset = ByteWitch.stripCommentsAndFilterHex(prefix).length.toDouble() / 2
+                val offsetHex = "0x" + floor(offset).roundToInt().toString(16)
 
-
-                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
+                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText =
+                    " — selected ${range}B at offset $offset ($offsetHex)"
             }
         }
-    }
-
+    })
 }
 
 
