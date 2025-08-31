@@ -151,8 +151,9 @@ class ChipList(
 ) {
     private val itemStore = mutableMapOf<String, ChipListItem>()
     private var itemToggleCallback: ((String, Boolean) -> Unit)? = null
+    private var itemDeleteCallback: ((String) -> Unit)? = null
     private val dragAndDropHandler = DragAndDropHandler()
-    private var noDecodersMessage: HTMLDivElement? = null
+    private val noDecodersMessage: HTMLDivElement
 
 
     companion object {
@@ -171,7 +172,7 @@ class ChipList(
         d.style.color = "gray"
         d.style.padding = "8px"
         noDecodersMessage = d;
-        node.appendChild(noDecodersMessage!!)
+        node.appendChild(noDecodersMessage)
 
         node.ondragstart = { event ->
             dragAndDropHandler.handleDragStart(event)
@@ -200,6 +201,10 @@ class ChipList(
 
     fun setItemToggleCallback(callback: (String, Boolean) -> Unit) {
         itemToggleCallback = callback
+    }
+
+    fun setItemDeleteCallback(callback: (String) -> Unit) {
+        itemDeleteCallback = callback
     }
 
     private fun getItemKeysOrdered(): List<String> {
@@ -248,10 +253,8 @@ class ChipList(
         itemStore[item.id] = item
         node.appendChild(item.node)
 
-        noDecodersMessage?.let {
-            if (node.contains(it)) {
-                node.removeChild(it)
-            }
+        if (node.contains(noDecodersMessage)) {
+            node.removeChild(noDecodersMessage)
         }
     }
 
@@ -280,8 +283,9 @@ class ChipList(
         return itemStore.remove(id)?.let {
             node.removeChild(it.node)
             if (itemStore.isEmpty()) {
-                node.appendChild(noDecodersMessage!!)
+                node.appendChild(noDecodersMessage)
             }
+            itemDeleteCallback?.invoke(id)
             true
         } ?: false
     }
@@ -307,6 +311,10 @@ class ChipList(
         } ?: false
     }
 
+    fun setItemStatusForAll(status: Boolean) {
+        allItems.forEach { item -> item.setStatus(status) }
+    }
+
     /**
      * Finds an item by ID
      */
@@ -322,7 +330,7 @@ class ChipList(
             node.removeChild(item.node)
         }
         itemStore.clear()
-        node.appendChild(noDecodersMessage!!)
+        node.appendChild(noDecodersMessage)
     }
 
     /**

@@ -12,51 +12,82 @@ object ByteWitch {
         Randomness, HeuristicSignatureDetector
     )
 
-    private var bundledKaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
-    private var kaitaiDecoders = mutableMapOf<String, ByteWitchDecoder>()
-    private var kaitaiLiveDecoder: ByteWitchDecoder? = null
-
     private var plainHex = false
     fun isPlainHex() = plainHex
 
-    object DecoderManager {
-        private var disabledDefaultDecoders = mutableSetOf<String>()
-        private var disabledBundledDecoders = mutableSetOf<String>()
-        fun getDisabledDefaultDecoders() = disabledDefaultDecoders
-        fun getDisabledBundledDecoders() = disabledBundledDecoders
+    val builtinDecoderListManager = DecoderListManager<ByteWitchDecoder>()
+    val builtinKaitaiDecoderListManager = DecoderListManager<Kaitai>()
+    val userKaitaiDecoderListManager = DecoderListManager<Kaitai>()
 
-        fun setAllDefaultDecoderEnabled(enabled: Boolean) {
+    private var kaitaiLiveDecoder: ByteWitchDecoder? = null
+
+    init {
+        builtinDecoderListManager.setDecoders(
+            decoders.associateBy { it.name },
+        )
+    }
+
+    class DecoderListManager<DecoderType : ByteWitchDecoder> {
+        private var decoders: MutableMap<String, DecoderType> = mutableMapOf()
+        private var disabledDecoderNames = mutableSetOf<String>()
+        private var activeOrderedDecoders = mutableListOf<DecoderType>()
+
+        fun setDecoders(decoders: Map<String, DecoderType>) {
+            this.decoders = decoders.toMutableMap()
+            updateActiveOrderedDecoders()
+        }
+
+        fun setDecoder(id: String, decoder: DecoderType) {
+            decoders[id] = decoder
+            updateActiveOrderedDecoders()
+        }
+
+        fun hasDecoder(id: String): Boolean {
+            return decoders.containsKey(id)
+        }
+
+        fun removeDecoder(id: String) {
+            decoders.remove(id)
+            updateActiveOrderedDecoders()
+        }
+
+        fun getAllDecoderNames() : List<Pair<String, String>> {
+            return decoders.map { entry ->
+                Pair(entry.key, entry.value.name)
+            }
+        }
+
+        fun setAllDecodersEnabled(enabled: Boolean) {
             if (enabled) {
-                disabledDefaultDecoders.clear()
+                disabledDecoderNames.clear()
             } else {
-                disabledDefaultDecoders.addAll(
-                    decoders.map { it.name }
+                disabledDecoderNames.addAll(
+                    decoders.map { it.key }
                 )
             }
+            updateActiveOrderedDecoders()
         }
 
-        fun setDefaultDecoderEnabled(name: String, enabled: Boolean) {
+        fun setDecoderEnabled(name: String, enabled: Boolean) {
             if (enabled) {
-                disabledDefaultDecoders.remove(name)
+                disabledDecoderNames.remove(name)
             } else {
-                disabledDefaultDecoders.add(name)
+                disabledDecoderNames.add(name)
             }
+            updateActiveOrderedDecoders()
         }
 
-        fun getDefaultDecoderNames() : List<Pair<String, String>> {
-            return decoders.map { decoder ->
-                Pair(decoder.name, decoder.name)
-            }
+        fun getActiveOrderedDecoders(): List<DecoderType> {
+            return activeOrderedDecoders
         }
 
-        fun getActiveDefaultDecoders(): List<ByteWitchDecoder> {
-            return decoders.filter { !disabledDefaultDecoders.contains(it.name) }
-        }
-
-        fun getBundledDecoderNames() : List<Pair<String, String>> {
-            return bundledKaitaiDecoders.map { decoder ->
-                Pair(decoder.key, decoder.key)
-            }
+        private fun updateActiveOrderedDecoders() {
+            activeOrderedDecoders.clear()
+            activeOrderedDecoders.addAll(
+                decoders
+                    .filter { entry -> !disabledDecoderNames.contains(entry.key) }
+                    .map { it.value }
+            )
         }
     }
 
@@ -68,14 +99,14 @@ object ByteWitch {
         }
 
         val decoder = Kaitai(name, struct)
-        bundledKaitaiDecoders[name] = decoder
+        builtinKaitaiDecoderListManager.setDecoder(name, decoder)
         Logger.log("Registered bundled Kaitai decoder: $name")
         return true
     }
 
     fun registerKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
         // TODO: Do we want to allow overwriting existing decoders?
-        if (kaitaiDecoders.containsKey(name)) {
+        if (userKaitaiDecoderListManager.hasDecoder(name)) {
             Logger.log("Kaitai decoder for $name already registered, skipping.")
             return false
         }
@@ -86,20 +117,9 @@ object ByteWitch {
             return false
         }
         val decoder = Kaitai(name, struct)
-        kaitaiDecoders[name] = decoder
+        userKaitaiDecoderListManager.setDecoder(name, decoder)
         Logger.log("Registered Kaitai decoder: $name")
         return true
-    }
-
-    fun deregisterKaitaiDecoder(name: String): Boolean {
-        if (kaitaiDecoders.containsKey(name)) {
-            kaitaiDecoders.remove(name)
-            Logger.log("Deregistered Kaitai decoder: $name")
-            return true
-        } else {
-            Logger.log("No Kaitai decoder found for $name")
-            return false
-        }
     }
 
     fun setKaitaiLiveDecoder(kaitaiStruct: String?): Boolean {
@@ -122,9 +142,9 @@ object ByteWitch {
     }
 
     fun getAllDecoders(): List<ByteWitchDecoder> {
-        val allDecoders = kaitaiDecoders.values +
-                bundledKaitaiDecoders.values +
-                DecoderManager.getActiveDefaultDecoders()
+        val allDecoders = userKaitaiDecoderListManager.getActiveOrderedDecoders() +
+                builtinKaitaiDecoderListManager.getActiveOrderedDecoders() +
+                builtinDecoderListManager.getActiveOrderedDecoders()
         return listOfNotNull(kaitaiLiveDecoder) + allDecoders
     }
 

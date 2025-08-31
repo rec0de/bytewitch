@@ -18,8 +18,6 @@ object KaitaiUI {
     private val addButton = document.getElementById("add-kaitai") as HTMLButtonElement
     private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput")
     private val kaitaiValid = document.getElementById("kaitai-valid") as HTMLDivElement
-    private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
-    private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
     private val includeLiveStruct = TwoWayCheckboxBinding("kaitai-live")
     private var changedSinceLastDecode = true
 
@@ -94,7 +92,7 @@ object KaitaiUI {
                     continue
                 }
 
-                addParserToUI(kaitaiName)
+                DecoderListManager.addUserKaitaiDecoder(kaitaiName, kaitaiName)
             } else {
                 console.warn("Kaitai Struct $kaitaiName not found in storage")
             }
@@ -119,7 +117,7 @@ object KaitaiUI {
                 throw Error("Failed to register Kaitai Struct: $name")
             }
 
-            addParserToUI(name, bundled = true)
+            DecoderListManager.addBuiltinKaitaiDecoder(name, name)
         }
     }
 
@@ -141,19 +139,7 @@ object KaitaiUI {
                 console.error("Failed to save Kaitai Struct: $name")
             }
 
-            addParserToUI(name)
-        }
-    }
-
-    private fun addParserToUI(name: String, bundled: Boolean = false) {
-        val parserDiv = document.createElement("DIV") as HTMLDivElement
-        parserDiv.classList.add("kaitai")
-        parserDiv.innerHTML = name
-
-        if (bundled) {
-            bundledLegendContainer.appendChild(parserDiv)
-        } else {
-            legendContainer.appendChild(parserDiv)
+            DecoderListManager.addUserKaitaiDecoder(name, name)
         }
     }
 }
