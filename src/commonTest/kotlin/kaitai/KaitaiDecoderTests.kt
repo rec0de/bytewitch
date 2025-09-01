@@ -957,4 +957,34 @@ class KaitaiDecoderTests {
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
     }
+
+    @Test
+    fun testIfConditions() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "if_false", type = KTType.Primitive("u1"), ifCondition = StringOrBoolean.StringValue("1 == 2")),
+                KTSeq(id = "if_true", type = KTType.Primitive("u1"), ifCondition = StringOrBoolean.BooleanValue(true)),
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x11,
+            0x22
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        try {
+            result.bytesListTree["if_false"]
+            check(false)
+        } catch (e: Exception) {
+            check(e.message == "Could not find element with id if_false") {"Exception \"Could not find element with id if_false\" was expected but $e was thrown."}
+        }
+
+        val element = result.bytesListTree["if_true"]
+        checkElement(element, id="if_true", elementClass=KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11))
+    }
 }
