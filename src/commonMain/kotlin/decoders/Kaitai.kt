@@ -1844,11 +1844,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             type.sizeIsKnown = true
         }
 
-        // if we are operating on non byte aligned data, but we don't have a binary data type, something is very wrong
-        if (((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY))
-            && type.customType == null
-        ) {  // if it has subtypes we ignore the problem for now and we'll see inside the subtype again
-            throw RuntimeException("Cannot have a non binary type that starts in the middle of a byte")
+        // if we are operating on non byte aligned data, but we don't have a binary data type, we just skip some of the bits
+        if ((((offsetInDatastreamInBits + sourceOffsetInBits) % 8) != 0) && (type.usedDisplayStyle != DisplayStyle.BINARY)) {
+            val bufferAfterBinaryElement = 8 - ((offsetInDatastreamInBits + sourceOffsetInBits) % 8)
+            offsetInDatastreamInBits += bufferAfterBinaryElement
+            dataSizeOfSequenceInBits += bufferAfterBinaryElement
         }
 
         var kaitaiElement: KaitaiElement

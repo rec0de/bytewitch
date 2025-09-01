@@ -1,17 +1,9 @@
 package kaitai
 
 import bitmage.ByteOrder
-import bitmage.byteArrayOfInts
 import bitmage.booleanArrayOfInts
-import decoders.Kaitai
-import decoders.KaitaiBinary
-import decoders.KaitaiBytes
-import decoders.KaitaiList
-import decoders.KaitaiResult
-import decoders.KaitaiSignedInteger
-import decoders.KaitaiString
-import decoders.KaitaiUnsignedInteger
-import decoders.KaitaiEnum
+import bitmage.byteArrayOfInts
+import decoders.*
 import kaitai.KaitaiTestUtils.checkElement
 import kotlin.test.Test
 
@@ -292,7 +284,7 @@ class KaitaiDecoderTests {
 
         val field3 = result.bytesListTree["subElementsSpeakForThemselves"]
 
-        checkElement(field3, "subElementsSpeakForThemselves", KaitaiResult::class, Pair(17, 24), Pair(0, 0),)
+        checkElement(field3, "subElementsSpeakForThemselves", KaitaiResult::class, Pair(17, 24), Pair(0, 0))
         check(field3.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field3.bytesListTree!!.size}" }
         check(field3.bytesListTree!!["code"].value.contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
             "Expected subtype.code to be exactly 0xc0de and not ${field3.bytesListTree!!["code"].value}"
@@ -308,13 +300,19 @@ class KaitaiDecoderTests {
             seq = listOf(
                 KTSeq(id = "a", type = KTType.Primitive("b4")),
                 KTSeq(id = "b", type = KTType.Primitive("b5")),
-                KTSeq(id = "c", type = KTType.Primitive("b7"))
+                KTSeq(id = "c", type = KTType.Primitive("b7")),
+                KTSeq(id = "d", type = KTType.Primitive("b4")),
+                KTSeq(id = "e", type = KTType.Primitive("u1")),
+                KTSeq(id = "f", type = KTType.Primitive("b2")),
+                KTSeq(id = "g", type = KTType.Primitive("u1")),
             ),
         )
 
         val data = byteArrayOfInts(
             // subElementsTooShort, not a problem
-            0x12, 0xab,
+            0x11, 0x22,
+            0x33, 0x44,
+            0x55, 0x66,
         )
 
         val decoder = Kaitai("bitwise_offsets", struct)
@@ -328,13 +326,25 @@ class KaitaiDecoderTests {
         }
 
         val a = result.bytesListTree["a"]
-        checkElement(a, "a", KaitaiBinary::class, Pair(0,0), Pair(0, 4),)
+        checkElement(a, "a", KaitaiBinary::class, Pair(0,0), Pair(0, 4), booleanArrayOf(false, false, false, true))
 
         val b = result.bytesListTree["b"]
-        checkElement(b, "b", KaitaiBinary::class, Pair(0, 1), Pair(4, 1),)
+        checkElement(b, "b", KaitaiBinary::class, Pair(0, 1), Pair(4, 1), booleanArrayOf(false, false, false, true, false))
 
         val c = result.bytesListTree["c"]
-        checkElement(c, "c", KaitaiBinary::class, Pair(1, 2), Pair(1, 0),)
+        checkElement(c, "c", KaitaiBinary::class, Pair(1, 2), Pair(1, 0), booleanArrayOf(false, true, false, false, false, true, false))
+
+        val d = result.bytesListTree["d"]
+        checkElement(d, "d", KaitaiBinary::class, Pair(2, 2), Pair(0, 4),booleanArrayOf(false, false, true, true))
+
+        val e = result.bytesListTree["e"]
+        checkElement(e, "e", KaitaiUnsignedInteger::class, Pair(3, 4), Pair(0, 0), booleanArrayOfInts(0x44))
+
+        val f = result.bytesListTree["f"]
+        checkElement(f, "f", KaitaiBinary::class, Pair(4, 4), Pair(0, 2), booleanArrayOf(false, true))
+
+        val g = result.bytesListTree["g"]
+        checkElement(g, "g", KaitaiUnsignedInteger::class, Pair(5, 6), Pair(0, 0), booleanArrayOfInts(0x66))
     }
 
     @Test
@@ -848,7 +858,6 @@ class KaitaiDecoderTests {
                 KTSeq(id = "verbose_negative", type = KTType.Primitive("s4"), enum = "verbose_levels"),
                 KTSeq(id = "verbose_positive", type = KTType.Primitive("s4"), enum = "verbose_levels"),
                 KTSeq(id = "flags", type = KTType.Primitive("b1"), enum = "bit_flags"),
-                KTSeq(id = "buffer", type = KTType.Primitive("b7")),
                 KTSeq(id = "padding", type = KTType.Primitive("u1"), enum = "has_padding"),
             ),
             enums = mapOf(
