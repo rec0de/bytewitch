@@ -55,6 +55,45 @@ class KaitaiDecoderTests {
     }
 
     @Test
+    fun testBooleans() {
+        val struct = KTStruct(
+            meta = KTMeta(
+                id = "booleans",
+            ),
+            seq = listOf(
+                KTSeq(id = "field1", type = KTType.Primitive("b1")),
+                KTSeq(id = "field2", type = KTType.Primitive("b1")),
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x80,  // field1 = 1, field2 = 0, rest = 00_0000
+        )
+
+        val decoder = Kaitai("bools", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        // Validate the main result element
+        checkElement(result, "booleans", KaitaiResult::class, Pair(0, 0), Pair(0, 2))  // whether this is correct or not idk, but it's how it is implemented right now at the end of processSeq
+        check(result.endianness == ByteOrder.BIG) { "Expected endianness to be 'big', got '${result.endianness}'" }
+        check(result.bytesListTree.size == struct.seq.size) {
+            "Expected bytesListTree to have ${struct.seq.size} elements, got ${result.bytesListTree.size}"
+        }
+
+        // Validate field1
+        val field1 = result.bytesListTree["field1"]
+        check(field1 is KaitaiBoolean) { "Expected field1 to be KaitaiBoolean, got ${field1::class.simpleName}" }
+        checkElement(field1, "field1", KaitaiBoolean::class, Pair(0, 0), Pair(0, 1), htmlInnerContent = "field1(true)bool")
+
+        // Validate field2
+        val field2 = result.bytesListTree["field2"]
+        check(field2 is KaitaiBoolean) { "Expected field2 to be KaitaiBoolean, got ${field2::class.simpleName}" }
+        checkElement(field2, "field2", KaitaiBoolean::class, Pair(0, 0), Pair(1, 2), htmlInnerContent = "field2(false)bool")
+    }
+
+    @Test
     fun testUnsignedIntegers() {
         val struct = KTStruct(
             meta = KTMeta(
