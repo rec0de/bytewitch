@@ -2118,18 +2118,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
     ): Triple<KaitaiElement?, Int, Int> {
-        throw Exception("Instances are not properly implemented yet. Please come back later.")
         // TODO what to do with value?
         /*val value = instance.value?.let {
             //parseExpression(instance.value)
-        }
+        }*/
 
         // TODO wait until I get iostreams from Justus
         val actualIoStream : BooleanArray = if (instance.io != null) {
-            parseExpression(instance.io)
+            val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
+            expressionParser.parseExpression(instance.io)
         } else {
             ioStream
-        }*/
+        }
 
         val offsetInDatastreamInBits = 0
 
