@@ -54,6 +54,10 @@ object DecoderListManager {
         userKaitaiList.addEventListener("itemEdited", { ids ->
             KaitaiUI.editUserKaitai(ids.first())
         })
+        userKaitaiList.addEventListener("orderChanged", { ids ->
+            KaitaiStorage.reorderStructNames(ids)
+            decode(false, force = true)
+        })
     }
 
     private fun <DecoderType : ByteWitchDecoder> setupDecoderList(
