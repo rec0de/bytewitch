@@ -489,31 +489,43 @@ class KaitaiExpressionTests {
 
         var expressionResult = expressionParser.parseExpression("u1")
         check(expressionResult is Long) {"Expected type of u1 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 1) {"Expected result to be 1, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("u2")
         check(expressionResult is Long) {"Expected type of u2 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 514L) {"Expected result to be 514, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("u4")
         check(expressionResult is Long) {"Expected type of u4 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 67372036L) {"Expected result to be 67372036, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("u8")
         check(expressionResult is Long) {"Expected type of u8 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 578721382704613384L) {"Expected result to be 578721382704613384, got $expressionResult"}
 
         expressionResult = expressionParser.parseExpression("s1")
         check(expressionResult is Long) {"Expected type of s1 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 17L) {"Expected result to be 17, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("s2")
         check(expressionResult is Long) {"Expected type of s2 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 4626L) {"Expected result to be 4626, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("s4")
         check(expressionResult is Long) {"Expected type of s4 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 336860180L) {"Expected result to be 336860180, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("s8")
         check(expressionResult is Long) {"Expected type of s8 to be Long, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 1736164148113840152L) {"Expected result to be 1736164148113840152, got $expressionResult"}
 
         expressionResult = expressionParser.parseExpression("f4")
         check(expressionResult is Double) {"Expected type of f4 to be Double, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 3.559244355763391e-17) {"Expected result to be 3.559244355763391e-17, got $expressionResult"}
         expressionResult = expressionParser.parseExpression("f8")
         check(expressionResult is Double) {"Expected type of f8 to be Double, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == 3.0654356309538037e-115) {"Expected result to be 3.0654356309538037e-115, got $expressionResult"}
 
         expressionResult = expressionParser.parseExpression("str")
         check(expressionResult is String) {"Expected type of str to be String, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == "1") {"Expected result to be \"1\", got $expressionResult"}
         expressionResult = expressionParser.parseExpression("strz")
         check(expressionResult is String) {"Expected type of strz to be String, got ${expressionResult::class.simpleName}" }
+        check(expressionResult == "33\u0000") {"Expected result to be \"33\u0000\", got $expressionResult"}
     }
 
     @Test
