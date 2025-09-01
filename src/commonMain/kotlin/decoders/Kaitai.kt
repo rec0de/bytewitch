@@ -2123,7 +2123,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             //parseExpression(instance.value)
         }*/
 
-        // TODO wait until I get iostreams from Justus
         val actualIoStream : BooleanArray = if (instance.io != null) {
             val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
             expressionParser.parseExpression(instance.io)
@@ -2139,7 +2138,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             parentScopeStruct,
             currentScopeStruct,
             bytesListTree,
-            ioStream,
+            actualIoStream,
             offsetInDatastreamInBits,
             sourceOffsetInBits,
             dataSizeOfSequenceInBits,
