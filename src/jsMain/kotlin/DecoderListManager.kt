@@ -1,5 +1,6 @@
 import decoders.ByteWitchDecoder
 import kotlinx.browser.document
+import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 
@@ -32,7 +33,13 @@ object DecoderListManager {
 
         // User Kaitai decoder list
         val userKaitaiListElement = document.getElementById("user-kaitai-decoder-list") as HTMLDivElement
-        userKaitaiList = ChipList(userKaitaiListElement, canEdit = true, canDelete = true)
+        val userKaitaiDeleteConfirmationCallback = { id: String ->
+            window.confirm("Are you sure you want to delete the decoder '$id'?")
+        }
+        userKaitaiList = ChipList(
+            userKaitaiListElement, canEdit = true, canDelete = true,
+            deleteConfirmationCallback = userKaitaiDeleteConfirmationCallback
+        )
         setupDecoderList(
             userKaitaiList,
             ByteWitch.userKaitaiDecoderListManager,
@@ -54,7 +61,7 @@ object DecoderListManager {
         listManager: ByteWitch.DecoderListManager<DecoderType>,
         prefix: String
     ) {
-        list.addEventListener("orderChanged", {orderedIds ->
+        list.addEventListener("orderChanged", { orderedIds ->
             listManager.setDecoderOrder(orderedIds)
             decode(false, force = true)
         })

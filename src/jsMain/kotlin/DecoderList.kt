@@ -150,7 +150,8 @@ class ChipList(
     private val canSort: Boolean = true,
     private val canDelete: Boolean = true,
     private val canEdit: Boolean = true,
-    private val canToggleEnabled: Boolean = true
+    private val canToggleEnabled: Boolean = true,
+    private val deleteConfirmationCallback: ((String) -> Boolean)? = null,
 ) {
     private val itemStore = mutableMapOf<String, ChipListItem>()
     private val dragAndDropHandler = DragAndDropHandler()
@@ -263,6 +264,10 @@ class ChipList(
      * Removes an item from the list by ID
      */
     fun deleteItem(id: String): Boolean {
+        // If a delete confirmation callback is set, call it and check the result. Otherwise, proceed with deletion
+        val deleteConfirmed = deleteConfirmationCallback?.invoke(id) ?: true
+        if (!deleteConfirmed) return false
+
         return itemStore.remove(id)?.let {
             node.removeChild(it.node)
             if (itemStore.isEmpty()) {
