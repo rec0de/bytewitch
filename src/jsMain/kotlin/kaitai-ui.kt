@@ -27,6 +27,9 @@ object KaitaiUI {
             val inputValue = getInputValue()
             if (name.isNotEmpty() && inputValue.isNotEmpty()) {
                 addParser(name, inputValue)
+                // clear fields to indicate successful save
+                nameInput.value = ""
+                kaitaiInput.value = ""
             } else {
                 console.warn("Kaitai name and input cannot be empty")
             }
