@@ -178,7 +178,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         fun expressionToInt(input: Pair<TokenType, dynamic>, radix: Int = 10): Pair<TokenType, Long> {
             when (input.first) {
                 TokenType.FLOAT -> {
-                    return Pair(TokenType.INTEGER, (input.second as Float).toLong())
+                    return Pair(TokenType.INTEGER, (input.second as Double).toLong())
                 }
 
                 TokenType.STRING -> {
@@ -479,7 +479,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         fun parseInteger(token: Pair<TokenType, Long>): Pair<TokenType, Long> = token
 
-        fun parseFloat(token: Pair<TokenType, Float>): Pair<TokenType, Float> = token
+        fun parseFloat(token: Pair<TokenType, Double>): Pair<TokenType, Double> = token
 
         fun parseString(token: Pair<TokenType, String>): Pair<TokenType, String> = token
 
@@ -566,7 +566,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     Pair(TokenType.INTEGER, result)
                 }
                 is KaitaiUnsignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
-                is KaitaiFloat -> Pair(TokenType.FLOAT, Float.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
+                is KaitaiFloat -> {
+                    val byteArray = targetElement.value.toByteArray()
+                    val result = when (byteArray.size) {
+                        4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toDouble()
+                        8 -> Double.fromBytes(byteArray, ByteOrder.BIG)
+                        else -> throw IllegalArgumentException("Invalid byte array size for float: ${byteArray.size}")
+                    }
+                    Pair(TokenType.FLOAT, result)
+                }
                 is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.enum)
                 is KaitaiBytes -> {
                     val byteArray = targetElement.value.toByteArray()
@@ -813,7 +821,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             else
                 Pair(
                     TokenType.FLOAT,
-                    -(op.second).toFloat()
+                    -(op.second).toDouble()
                 )
         }
 
@@ -856,8 +864,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
-            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
             Pair(
                 TokenType.FLOAT,
                 left * right
@@ -877,8 +885,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
-            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
             Pair(
                 TokenType.FLOAT,
                 left / right
@@ -898,10 +906,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val result: Float = (op1.second).toFloat() % (op2.second).toFloat()
+            val result: Double = (op1.second).toDouble() % (op2.second).toDouble()
             Pair(
                 TokenType.FLOAT,
-                if (result < 0) result + (op2.second).toFloat() else result
+                if (result < 0) result + (op2.second).toDouble() else result
             )
         }
         else {
@@ -925,8 +933,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 (op1.second as String) + (op2.second as String)
             )
         else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
-            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
             Pair(
                 TokenType.FLOAT,
                 left + right
@@ -946,8 +954,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
         val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Float = if (op1.first == TokenType.INTEGER) (op1.second as Long).toFloat() else op1.second as Float
-            val right: Float = if (op2.first == TokenType.INTEGER) (op2.second as Long).toFloat() else op2.second as Float
+            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
             Pair(
                 TokenType.FLOAT,
                 left - right
@@ -1078,7 +1086,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             } else if (op1.first == TokenType.FLOAT && op2.first == TokenType.FLOAT){
                 val result: Pair<TokenType, Boolean> = Pair(
                     TokenType.BOOLEAN,
-                    op1.second as Float == op2.second as Float
+                    op1.second as Double == op2.second as Double
                 )
 
                 return result
@@ -1093,14 +1101,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 // this approach does not work as kotlin does not support comparing different values
                 /*val left = when (op1.first) {
                     TokenType.INTEGER -> op1.second as Long
-                    TokenType.FLOAT -> op1.second as Float
+                    TokenType.FLOAT -> op1.second as Double
                     TokenType.STRING -> op1.second as String
                     TokenType.BOOLEAN -> op1.second as Boolean
                     else -> throw RuntimeException("Cannot compare ${op1.first}")
                 }
                 val right = when (op2.first) {
                     TokenType.INTEGER -> op2.second as Long
-                    TokenType.FLOAT -> op2.second as Float
+                    TokenType.FLOAT -> op2.second as Double
                     TokenType.STRING -> op2.second as String
                     TokenType.BOOLEAN -> op2.second as Boolean
                     else -> throw RuntimeException("Cannot compare ${op2.first}")
@@ -1501,7 +1509,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         return Pair(
                             Pair(
                                 TokenType.FLOAT,
-                                trimmedExpression.substring(0..breakIndex - 1).replace("_", "").toFloat()
+                                trimmedExpression.substring(0..breakIndex - 1).replace("_", "").toDouble()
                             ), trimmed + breakIndex
                         )
                     else

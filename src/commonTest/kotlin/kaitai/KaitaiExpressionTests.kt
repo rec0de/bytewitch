@@ -507,8 +507,8 @@ class KaitaiExpressionTests {
 
         expressionResult = expressionParser.parseExpression("f4")
         check(expressionResult is Double) {"Expected type of f4 to be Double, got ${expressionResult::class.simpleName}" }
-        //expressionResult = expressionParser.parseExpression("f8")  // TODO f8 currently not supported
-        //check(expressionResult is Double) {"Expected type of f8 to be Double, got ${expressionResult::class.simpleName}" }
+        expressionResult = expressionParser.parseExpression("f8")
+        check(expressionResult is Double) {"Expected type of f8 to be Double, got ${expressionResult::class.simpleName}" }
 
         expressionResult = expressionParser.parseExpression("str")
         check(expressionResult is String) {"Expected type of str to be String, got ${expressionResult::class.simpleName}" }
