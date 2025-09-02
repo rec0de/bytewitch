@@ -2201,14 +2201,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         */
         val bytesListTree = MutableKaitaiTree(ioStream = ioStream)
         bytesListTree.parent = parentBytesListTree
-        if (bytesListTree.parent != null) {
-            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
-        } else {
-            bytesListTree.byteOrder = ByteOrder.BIG
-        }
-        currentScopeStruct.meta?.endian?.let { endian ->
-            bytesListTree.byteOrder = endian.toByteOrder()
-        }
+        bytesListTree.byteOrder = currentScopeStruct.meta?.endian?.toByteOrder() ?: bytesListTree.parent?.byteOrder ?: ByteOrder.BIG
 
         var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
