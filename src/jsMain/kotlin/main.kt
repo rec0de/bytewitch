@@ -32,6 +32,9 @@ fun main() {
         }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
+        // Initialize the layout manager
+        LayoutManager
+
         val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
         val tryhardBtn = document.getElementById("tryhard") as HTMLButtonElement
@@ -171,6 +174,7 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
         messageBox.appendChild(decodeWithSSF(bytes, taIndex))
     } else {
         messageBox?.remove()
+        noDecodeYet.style.display = "block"
     }
 }
 
