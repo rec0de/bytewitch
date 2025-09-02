@@ -55,6 +55,41 @@ class KaitaiDecoderTests {
     }
 
     @Test
+    fun endiannessTest() {
+        val struct = KTStruct(
+            meta = KTMeta(
+                id = "endianness",
+                endian = KTEndian.LE
+            ),
+            seq = listOf(
+                KTSeq(id = "a", type = KTType.Primitive("b17")),
+                KTSeq(id = "b", type = KTType.Primitive("b15")),
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x00, 0x01,
+            0x80, 0xff,
+        )
+
+        val decoder = Kaitai("endianness", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        // Validate the main result element
+        check(result.bytesListTree.size == struct.seq.size) {
+            "Expected bytesListTree to have ${struct.seq.size} elements, got ${result.bytesListTree.size}"
+        }
+
+        val a = result.bytesListTree["a"]
+        checkElement(a, "a", KaitaiUnsignedInteger::class, Pair(0, 2), Pair(0, 1), booleanArrayOfInts(0x00, 0x00, 0x00, 0x03))
+
+        val b = result.bytesListTree["b"]
+        checkElement(b, "b", KaitaiUnsignedInteger::class, Pair(2, 4), Pair(1, 0), booleanArrayOfInts(0x00, 0xff))
+    }
+
+    @Test
     fun testBooleans() {
         val struct = KTStruct(
             meta = KTMeta(
@@ -85,12 +120,12 @@ class KaitaiDecoderTests {
         // Validate field1
         val field1 = result.bytesListTree["field1"]
         check(field1 is KaitaiBoolean) { "Expected field1 to be KaitaiBoolean, got ${field1::class.simpleName}" }
-        checkElement(field1, "field1", KaitaiBoolean::class, Pair(0, 0), Pair(0, 1), htmlInnerContent = "field1(true)bool")
+        checkElement(field1, "field1", KaitaiBoolean::class, Pair(0, 0), Pair(0, 1), htmlInnerContent = "field1(true)b")
 
         // Validate field2
         val field2 = result.bytesListTree["field2"]
         check(field2 is KaitaiBoolean) { "Expected field2 to be KaitaiBoolean, got ${field2::class.simpleName}" }
-        checkElement(field2, "field2", KaitaiBoolean::class, Pair(0, 0), Pair(1, 2), htmlInnerContent = "field2(false)bool")
+        checkElement(field2, "field2", KaitaiBoolean::class, Pair(0, 0), Pair(1, 2), htmlInnerContent = "field2(false)b")
     }
 
     @Test
@@ -339,11 +374,13 @@ class KaitaiDecoderTests {
             seq = listOf(
                 KTSeq(id = "a", type = KTType.Primitive("b4")),
                 KTSeq(id = "b", type = KTType.Primitive("b5")),
-                KTSeq(id = "c", type = KTType.Primitive("b7")),
-                KTSeq(id = "d", type = KTType.Primitive("b4")),
+                KTSeq(id = "c", type = KTType.Primitive("b8")),
+                KTSeq(id = "d", type = KTType.Primitive("b3")),
                 KTSeq(id = "e", type = KTType.Primitive("u1")),
                 KTSeq(id = "f", type = KTType.Primitive("b2")),
                 KTSeq(id = "g", type = KTType.Primitive("u1")),
+                KTSeq(id = "h", type = KTType.Primitive("b17")),
+                KTSeq(id = "i", type = KTType.Primitive("b15")),
             ),
         )
 
@@ -352,6 +389,8 @@ class KaitaiDecoderTests {
             0x11, 0x22,
             0x33, 0x44,
             0x55, 0x66,
+            0x00, 0x01,
+            0x80, 0xff
         )
 
         val decoder = Kaitai("bitwise_offsets", struct)
@@ -365,25 +404,31 @@ class KaitaiDecoderTests {
         }
 
         val a = result.bytesListTree["a"]
-        checkElement(a, "a", KaitaiBinary::class, Pair(0,0), Pair(0, 4), booleanArrayOf(false, false, false, true))
+        checkElement(a, "a", KaitaiUnsignedInteger::class, Pair(0,0), Pair(0, 4), booleanArrayOf(false, false, false, false, false, false, false, true))
 
         val b = result.bytesListTree["b"]
-        checkElement(b, "b", KaitaiBinary::class, Pair(0, 1), Pair(4, 1), booleanArrayOf(false, false, false, true, false))
+        checkElement(b, "b", KaitaiUnsignedInteger::class, Pair(0, 1), Pair(4, 1), booleanArrayOf(false, false, false, false, false, false, true, false))
 
         val c = result.bytesListTree["c"]
-        checkElement(c, "c", KaitaiBinary::class, Pair(1, 2), Pair(1, 0), booleanArrayOf(false, true, false, false, false, true, false))
+        checkElement(c, "c", KaitaiUnsignedInteger::class, Pair(1, 2), Pair(1, 1), booleanArrayOf(false, true, false, false, false, true, false, false))
 
         val d = result.bytesListTree["d"]
-        checkElement(d, "d", KaitaiBinary::class, Pair(2, 2), Pair(0, 4),booleanArrayOf(false, false, true, true))
+        checkElement(d, "d", KaitaiUnsignedInteger::class, Pair(2, 2), Pair(1, 4),booleanArrayOf(false, false, false, false, false, false, true, true))
 
         val e = result.bytesListTree["e"]
         checkElement(e, "e", KaitaiUnsignedInteger::class, Pair(3, 4), Pair(0, 0), booleanArrayOfInts(0x44))
 
         val f = result.bytesListTree["f"]
-        checkElement(f, "f", KaitaiBinary::class, Pair(4, 4), Pair(0, 2), booleanArrayOf(false, true))
+        checkElement(f, "f", KaitaiUnsignedInteger::class, Pair(4, 4), Pair(0, 2), booleanArrayOf(false, false, false, false, false, false, false, true))
 
         val g = result.bytesListTree["g"]
         checkElement(g, "g", KaitaiUnsignedInteger::class, Pair(5, 6), Pair(0, 0), booleanArrayOfInts(0x66))
+
+        val h = result.bytesListTree["h"]
+        checkElement(h, "h", KaitaiUnsignedInteger::class, Pair(6, 8), Pair(0, 1), booleanArrayOfInts(0x00, 0x00, 0x00, 0x03))
+
+        val i = result.bytesListTree["i"]
+        checkElement(i, "i", KaitaiUnsignedInteger::class, Pair(8, 10), Pair(1, 0), booleanArrayOfInts(0x00, 0xff))
     }
 
     @Test
@@ -968,7 +1013,7 @@ class KaitaiDecoderTests {
         // Validate field protocol_huge
         protocol = result.bytesListTree["protocol_huge"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xB2, 0xD0, 0x5E, 0x00,))
+        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xB2, 0xD0, 0x5E, 0x00))
         enum = Pair(struct.enums["ip_protocols"], "some_protocol")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
@@ -984,7 +1029,7 @@ class KaitaiDecoderTests {
         // Validate field verbose positive
         protocol = result.bytesListTree["verbose_positive"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="verbose_positive", elementClass=KaitaiEnum::class, sourceByteRange=Pair(12, 16), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x02,))
+        checkElement(protocol, id="verbose_positive", elementClass=KaitaiEnum::class, sourceByteRange=Pair(12, 16), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x02))
         enum = Pair(struct.enums["verbose_levels"], "medium")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
@@ -992,7 +1037,7 @@ class KaitaiDecoderTests {
         // Validate field flags
         protocol = result.bytesListTree["flags"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="flags", elementClass=KaitaiEnum::class, sourceByteRange=Pair(16, 16), sourceRangeBitOffset=Pair(0, 1), value=booleanArrayOf(true,))
+        checkElement(protocol, id="flags", elementClass=KaitaiEnum::class, sourceByteRange=Pair(16, 16), sourceRangeBitOffset=Pair(0, 1), value=booleanArrayOf(true))
         enum = Pair(struct.enums["bit_flags"], "flag2")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
@@ -1000,7 +1045,7 @@ class KaitaiDecoderTests {
         // Validate field padding
         protocol = result.bytesListTree["padding"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="padding", elementClass=KaitaiEnum::class, sourceByteRange=Pair(17, 18), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x10,))
+        checkElement(protocol, id="padding", elementClass=KaitaiEnum::class, sourceByteRange=Pair(17, 18), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x10))
         enum = Pair(struct.enums["has_padding"], "true")
         check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
         check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
