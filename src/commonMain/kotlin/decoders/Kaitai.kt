@@ -1652,17 +1652,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return fullyFlatArray
     }
 
-    fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, bytesListTree: MutableKaitaiTree): V? {
-        val value = parseValue(switchOn, bytesListTree)
-        val transformedMap = cases.mapKeys { case -> parseValue(case.key, bytesListTree) }
-        val matchingKey = transformedMap.keys.find {
-            if (it.size < value.size) {
-                it.padLeft(value.size - it.size).contentEquals(value)
-            } else {
-                value.padLeft(it.size - value.size).contentEquals(it)
+    fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, expressionParser: ExpressionParser): V? {
+        cases.forEach { (key, value) ->
+            if (key != "_") {
+                val matches = expressionParser.parseExpression("$switchOn == $key") as Boolean
+                if (matches) {
+                    return value
+                }
             }
         }
-        return matchingKey?.let { transformedMap[matchingKey] } ?: cases["_"]
+        return cases["_"]
     }
 
     fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
@@ -1773,7 +1772,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 Type(seqElement.type.type)
             }
             is KTType.Switch -> {
-                val entry = processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, bytesListTree)
+                val entry = processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, expressionParser)
                 checkNotNull(entry) { "No matching case found" }
                 Type(entry)
             }
@@ -2191,7 +2190,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     endian.value.toByteOrder()
                 }
                 is KTEndian.Switch -> {
-                    val entry = processSwitchOn(endian.switchOn, endian.cases, bytesListTree)
+                    val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
+                    val entry = processSwitchOn(endian.switchOn, endian.cases, expressionParser)
                     checkNotNull(entry) { "No matching case found" }
                     entry.toByteOrder()
                 }
