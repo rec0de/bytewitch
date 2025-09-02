@@ -25,7 +25,8 @@ class KaitaiParserTests {
         checkNotNull(struct.meta) { "Expected meta to be non-null" }
         check(struct.meta.id == "example") { "Expected id to be 'example', got '${struct.meta.id}'" }
         check(struct.meta.title == "Example Struct") { "Expected title to be 'Example Struct', got '${struct.meta.title}'" }
-        check(struct.meta.endian == KTEndian.LE) { "Expected endian to be 'le', got '${struct.meta.endian}'" }
+        check(struct.meta.endian is KTEndian.Primitive) { "Expected endian to be primitive" }
+        check(struct.meta.endian.value == KTEndianEnum.LE) { "Expected endian to be 'le', got '${struct.meta.endian}'" }
 
         check(struct.seq.size == 2) { "Expected 2 sequence items, got ${struct.seq.size}" }
 
