@@ -56,7 +56,6 @@ object DecoderListManager {
         })
         userKaitaiList.addEventListener("orderChanged", { ids ->
             KaitaiStorage.reorderStructNames(ids)
-            decode(false, force = true)
         })
     }
 
