@@ -40,6 +40,7 @@ fun main() {
         LayoutManager
         SettingsManager
         DecoderListManager
+        TextareaUtils
 
         val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
@@ -91,14 +92,12 @@ fun main() {
 
         // to add more text areas for protocols
         addDataBox.onclick = {
-            appendTextArea()
+            TextareaUtils.appendTextArea()
         }
 
         // to delete last text area
         deleteDataBox.onclick = {
-            if (dataContainer.children.length > 1) { // there need to be at least one data container left
-                removeTextArea(dataContainer)
-            }
+            TextareaUtils.removeTextArea()
         }
 
         liveDecode.onchange = {
@@ -109,7 +108,7 @@ fun main() {
         }
 
         // init first textarea
-        appendTextArea()
+        TextareaUtils.appendTextArea()
 
         // a click anywhere clears any present selection
         // (as do specific keystrokes, but we'll see if we want to worry about those)

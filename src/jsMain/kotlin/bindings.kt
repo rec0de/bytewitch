@@ -30,11 +30,10 @@ class TwoWayInputBinding(elementId: String, storageKey: String? = null) {
     }
 }
 
-class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
-    private val inputElement = document.getElementById(elementId) as HTMLTextAreaElement
+class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String?) {
 
-    var value: String by Delegates.observable(inputElement.value) { _, _, newValue ->
-        inputElement.value = newValue
+    var value: String by Delegates.observable(element.value) { _, _, newValue ->
+        element.value = newValue
         // TODO: Should this be debounced?
         storageKey?.also {
             sessionStorage.setItem(it, newValue)
@@ -50,10 +49,11 @@ class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
             }
         }
 
-        inputElement.oninput = {
-            value = inputElement.value
+        // use addEventListener to avoid overwriting (or being overwritten by) other listeners
+        element.addEventListener("input", {
+            value = element.value
             onInput?.invoke(value)
-        }
+        })
     }
 }
 

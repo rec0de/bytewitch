@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
+import org.w3c.dom.HTMLTextAreaElement
 
 
 @Serializable
@@ -15,7 +16,7 @@ data class KaitaiManifest(
 object KaitaiUI {
     private val nameInput = TwoWayInputBinding("kaitai-name", "kaitai-name-input")
     private val saveButton = document.getElementById("save-kaitai") as HTMLButtonElement
-    private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput", "kaitai-live-struct")
+    private val kaitaiInput = TwoWayTextAreaBinding(document.getElementById("kaitaiinput") as HTMLTextAreaElement, "kaitai-live-struct")
     private val kaitaiValid = document.getElementById("kaitai-valid") as HTMLDivElement
     private val includeLiveStruct = TwoWayCheckboxBinding("kaitai-live", "include-kaitai-live-struct")
     private var changedSinceLastDecode = true
