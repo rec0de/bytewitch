@@ -187,7 +187,7 @@ class ChipList(
         }
     }
 
-    private fun getItemKeysOrdered(): List<String> {
+    fun getItemIdsOrdered(): List<String> {
         //return container.querySelectorAll(".chip").asList().mapNotNull { it.getAttribute("data-chip-id") }
         return node.querySelectorAll(".chip").asList()
             .mapNotNull { node -> (node as HTMLElement).getAttribute("data-chip-id") }
@@ -197,7 +197,7 @@ class ChipList(
      * Gets all items in the list regardless of their enabled state
      */
     val allItems: List<ChipListItem>
-        get() = getItemKeysOrdered().mapNotNull { key -> itemStore[key] }
+        get() = getItemIdsOrdered().mapNotNull { key -> itemStore[key] }
 
 
     /**
@@ -321,7 +321,7 @@ class ChipList(
         allItems.forEach { item ->
             node.removeChild(item.node)
         }
-        val affectedIds = getItemKeysOrdered()
+        val affectedIds = getItemIdsOrdered()
         itemStore.clear()
         node.appendChild(noDecodersMessage)
         dispatchEvents("listCleared", affectedIds = affectedIds)
@@ -340,12 +340,12 @@ class ChipList(
         get() = itemStore.isEmpty()
 
     fun saveDefaultOrder() {
-        defaultOrder = getItemKeysOrdered()
+        defaultOrder = getItemIdsOrdered()
     }
 
     fun getDefaultOrder(): List<String> {
         return defaultOrder.ifEmpty {
-            getItemKeysOrdered()
+            getItemIdsOrdered()
         }
     }
 
@@ -464,7 +464,7 @@ class ChipList(
             removePlaceholder()
             removeLinebreaker()
 
-            dispatchEvents("orderChanged", affectedIds = getItemKeysOrdered())
+            dispatchEvents("orderChanged", affectedIds = getItemIdsOrdered())
         }
 
         private fun createPlaceholder() {

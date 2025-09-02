@@ -134,7 +134,6 @@ fun main() {
 }
 
 fun clearSelections() {
-    console.log("decode(tryhard=$tryhard)")
     val inputs = document.querySelectorAll("#data_container .input_area")
     inputs.asList().forEach {
         val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!

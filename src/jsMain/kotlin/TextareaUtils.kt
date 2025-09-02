@@ -45,7 +45,7 @@ object TextareaUtils {
         hexview.innerHTML = ""
     }
 
-    fun appendTextArea(content: String = "") {
+    fun appendTextArea(content: String? = null) {
         val textareaIndex = textareaContainers.size
 
         // create new textareaContainer if no empty one exists
@@ -58,7 +58,7 @@ object TextareaUtils {
         // textarea.value = content // set later via binding
         textarea.setAttribute("data-textarea-id", textareaIndex.toString())
 
-        val bytes = ByteWitch.getBytesFromInputEncoding(content)
+        val bytes = ByteWitch.getBytesFromInputEncoding(content?:"")
         val byteSizeText = "${bytes.size}B (0x${bytes.size.toString(16)})"
 
         val sizeText = document.createElement("span") as HTMLSpanElement
@@ -75,7 +75,11 @@ object TextareaUtils {
         textareaContainers.add(textareaIndex, textareaContainer)
 
         val binding = TwoWayTextAreaBinding(textarea, "input-data-$textareaIndex")
-        binding.value = content
+        // if content is passed to this function, overwrite the stored content
+        // (this currently only happens when a file is imported)
+        if (content != null && content.isNotEmpty()) {
+            binding.value = content
+        }
         textareaBindings.add(binding)
 
 

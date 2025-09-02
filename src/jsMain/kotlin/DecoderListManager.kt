@@ -81,21 +81,27 @@ object DecoderListManager {
 
         val enableAllBtn = document.getElementById("$prefix-decoders-enable-all") as? HTMLButtonElement
         enableAllBtn?.onclick = { event ->
-            list.setItemStatusForAll(true)
-            listManager.setAllDecodersEnabled(true)
-            decode(false, force = true)
+            if (!list.disabledItems.isEmpty()) {
+                list.setItemStatusForAll(true)
+                listManager.setAllDecodersEnabled(true)
+                decode(false, force = true)
+            }
         }
 
         val disableAllBtn = document.getElementById("$prefix-decoders-disable-all") as? HTMLButtonElement
         disableAllBtn?.onclick = { event ->
-            list.setItemStatusForAll(false)
-            listManager.setAllDecodersEnabled(false)
-            decode(false, force = true)
+            if (!list.enabledItems.isEmpty()) {
+                list.setItemStatusForAll(false)
+                listManager.setAllDecodersEnabled(false)
+                decode(false, force = true)
+            }
         }
 
         val resetOrderBtn = document.getElementById("$prefix-decoders-reset-order") as? HTMLButtonElement
         resetOrderBtn?.onclick = { event ->
-            list.resetDefaultOrder()
+            if (list.getDefaultOrder() != list.getItemIdsOrdered()) {
+                list.resetDefaultOrder()
+            }
             // no need to update the order of decoders in the backend or force a decode,
             // as resetting the order triggers the orderChanged event
         }
