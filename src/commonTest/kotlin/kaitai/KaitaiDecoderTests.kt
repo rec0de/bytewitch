@@ -1080,4 +1080,125 @@ class KaitaiDecoderTests {
         val element = result.bytesListTree["if_true"]
         checkElement(element, id="if_true", elementClass=KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x11))
     }
+
+    @Test
+    fun testSwitchOn() {
+        val struct = KTStruct(
+            meta = KTMeta(
+                id = "switch-on",
+            ),
+            seq = listOf(
+                KTSeq(id = "signature", size = StringOrInt.IntValue(4)),
+                KTSeq(id = "field", type = KTType.Primitive("sub")),
+                KTSeq(id = "number_type1", type = KTType.Primitive("u2")),
+                KTSeq(id = "number_body1", type = KTType.Switch(
+                    switchOn = "number_type1",
+                    cases = mapOf(
+                        "0x0201" to "u2",
+                        "0x0403" to "s2",
+                        "0x0605" to "u4",
+                        "0x0807" to "s4"
+                    )
+                )),
+                KTSeq(id = "number_type2", type = KTType.Primitive("u2")),
+                KTSeq(id = "number_body2", type = KTType.Switch(
+                    switchOn = "number_type2",
+                    cases = mapOf(
+                        "513" to "u2",
+                        "1027" to "s2",
+                        "1541" to "u4",
+                        "2055" to "s4"
+                    )
+                )),
+                KTSeq(id = "number_type_default", type = KTType.Primitive("u1")),
+                KTSeq(id = "number_body_default", type = KTType.Switch(
+                    switchOn = "number_type_default",
+                    cases = mapOf(
+                        "0x01" to "u1",
+                        "0x02" to "s1",
+                        "_" to "u2",
+                    )
+                )),
+            ),
+            types = mapOf(
+                Pair(
+                    "sub",
+                    KTStruct(
+                        meta = KTMeta(
+                            endian = KTEndian.Switch(
+                                switchOn = "_root.signature",
+                                cases = mapOf(
+                                    "[0xde, 0x12, 0x04, 0x95]" to KTEndianEnum.LE,
+                                    "[0x95, 0x04, 0x12, 0xde]" to KTEndianEnum.BE
+                                )
+                            )
+                        ),
+                        seq = listOf(
+                            KTSeq(id = "sub-field", type = KTType.Primitive("u2"))
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0xde, 0x12, 0x04, 0x95, // signature
+            0x11, 0x00, // field (17 le)
+            0x04, 0x03, // number_type1 (1027)
+            0xFF, 0xB2, // number_body1 (-78)
+            0x06, 0x05, // number_type2 (1541)
+            0xFF, 0xB2, 0xF2, 0x38, // number_body1 (4289917496)
+            0x03, // number_type_default (3)
+            0x04, 0x01 // number_body_default (1025)
+        )
+
+        val decoder = Kaitai("switch-on", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        // Validate the main result element
+        checkElement(result, "switch-on", KaitaiResult::class, Pair(0, 19), Pair(0, 0))
+        check(result.endianness == ByteOrder.BIG) { "Expected endianness to be 'big', got '${result.endianness}'" }
+        check(result.bytesListTree.size == struct.seq.size) {
+            "Expected bytesListTree to have ${struct.seq.size} elements, got ${result.bytesListTree.size}"
+        }
+
+        // Validate field signature
+        val fieldSignature = result.bytesListTree["signature"]
+        checkElement(fieldSignature, "signature", KaitaiBytes::class, Pair(0, 4), Pair(0, 0), booleanArrayOfInts(0xde, 0x12, 0x04, 0x95))
+
+        // Validate field 'field'
+        val field = result.bytesListTree["field"]
+        checkElement(field, "field", KaitaiResult::class, Pair(4, 6), Pair(0, 0))
+
+        // Validate field sub-field
+        val subField = field.bytesListTree?.get("sub-field")
+        checkNotNull(subField) { "Expected sub-field to be part pf field" }
+        checkElement(subField, "sub-field", KaitaiUnsignedInteger::class, Pair(4, 6), Pair(0, 0), htmlInnerContent = "sub-field(17)u")
+
+        // Validate field number_type1
+        val fieldNumberType1 = result.bytesListTree["number_type1"]
+        checkElement(fieldNumberType1, "number_type1", KaitaiUnsignedInteger::class, Pair(6, 8), Pair(0, 0), htmlInnerContent = "number_type1(1027)u")
+
+        // Validate field number_body1
+        val fieldNumberBody1 = result.bytesListTree["number_body1"]
+        checkElement(fieldNumberBody1, "number_body1", KaitaiSignedInteger::class, Pair(8, 10), Pair(0, 0), htmlInnerContent = "number_body1(-78)s")
+
+        // Validate field number_type2
+        val fieldNumberType2 = result.bytesListTree["number_type2"]
+        checkElement(fieldNumberType2, "number_type2", KaitaiUnsignedInteger::class, Pair(10, 12), Pair(0, 0), htmlInnerContent = "number_type2(1541)u")
+
+        // Validate field number_body2
+        val fieldNumberBody2 = result.bytesListTree["number_body2"]
+        checkElement(fieldNumberBody2, "number_body2", KaitaiUnsignedInteger::class, Pair(12, 16), Pair(0, 0), htmlInnerContent = "number_body2(4289917496)u")
+
+        // Validate field number_type_default
+        val fieldNumberTypeDefault = result.bytesListTree["number_type_default"]
+        checkElement(fieldNumberTypeDefault, "number_type_default", KaitaiUnsignedInteger::class, Pair(16, 17), Pair(0, 0), htmlInnerContent = "number_type_default(3)u")
+
+        // Validate field number_body_default
+        val fieldNumberBodyDefault = result.bytesListTree["number_body_default"]
+        checkElement(fieldNumberBodyDefault, "number_body_default", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "number_body_default(1025)u")
+    }
 }
