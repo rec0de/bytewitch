@@ -12,7 +12,7 @@ object KaitaiTestUtils {
         elementClass: KClass<*>? = null,
         sourceByteRange: Pair<Int, Int>? = null,
         sourceRangeBitOffset: Pair<Int, Int>? = null,
-        value: BooleanArray? = null,
+        value: dynamic = null,
         htmlInnerContent: String? = null
     ) {
         check(element.id == id) {
@@ -34,7 +34,10 @@ object KaitaiTestUtils {
             }
         }
         if (value != null) {
-            check(element.value.contentEquals(value)) {
+            check(when (element.value) {
+                is BooleanArray -> (element.value as BooleanArray).contentEquals(value)
+                is List<dynamic> -> (element.value as List<dynamic>).withIndex().all {(i, it) -> it == (value as List<dynamic>)[i]}
+                else -> element.value == value}) {
                 "Expected value of field '$id' to be exactly '$value', got '${element.value}'"
             }
         }

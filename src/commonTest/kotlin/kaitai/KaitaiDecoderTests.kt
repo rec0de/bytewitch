@@ -339,20 +339,20 @@ class KaitaiDecoderTests {
         val field1 = result.bytesListTree["subElementsTooShort"]
         checkElement(field1, "subElementsTooShort", KaitaiResult::class, Pair(0, 7), Pair(0, 0))
         check(field1.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field1.bytesListTree!!.size}" }
-        check(field1.bytesListTree!!["code"].value.contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
+        check((field1.bytesListTree!!["code"].value as BooleanArray).contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
             "Expected subtype.code to be exactly 0xc0 0xde and not ${field1.bytesListTree!!["code"].value}"
         }
-        check(field1.bytesListTree!!["name"].value.contentEquals(booleanArrayOfInts(0x61, 0x62, 0x63, 0x64, 0x65))) {
+        check((field1.bytesListTree!!["name"].value as BooleanArray).contentEquals(booleanArrayOfInts(0x61, 0x62, 0x63, 0x64, 0x65))) {
             "Expected subtype.name to be exactly 0xc0de and not ${field1.bytesListTree!!["name"].value}"
         }
 
         val field2 = result.bytesListTree["subElementsJustRight"]
         checkElement(field2, "subElementsJustRight", KaitaiResult::class, Pair(10, 17), Pair(0, 0))
         check(field2.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field2.bytesListTree!!.size}" }
-        check(field2.bytesListTree!!["code"].value.contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
+        check((field2.bytesListTree!!["code"].value as BooleanArray).contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
             "Expected subtype.code to be exactly 0xc0de and not ${field2.bytesListTree!!["code"].value}"
         }
-        check(field2.bytesListTree!!["name"].value.contentEquals(booleanArrayOfInts(0x71, 0x72, 0x73, 0x74, 0x75))) {
+        check((field2.bytesListTree!!["name"].value as BooleanArray).contentEquals(booleanArrayOfInts(0x71, 0x72, 0x73, 0x74, 0x75))) {
             "Expected subtype.name to be exactly 0xc0de and not ${field2.bytesListTree!!["name"].value}"
         }
 
@@ -360,10 +360,10 @@ class KaitaiDecoderTests {
 
         checkElement(field3, "subElementsSpeakForThemselves", KaitaiResult::class, Pair(17, 24), Pair(0, 0))
         check(field3.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field3.bytesListTree!!.size}" }
-        check(field3.bytesListTree!!["code"].value.contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
+        check((field3.bytesListTree!!["code"].value as BooleanArray).contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
             "Expected subtype.code to be exactly 0xc0de and not ${field3.bytesListTree!!["code"].value}"
         }
-        check(field3.bytesListTree!!["name"].value.contentEquals(booleanArrayOfInts(0x41, 0x42, 0x43, 0x44, 0x45))) {
+        check((field3.bytesListTree!!["name"].value as BooleanArray).contentEquals(booleanArrayOfInts(0x41, 0x42, 0x43, 0x44, 0x45))) {
             "Expected subtype.name to be exactly 0xc0de and not ${field3.bytesListTree!!["name"].value}"
         }
     }
@@ -567,7 +567,7 @@ class KaitaiDecoderTests {
 
         val dummy0 = result.bytesListTree["dummy0"]
         check(dummy0 is KaitaiBytes) { "Expected a to be KaitaiBytes, got ${dummy0::class.simpleName}" }
-        check(dummy0.value.isEmpty()) { "Expected size to be 0, got ${dummy0.value.size}" }
+        check((dummy0.value as BooleanArray).isEmpty()) { "Expected size to be 0, got ${(dummy0.value as BooleanArray).size}" }
         val dummy1 = result.bytesListTree["dummy1"]
         check(dummy1 is KaitaiResult) { "Expected a to be KaitaiResult, got ${dummy1::class.simpleName}" }
         check(dummy1.value.isEmpty()) { "Expected size to be 0, got ${dummy1.value.size}" }
@@ -905,31 +905,31 @@ class KaitaiDecoderTests {
 
         var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
         check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
-        checkElement(element, id="element_a", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x01))
+        checkElement(element, id="element_a", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 1), sourceRangeBitOffset=Pair(0, 0))
         var enum: Pair<KTEnum?, String> = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a")
-        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
-        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+        check(element.value.first === enum.first) {"Expected ${enum.first}, got ${element.value.first}"}
+        check(element.value.second == enum.second) {"Expected ${enum.second}, got ${element.value.second}"}
 
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
         check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
-        checkElement(element, id="element_b", elementClass=KaitaiEnum::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x02))
+        checkElement(element, id="element_b", elementClass=KaitaiEnum::class, sourceByteRange=Pair(1, 2), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.types["sub"]!!.enums["enum_b"], "sub_b")
-        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
-        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+        check(element.value.first === enum.first) {"Expected ${enum.first}, got ${element.value.first}"}
+        check(element.value.second == enum.second) {"Expected ${enum.second}, got ${element.value.second}"}
 
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
         check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
-        checkElement(element, id="element_c", elementClass=KaitaiEnum::class, sourceByteRange=Pair(2, 3), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x03))
+        checkElement(element, id="element_c", elementClass=KaitaiEnum::class, sourceByteRange=Pair(2, 3), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.enums["enum_c"], "root_c")
-        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
-        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+        check(element.value.first === enum.first) {"Expected ${enum.first}, got ${element.value.first}"}
+        check(element.value.second == enum.second) {"Expected ${enum.second}, got ${element.value.second}"}
 
         element = result.bytesListTree["enumWithPath"]
         check(element is KaitaiEnum) { "Expected KaitaiEnum, got ${element::class.simpleName}" }
-        checkElement(element, id="enumWithPath", elementClass=KaitaiEnum::class, sourceByteRange=Pair(3, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x04))
+        checkElement(element, id="enumWithPath", elementClass=KaitaiEnum::class, sourceByteRange=Pair(3, 4), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.types["sub"]!!.types["subsub"]!!.enums["enum_a"], "subsub_a_from_root")
-        check(element.enum.first === enum.first) {"Expected ${enum.first}, got ${element.enum.first}"}
-        check(element.enum.second == enum.second) {"Expected ${enum.second}, got ${element.enum.second}"}
+        check(element.value.first === enum.first) {"Expected ${enum.first}, got ${element.value.first}"}
+        check(element.value.second == enum.second) {"Expected ${enum.second}, got ${element.value.second}"}
     }
 
 
@@ -1005,50 +1005,50 @@ class KaitaiDecoderTests {
         // Validate field protocol
         var protocol = result.bytesListTree["protocol"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="protocol", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x06))
+        checkElement(protocol, id="protocol", elementClass=KaitaiEnum::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0))
         var enum: Pair<KTEnum?, String> = Pair(struct.enums["ip_protocols"], "tcp")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
 
         // Validate field protocol_huge
         protocol = result.bytesListTree["protocol_huge"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xB2, 0xD0, 0x5E, 0x00))
+        checkElement(protocol, id="protocol_huge", elementClass=KaitaiEnum::class, sourceByteRange=Pair(4, 8), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.enums["ip_protocols"], "some_protocol")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
 
         // Validate field verbose negative
         protocol = result.bytesListTree["verbose_negative"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="verbose_negative", elementClass=KaitaiEnum::class, sourceByteRange=Pair(8, 12), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xff, 0xff, 0xff, 0xff))
+        checkElement(protocol, id="verbose_negative", elementClass=KaitaiEnum::class, sourceByteRange=Pair(8, 12), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.enums["verbose_levels"], "negative")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
 
         // Validate field verbose positive
         protocol = result.bytesListTree["verbose_positive"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="verbose_positive", elementClass=KaitaiEnum::class, sourceByteRange=Pair(12, 16), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x00, 0x00, 0x00, 0x02))
+        checkElement(protocol, id="verbose_positive", elementClass=KaitaiEnum::class, sourceByteRange=Pair(12, 16), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.enums["verbose_levels"], "medium")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
 
         // Validate field flags
         protocol = result.bytesListTree["flags"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="flags", elementClass=KaitaiEnum::class, sourceByteRange=Pair(16, 16), sourceRangeBitOffset=Pair(0, 1), value=booleanArrayOf(true))
+        checkElement(protocol, id="flags", elementClass=KaitaiEnum::class, sourceByteRange=Pair(16, 16), sourceRangeBitOffset=Pair(0, 1))
         enum = Pair(struct.enums["bit_flags"], "flag2")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
 
         // Validate field padding
         protocol = result.bytesListTree["padding"]
         check(protocol is KaitaiEnum) { "Expected KaitaiEnum, got ${protocol::class.simpleName}" }
-        checkElement(protocol, id="padding", elementClass=KaitaiEnum::class, sourceByteRange=Pair(17, 18), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0x10))
+        checkElement(protocol, id="padding", elementClass=KaitaiEnum::class, sourceByteRange=Pair(17, 18), sourceRangeBitOffset=Pair(0, 0))
         enum = Pair(struct.enums["has_padding"], "true")
-        check(protocol.enum.first === enum.first) {"Expected ${enum.first}, got ${protocol.enum.first}"}
-        check(protocol.enum.second == enum.second) {"Expected ${enum.second}, got ${protocol.enum.second}"}
+        check(protocol.value.first === enum.first) {"Expected ${enum.first}, got ${protocol.value.first}"}
+        check(protocol.value.second == enum.second) {"Expected ${enum.second}, got ${protocol.value.second}"}
     }
 
     @Test

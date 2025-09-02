@@ -85,7 +85,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): BooleanArray {
+    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): dynamic {
         // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
         if (reference.startsWith("_root.")) //_root.magic
             return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
@@ -553,50 +553,62 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
 
         fun parseReferenceHelper(targetElement: KaitaiElement): Pair<TokenType, dynamic> {
-            return when (targetElement) {
-                is KaitaiResult -> Pair(TokenType.KAITAITREE, targetElement.bytesListTree)
-                is KaitaiBoolean -> Pair(TokenType.BOOLEAN, targetElement.value[0])
-                is KaitaiString -> Pair(TokenType.STRING, targetElement.value.toByteArray().toUTF8String())
-                is KaitaiSignedInteger -> {
-                    val byteArray = targetElement.value.toByteArray()
-                    val result = when (byteArray.size) {
-                        1 -> byteArray[0].toLong()
-                        2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toLong()
-                        4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toLong()
-                        8 -> Long.fromBytes(byteArray, ByteOrder.BIG)
-                        else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+            return if (targetElement.value is BooleanArray) {
+                when (targetElement) {
+                    is KaitaiBoolean -> Pair(TokenType.BOOLEAN, targetElement.value[0])
+                    is KaitaiString -> Pair(TokenType.STRING, (targetElement.value as BooleanArray).toByteArray().toUTF8String())
+                    is KaitaiSignedInteger -> {
+                        val byteArray = (targetElement.value as BooleanArray).toByteArray()
+                        val result = when (byteArray.size) {
+                            1 -> byteArray[0].toLong()
+                            2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                            4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                            8 -> Long.fromBytes(byteArray, ByteOrder.BIG)
+                            else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+                        }
+                        Pair(TokenType.INTEGER, result)
                     }
-                    Pair(TokenType.INTEGER, result)
-                }
-                is KaitaiUnsignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes(targetElement.value.toByteArray(), ByteOrder.BIG))
-                is KaitaiFloat -> {
-                    val byteArray = targetElement.value.toByteArray()
-                    val result = when (byteArray.size) {
-                        4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toDouble()
-                        8 -> Double.fromBytes(byteArray, ByteOrder.BIG)
-                        else -> throw IllegalArgumentException("Invalid byte array size for float: ${byteArray.size}")
+                    is KaitaiUnsignedInteger -> Pair(TokenType.INTEGER, Long.fromBytes((targetElement.value as BooleanArray).toByteArray(), ByteOrder.BIG))
+                    is KaitaiFloat -> {
+                        val byteArray = (targetElement.value as BooleanArray).toByteArray()
+                        val result = when (byteArray.size) {
+                            4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toDouble()
+                            8 -> Double.fromBytes(byteArray, ByteOrder.BIG)
+                            else -> throw IllegalArgumentException("Invalid byte array size for float: ${byteArray.size}")
+                        }
+                        Pair(TokenType.FLOAT, result)
                     }
-                    Pair(TokenType.FLOAT, result)
-                }
-                is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.enum)
-                is KaitaiBytes -> {
-                    val byteArray = targetElement.value.toByteArray()
-                    val array: MutableList<Pair<TokenType, Long>> = mutableListOf()
-                    for (byte in byteArray) {
-                        array.add(Pair(TokenType.INTEGER, byte.toLong()))
+                    is KaitaiBytes -> {
+                        val byteArray = (targetElement.value as BooleanArray).toByteArray()
+                        val array: MutableList<Pair<TokenType, Long>> = mutableListOf()
+                        for (byte in byteArray) {
+                            array.add(Pair(TokenType.INTEGER, byte.toLong()))
+                        }
+                        Pair(TokenType.BYTEARRAY, array.toList())
                     }
-                    Pair(TokenType.BYTEARRAY, array.toList())
-                }
-                is KaitaiList -> {
-                    val kaitaiTree: MutableKaitaiTree = targetElement.bytesListTree
-                    val array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
-                    for (element in kaitaiTree) {
-                        array.add(parseReferenceHelper(element))
+                    else -> {
+                        throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
                     }
-                    Pair(TokenType.ARRAY, array.toList())
                 }
-                else -> { // TODO instances with values
-                    throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
+            } else {
+                when (targetElement) {
+                    is KaitaiBoolean -> Pair(TokenType.BOOLEAN, targetElement.value)
+                    is KaitaiSignedInteger -> Pair(TokenType.INTEGER, targetElement.value)
+                    is KaitaiFloat -> Pair(TokenType.FLOAT, targetElement.value)
+                    is KaitaiBytes -> Pair(TokenType.BYTEARRAY, (targetElement.value as List<Long>).map {Pair(TokenType.INTEGER, it)})
+                    is KaitaiEnum -> Pair(TokenType.ENUM, targetElement.value)
+                    is KaitaiResult -> Pair(TokenType.KAITAITREE, targetElement.bytesListTree)
+                    is KaitaiList -> {
+                        val kaitaiTree: MutableKaitaiTree = targetElement.bytesListTree
+                        val array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
+                        for (element in kaitaiTree) {
+                            array.add(parseReferenceHelper(element))
+                        }
+                        Pair(TokenType.ARRAY, array.toList())
+                    }
+                    else -> {
+                        throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
+                    }
                 }
             }
         }
@@ -633,7 +645,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 }
 
                 else -> {
-                    val targetElement = bytesListTree[token.second]
+                    val targetElement = try {
+                        bytesListTree[token.second]
+                    } catch (e: Exception) {
+                        val instance : KTSeq = currentScopeStruct.instances[token.second]!!
+                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first!!
+                    }
+
                     parseReferenceHelper(targetElement)
                 }
             }
@@ -770,25 +788,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
 
                     else -> {
-                        val targetElement: KaitaiElement = (op1.second as MutableKaitaiTree)[op2.second as String]
+                        val targetElement = try {
+                            (op1.second as MutableKaitaiTree)[op2.second as String]
+                        } catch (e: Exception) {
+                            throw NotImplementedError("Actual exception is $e, which is expected if you mistyped or tried to access an element from the wrong scope. If the element you tried to access should exist, but only doesn't because it has not been parsed yet.. well we thought this would never occur.")
+                            val instance : KTSeq = currentScopeStruct.instances[op2.second as String]!!
+                            processInstance(op2.second as String, instance, parentScopeStruct, currentScopeStruct, (op1.second as MutableKaitaiTree), ioStream, 0, 0).first!!
+                        }
                         parseReferenceHelper(targetElement)
                     }
-                }
-            } else if (op1.first == TokenType.KAITAIELEMENT) {
-                return if (op2.second == "_parent") {
-                    Pair(TokenType.KAITAITREE, op1.second.bytesListTree.parent)
-                } else if (op2.second == "_root") {
-                    Pair(TokenType.KAITAITREE, op1.second.bytesListTree.root)
-                } else if (op2.second == "_io") {
-                    Pair(TokenType.STREAM, (op1.second as KaitaiElement).ioStream)
-                } else if (op2.first == TokenType.CAST) {
-                    expressionCast(
-                        op1,
-                        op2
-                    ) // the source type KAITAIELEMENT is not supported in expressionCast. The function just returns the token op1
-                } else {
-                    val targetElement: KaitaiElement = (op1.second as KaitaiResult).bytesListTree[op2.second as String]
-                    parseReferenceHelper(targetElement)
                 }
             }
 
@@ -1645,7 +1653,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 fullyFlatArray += element.toInt().toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
             } else {
                 try {
-                    fullyFlatArray += parseReference(element, bytesListTree)
+                    fullyFlatArray += parseReference(element, bytesListTree) as BooleanArray
                 } catch (e: Exception) {
                     fullyFlatArray += element.encodeToByteArray().toBooleanArray()
                 }
@@ -1973,14 +1981,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits) % 8
             )
             val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
-            println(ioSubStream.joinToString("") { if (it) "1" else "0" })
             kaitaiElement = when (type.usedDisplayStyle) {
                 DisplayStyle.BOOLEAN -> KaitaiBoolean(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                 DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                 DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                 DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
                 DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
-                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, enum)
+                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioStream, enum, sourceByteRange, sourceRangeBitOffset, elementDoc)
                 // displayStyle.HEX as the fallback (even if it's a known type or whatever)
                 else -> KaitaiBytes(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc)
             }
@@ -1995,7 +2002,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
 
         if (!type.sizeIsKnown) {  // only update value if it's still totally unknown. If we overwrite it always, then we would cut off seq that don't use the full datastream prematurely
-            type.sizeInBits = kaitaiElement.value.size
+            type.sizeInBits = (kaitaiElement.value as BooleanArray).size
             type.sizeIsKnown
         }
 
@@ -2125,6 +2132,51 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
     }
 
+    private fun processValueInstanceHelper(
+        expressionResult: dynamic,
+        id: String,
+        ioStream: BooleanArray,
+        instanceDoc: KaitaiDoc,
+        parentBytesListTree: MutableKaitaiTree
+        ): KaitaiElement {
+        return when(expressionResult) {
+            is Long -> { // token integer
+                KaitaiSignedInteger(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is Double-> { // token float
+                KaitaiFloat(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is String -> { // token string
+                KaitaiString(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is Boolean -> { // token boolean
+                KaitaiBoolean(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is BooleanArray -> { // token stream
+                KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is Pair<KTEnum, String> -> { // token enum
+                KaitaiEnum(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+            }
+            is MutableKaitaiTree -> {
+                expressionResult.kaitaiElement!!
+            }
+            is List<dynamic> -> {
+                if ((expressionResult as List<dynamic>).all {it is Long && it in 0L..255L}) { // token bytearray
+                    KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc)
+                } else { // token array
+                    val bytesListTree: MutableKaitaiTree = MutableKaitaiTree(ioStream = ioStream)
+                    bytesListTree.parent = parentBytesListTree
+                    bytesListTree.addAll((expressionResult as List<dynamic>).map {processValueInstanceHelper(it, id, ioStream, instanceDoc, bytesListTree)}) // TODO ioStream or ioSubStream
+                    KaitaiResult(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), instanceDoc)
+                }
+            }
+            else -> {
+                throw RuntimeException("Unexpected type ${expressionResult::class.simpleName} for value instance.")
+            }
+        }
+    }
+
     private fun processInstance(
         id: String,
         instance: KTSeq,
@@ -2135,27 +2187,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
     ): Triple<KaitaiElement?, Int, Int> {
-        // TODO what to do with value?
+
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
-        if (instance.value != null) {
-            throw NotImplementedError("valueinstances are not working yet")
-            val instanceValue = expressionParser.parseExpression(instance.value)
-            val instanceKaitaiElement : KaitaiElement = if (instanceValue is MutableKaitaiTree) {
-                instanceValue.kaitaiElement!!
-            } else if (instanceValue is Long) {
-                KaitaiSignedInteger(id, ByteOrder.BIG, ioStream, (instanceValue as Long).toBytes(ByteOrder.BIG).toBooleanArray(), Pair(0, 0), Pair(0, 0), KaitaiDoc(instance.doc, instance.docRef))
-            } else if (instanceValue is Boolean) {
-                KaitaiBoolean(id, ByteOrder.BIG, ioStream, booleanArrayOf(instanceValue as Boolean), Pair(0, 0), Pair(0, 0), KaitaiDoc(instance.doc, instance.docRef))
-            } else if (instanceValue is Double) {
-                KaitaiFloat(id, ByteOrder.BIG, ioStream, (instanceValue as Double).toBytes(ByteOrder.BIG).toBooleanArray(), Pair(0, 0), Pair(0, 0), KaitaiDoc(instance.doc, instance.docRef))
-            } else {
-                throw NotImplementedError("more types are not implemented yet")
-            }
-            return Triple(instanceKaitaiElement, 0, instanceKaitaiElement.value.size)
+        if (instance.value != null) {  //valueInstances have entirely eperate handling from normal instances
+            return Triple(processValueInstanceHelper(expressionParser.parseExpression(instance.value), id, ioStream, KaitaiDoc(instance.doc, instance.docRef), bytesListTree), 0, 0)
         }
 
-
-
+        //normal instance here, which behave like seqElements, except they can do a little bit more
         val actualIoStream : BooleanArray = if (instance.io != null) {
             expressionParser.parseExpression(instance.io)
         } else {
@@ -2182,7 +2220,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
-        var test = 13  -> 1101
+        var test = 13 -> 1101
         test[6..8] = 1
         test and 0b00000111 >> 0 = -> 101
         test and 0b00111000 >> 3 = -> 001
@@ -2226,7 +2264,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
         val resultDoc = KaitaiDoc(parentSeq?.doc, parentSeq?.docRef)
 
-        val bufferAfterBinaryElement = 8 - ((offsetInDatastreamInBits + sourceOffsetInBits) % 8)
+        val bufferAfterBinaryElement = (8 - ((dataSizeOfSequenceInBits + sourceOffsetInBits) % 8)) % 8
         dataSizeOfSequenceInBits += bufferAfterBinaryElement
 
         // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
@@ -2242,6 +2280,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         if (currentScopeStruct.instances.isNotEmpty()) {
             for ((id, instance) in currentScopeStruct.instances) {
+                //dataSizeOfSequenceInBits = 0
                 val triple = processInstance(id, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, sourceOffsetInBits, dataSizeOfSequenceInBits)
 
                 if (triple.first != null) {
@@ -2261,7 +2300,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 interface KaitaiElement : ByteWitchResult {
     val id: String
     val bytesListTree: MutableKaitaiTree? get() = null
-    val value: BooleanArray
+    val value: dynamic
     var endianness: ByteOrder
     var doc: KaitaiDoc
     val ioStream: BooleanArray
@@ -2355,7 +2394,7 @@ class KaitaiResult(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                result += element.value
+                if (element.value is BooleanArray) result += element.value as BooleanArray
             }
             return result
         }
@@ -2378,7 +2417,7 @@ class KaitaiList(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                result += element.value
+                if (element.value is BooleanArray) result += element.value as BooleanArray
             }
             return result
         }
@@ -2388,13 +2427,13 @@ class KaitaiList(
 
 class KaitaiBytes(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc,
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                    "${id}(${value.toByteArray().hex()})h" +
+                    "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()})h" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2404,7 +2443,7 @@ class KaitaiBytes(
 //  Therefor, do we even need it here? The conversion here can support both endianness, if the value is not flipped
 abstract class KaitaiNumber(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
 ) : KaitaiElement {
@@ -2422,20 +2461,24 @@ abstract class KaitaiNumber(
 
 class KaitaiSignedInteger(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc,
 ) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc) {
     override val suffix: String = "s"
 
     override fun parseValueAsString(): String {
-        val byteArray = value.toByteArray()
-        return when (byteArray.size) {
-            1 -> byteArray[0].toInt().toString()
-            2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toString()
-            4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toString()
-            8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toString()
-            else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+        return if (value is BooleanArray) {
+            val byteArray = (value as BooleanArray).toByteArray()
+            when (byteArray.size) {
+                1 -> byteArray[0].toInt().toString()
+                2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toString()
+                4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toString()
+                8 -> Long.fromBytes(byteArray, ByteOrder.BIG).toString()
+                else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+            }
+        } else {
+            (value as Long).toString()
         }
     }
 }
@@ -2462,31 +2505,35 @@ class KaitaiUnsignedInteger(
 
 class KaitaiFloat(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
 ) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc) {
     override val suffix: String = "f"
 
     override fun parseValueAsString(): String {
-        val byteArray = value.toByteArray()
-        return when (byteArray.size) {
-            4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toString()
-            8 -> Double.fromBytes(byteArray, ByteOrder.BIG).toString()
-            else -> throw IllegalArgumentException("Invalid byte array size for float or double: ${byteArray.size}")
+        return if (value is BooleanArray){
+            val byteArray = (value as BooleanArray).toByteArray()
+            when (byteArray.size) {
+                4 -> Float.fromBytes(byteArray, ByteOrder.BIG).toString()
+                8 -> Double.fromBytes(byteArray, ByteOrder.BIG).toString()
+                else -> throw IllegalArgumentException("Invalid byte array size for float or double: ${byteArray.size}")
+            }
+        } else {
+            (value as Double).toString()
         }
     }
 }
 
 class KaitaiBoolean(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc,
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                "${id}(${value[0]})b" +
+                "${id}(${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean})b" +
                 doc.renderHTML() +
                 "</div>"
     }
@@ -2494,13 +2541,13 @@ class KaitaiBoolean(
 
 class KaitaiString(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                    "${id}(${value.toByteArray().toUTF8String()})utf8" +
+                    "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String})utf8" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2508,14 +2555,13 @@ class KaitaiString(
 
 class KaitaiEnum(
     override val id: String, override var endianness: ByteOrder,
-    override val ioStream: BooleanArray, override val value: BooleanArray,
+    override val ioStream: BooleanArray, override val value: Pair<KTEnum?, String>,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc,
-    val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"generic roundbox tooltip\" $byteRangeDataTags>" +
-                    "${id}(${enum.second})enum" +
+                    "${id}(${value.second})enum" +
                     doc.renderHTML() +
                 "</div>"
     }
