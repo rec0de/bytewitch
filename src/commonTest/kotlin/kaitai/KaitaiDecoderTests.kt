@@ -59,7 +59,7 @@ class KaitaiDecoderTests {
         val struct = KTStruct(
             meta = KTMeta(
                 id = "endianness",
-                endian = KTEndian.LE
+                endian = KTEndian.Primitive(KTEndianEnum.LE)
             ),
             seq = listOf(
                 KTSeq(id = "a", type = KTType.Primitive("b17")),
