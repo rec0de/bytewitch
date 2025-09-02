@@ -19,12 +19,15 @@ var tryhard = false
 // track input changes to avoid unnecessary re-decodes
 var lastInputBytes = mutableMapOf<Int, ByteArray>()
 
-var ssfEnabled = false
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 
 // choose between segment- and byte-wise sequence alignment
 var showSegmentWiseAlignment = true
+
+// settings
+var ssfEnabled = true
+var showInstances = true
 
 fun main() {
     window.addEventListener("load", {

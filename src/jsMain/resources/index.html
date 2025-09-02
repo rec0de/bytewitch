@@ -85,11 +85,15 @@
             <img src="icons/settings_black.png"/>
             Settings
         </h2>
-        <div>
-            <span>
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem">
+            <div style="flex-grow: 1; flex-basis: 0;">
               <input type="checkbox" id="ssfdecode" checked/>
               <label for="ssfdecode">SwiftSegFinder Decoding</label>
-          </span>
+            </div>
+            <div style="flex-grow: 1; flex-basis: 0;">
+              <input type="checkbox" id="show-instances" checked/>
+              <label for="show-instances">Show Kaitai Instances</label>
+            </div>
         </div>
         <div class="decoder-list-container">
             <div class="decoder-list-header">
