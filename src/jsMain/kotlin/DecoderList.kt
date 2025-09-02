@@ -20,15 +20,12 @@ data class ChipListItem(
     val deletable: Boolean,
     var isEnabled: Boolean = true
 ) {
-    //val divElement = node.querySelector(".chip") as HTMLDivElement
-    val divElement = node
     val nameElement = node.querySelector(".chip-name") as HTMLSpanElement
     val separatorElement = node.querySelector(".chip-separator") as HTMLDivElement
     val buttonDivElement = node.querySelector(".chip-buttons") as HTMLDivElement
     val enableButton = node.querySelector(".chip-enable-btn") as HTMLDivElement
     val editButton = node.querySelector(".chip-edit-btn") as HTMLDivElement
     val deleteButton = node.querySelector(".chip-delete-btn") as HTMLDivElement
-
 
     var editCallback: ((String) -> Unit)? = null
     var deleteCallback: ((String) -> Unit)? = null
@@ -45,8 +42,8 @@ data class ChipListItem(
     init {
         setStatus(isEnabled)
 
-        divElement.setAttribute("data-chip-id", id)
-        divElement.setAttribute("draggable", sortable.toString())
+        node.setAttribute("data-chip-id", id)
+        node.setAttribute("draggable", sortable.toString())
 
         nameElement.innerHTML = displayName
 
@@ -84,16 +81,10 @@ data class ChipListItem(
         editCallback = callback
     }
 
-    /**
-     * Sets the delete callback function
-     */
     fun setDeleteCallback(callback: (String) -> Unit) {
         deleteCallback = callback
     }
 
-    /**
-     * Sets the toggle callback function
-     */
     fun setToggleCallback(callback: (String) -> Unit) {
         toggleCallback = callback
     }
@@ -102,16 +93,10 @@ data class ChipListItem(
         editCallback?.invoke(id)
     }
 
-    /**
-     * Handles the delete button click
-     */
     fun onDeleteClick() {
         deleteCallback?.invoke(id)
     }
 
-    /**
-     * Handles the toggle button click
-     */
     fun onToggleClick() {
         toggleCallback?.invoke(id)
     }
@@ -119,8 +104,8 @@ data class ChipListItem(
     fun setStatus(value: Boolean) {
         isEnabled = value
 
-        divElement.classList.toggle("chip-enabled", isEnabled)
-        divElement.classList.toggle("chip-disabled", !isEnabled)
+        node.classList.toggle("chip-enabled", isEnabled)
+        node.classList.toggle("chip-disabled", !isEnabled)
 
         enableButton.classList.toggle("icon-toggle-right-black", isEnabled)
         enableButton.classList.toggle("icon-toggle-left-black", !isEnabled)
@@ -142,9 +127,6 @@ data class ChipListItem(
 
 typealias EventListener = (List<String>) -> Unit
 
-/**
- * A customizable list of chip elements with support for sorting, deletion, and enabling/disabling
- */
 class ChipList(
     val node: HTMLDivElement,
     private val canSort: Boolean = true,
@@ -193,28 +175,15 @@ class ChipList(
             .mapNotNull { node -> (node as HTMLElement).getAttribute("data-chip-id") }
     }
 
-    /**
-     * Gets all items in the list regardless of their enabled state
-     */
     val allItems: List<ChipListItem>
         get() = getItemIdsOrdered().mapNotNull { key -> itemStore[key] }
 
-
-    /**
-     * Gets only enabled items
-     */
     val enabledItems: List<ChipListItem>
         get() = allItems.filter { item -> item.isEnabled }
 
-    /**
-     * Gets only disabled items
-     */
     val disabledItems: List<ChipListItem>
         get() = allItems.filter { item -> !item.isEnabled }
 
-    /**
-     * Adds an item to the list
-     */
     fun addItem(item: ChipListItem) {
         if (canEdit) {
             item.setEditCallback { itemId ->
@@ -243,9 +212,6 @@ class ChipList(
         dispatchEvents("itemAdded", affectedIds = listOf(item.id))
     }
 
-    /**
-     * Adds an item to the list by creating a new ChipListItem
-     */
     fun addItem(id: String, displayName: String, isEnabled: Boolean = true) {
         addItem(
             ChipListItem(
@@ -261,9 +227,6 @@ class ChipList(
         )
     }
 
-    /**
-     * Removes an item from the list by ID
-     */
     fun deleteItem(id: String): Boolean {
         // If a delete confirmation callback is set, call it and check the result. Otherwise, proceed with deletion
         val deleteConfirmed = deleteConfirmationCallback?.invoke(id) ?: true
@@ -279,9 +242,6 @@ class ChipList(
         } ?: false
     }
 
-    /**
-     * Toggles the enabled state of an item
-     */
     fun toggleItem(id: String): Boolean {
         return itemStore[id]?.let {
             it.statusToggle()
@@ -293,9 +253,6 @@ class ChipList(
         } ?: false
     }
 
-    /**
-     * Sets the enabled state of an item
-     */
     fun setItemStatus(id: String, status: Boolean): Boolean {
         return itemStore[id]?.let {
             it.setStatus(status)
@@ -307,16 +264,10 @@ class ChipList(
         allItems.forEach { item -> item.setStatus(status) }
     }
 
-    /**
-     * Finds an item by ID
-     */
     fun getItem(id: String): ChipListItem? {
         return itemStore[id]
     }
 
-    /**
-     * Clears all items from the list
-     */
     fun clear() {
         allItems.forEach { item ->
             node.removeChild(item.node)
@@ -327,15 +278,9 @@ class ChipList(
         dispatchEvents("listCleared", affectedIds = affectedIds)
     }
 
-    /**
-     * Gets the current size of the list
-     */
     val size: Int
         get() = itemStore.size
 
-    /**
-     * Checks if the list is empty
-     */
     val isEmpty: Boolean
         get() = itemStore.isEmpty()
 
@@ -501,13 +446,7 @@ class ChipList(
         private fun getBestAnchorPoint(x: Int, y: Int): AnchorPoint {
             var draggableElements = container.querySelectorAll(".chip").asList()
 
-            // remove all elements with class "debug-dot"
-            /*document.querySelectorAll(".debug-dot").asList().forEach {
-                it.parentNode?.removeChild(it)
-            }*/
-
             val anchorPoints: MutableList<AnchorPoint> = mutableListOf()
-
 
             for (i in -1 until draggableElements.size) {
                 val leftElement = draggableElements.getOrNull(i) as? HTMLElement
@@ -548,12 +487,7 @@ class ChipList(
                     anchorPoints.add(AnchorPoint(midPoint1, leftElement, rightElement, false))
                     anchorPoints.add(AnchorPoint(midPoint2, leftElement, rightElement, true))
                 }
-                //renderDot(rightCenter, "green")
             }
-            /*anchorPoints.forEach { midPoint ->
-                renderDot(midPoint.point, if (midPoint.isOnNewLine) "blue" else "yellow")
-            }*/
-
             data class Closest(val anchorPoint: AnchorPoint?, val xOffset: Double, val yOffset: Double)
 
             val closest = anchorPoints.fold(
@@ -587,7 +521,6 @@ class ChipList(
 
             }
 
-            //renderDot(closest.anchorPoint!!.point, "red")
             return closest.anchorPoint!!
         }
     }
