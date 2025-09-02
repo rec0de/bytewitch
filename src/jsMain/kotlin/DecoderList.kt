@@ -157,6 +157,7 @@ class ChipList(
     private val dragAndDropHandler = DragAndDropHandler()
     private val noDecodersMessage: HTMLDivElement
     private val eventListeners: MutableMap<String, MutableSet<EventListener>> = mutableMapOf()
+    private var defaultOrder: List<String> = listOf()
 
     init {
         node.classList.toggle("sortable", canSort)
@@ -337,6 +338,27 @@ class ChipList(
      */
     val isEmpty: Boolean
         get() = itemStore.isEmpty()
+
+    fun saveDefaultOrder() {
+        defaultOrder = getItemKeysOrdered()
+    }
+
+    fun getDefaultOrder(): List<String> {
+        return defaultOrder.ifEmpty {
+            getItemKeysOrdered()
+        }
+    }
+
+    fun resetDefaultOrder() {
+        val defaultOrder = getDefaultOrder()
+        var referenceNode = itemStore[defaultOrder.last()]!!.node
+        defaultOrder.reversed().forEach { id ->
+            val reorderedNode = itemStore[id]!!.node
+            node.insertBefore(reorderedNode, referenceNode)
+            referenceNode = reorderedNode
+        }
+        dispatchEvents("orderChanged", affectedIds = defaultOrder)
+    }
 
     private fun dispatchEvents(vararg eventTypes: String, affectedIds: List<String> = listOf()) {
         /*
