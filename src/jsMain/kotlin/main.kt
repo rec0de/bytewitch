@@ -16,11 +16,18 @@ var currentHighlight: Element? = null
 var lastSelectionEvent: Double? = null
 var tryhard = false
 
+// track input changes to avoid unnecessary re-decodes
+var lastInputBytes = mutableMapOf<Int, ByteArray>()
+
 // save parsed messages for float view and SwiftSegFinder
 var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 
 // choose between segment- and byte-wise sequence alignment
 var showSegmentWiseAlignment = true
+
+// settings
+var ssfEnabled = true
+var showInstances = true
 
 fun main() {
     window.addEventListener("load", {
@@ -32,8 +39,11 @@ fun main() {
         }
         KaitaiUI.loadKaitaiStructsFromStorage()
 
-        // Initialize the layout manager
+        // Initialize managers
         LayoutManager
+        SettingsManager
+        DecoderListManager
+        TextareaUtils
 
         val dataContainer = document.getElementById("data_container")!!
         val decodeBtn = document.getElementById("decode") as HTMLButtonElement
@@ -85,14 +95,12 @@ fun main() {
 
         // to add more text areas for protocols
         addDataBox.onclick = {
-            appendTextArea()
+            TextareaUtils.appendTextArea()
         }
 
         // to delete last text area
         deleteDataBox.onclick = {
-            if (dataContainer.children.length > 1) { // there need to be at least one data container left
-                removeTextArea(dataContainer)
-            }
+            TextareaUtils.removeTextArea()
         }
 
         liveDecode.onchange = {
@@ -103,19 +111,21 @@ fun main() {
         }
 
         // init first textarea
-        appendTextArea()
+        TextareaUtils.appendTextArea()
 
         // a click anywhere clears any present selection
         // (as do specific keystrokes, but we'll see if we want to worry about those)
         document.onclick = {
             // avoid immediately clearing selection from click associated with select event
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
+            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
+            if(deltaTimeMs > 250) {
                 clearSelections()
             }
         }
 
         document.onkeydown = {
-            if(lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250 && it.keyCode !in listOf(16, 17, 20)) {
+            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
+            if(deltaTimeMs > 250 && it.keyCode !in listOf(16, 17, 20)) {
                 clearSelections()
             }
         }
@@ -124,8 +134,6 @@ fun main() {
 }
 
 fun clearSelections() {
-    lastSelectionEvent = null
-    console.log("decode(tryhard=$tryhard)")
     val inputs = document.querySelectorAll("#data_container .input_area")
     inputs.asList().forEach {
         val sizeLabel = (it as HTMLTextAreaElement).nextElementSibling!!
@@ -171,7 +179,9 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
             messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
 
-        messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+        if (ssfEnabled) {
+            messageBox.appendChild(decodeWithSSF(bytes, taIndex))
+        }
     } else {
         messageBox?.remove()
         noDecodeYet.style.display = "block"
@@ -225,7 +235,7 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 }
 
 // decode all text areas
-fun decode(isLiveDecoding: Boolean) {
+fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -233,38 +243,39 @@ fun decode(isLiveDecoding: Boolean) {
         val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         val inputText = textarea.value.trim()
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
-        (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
-        // remember if this textarea has plain hex input so we can enable selection highlighting
-        textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
-
         // only decode text area if input changed or the Kaitai struct changed
-        val oldBytes = parsedMessages[i]?.bytes
-        if (KaitaiUI.hasChangedSinceLastDecode() || oldBytes == null || !oldBytes.contentEquals(bytes)) {
+        val inputChanged = lastInputBytes[i]?.contentEquals(bytes)?.not() ?: true
+        if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged) {
             parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+            lastInputBytes[i] = bytes
             decodeBytes(bytes, i)
         }
+        //console.log("textarea $i: force=$force, hasChangedSinceLastDecode=${KaitaiUI.hasChangedSinceLastDecode()}, inputChanged=$inputChanged")
+
     }
 
     KaitaiUI.setChangedSinceLastDecode(false)
 
-    // refine ssf fields and rerender html content
-    val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
-    refined.forEach { msg ->
-        parsedMessages[msg.msgIndex] = msg
-        rerenderSSF(msg.msgIndex, msg)
-    }
-
-    // for sequence alignment
-    if (tryhard && !isLiveDecoding) {
-        if (showSegmentWiseAlignment) {
-            val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
-            attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
-        } else {
-            val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
-            attachByteWiseSequenceAlignmentListeners(alignedSegment)
+    if (ssfEnabled) {
+        // refine ssf fields and rerender html content
+        val refined = SSFParser().refineSegmentsAcrossMessages(parsedMessages.values.toList())
+        refined.forEach { msg ->
+            parsedMessages[msg.msgIndex] = msg
+            rerenderSSF(msg.msgIndex, msg)
         }
 
+        // for sequence alignment
+        if (tryhard && !isLiveDecoding) {
+            if (showSegmentWiseAlignment) {
+                val alignedSegment = SegmentWiseSequenceAlignment.align(parsedMessages)
+                attachSegmentWiseSequenceAlignmentListeners(alignedSegment)
+            } else {
+                val alignedSegment = ByteWiseSequenceAlignment.align(parsedMessages)
+                attachByteWiseSequenceAlignmentListeners(alignedSegment)
+            }
+
+        }
     }
 }

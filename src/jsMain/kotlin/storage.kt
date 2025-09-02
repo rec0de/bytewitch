@@ -38,6 +38,11 @@ object KaitaiStorage {
         localStorage.setItem(KEY_NAME_LIST, existingNames.joinToString(";"))
         return true
     }
+
+    fun reorderStructNames(newOrder: List<String>): Boolean {
+        localStorage.setItem(KEY_NAME_LIST, newOrder.joinToString(";"))
+        return true
+    }
 }
 
 // Code snippet taken from https://slack-chats.kotlinlang.org/t/23109011/heyya-does-anyone-know-if-how-i-can-store-data-on-web-browse (as of 2025-06-26)
