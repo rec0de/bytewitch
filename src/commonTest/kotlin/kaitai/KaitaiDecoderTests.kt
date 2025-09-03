@@ -1287,4 +1287,51 @@ class KaitaiDecoderTests {
         val z2 = with_params.bytesListTree["z2"]
         checkElement(z2, "z2", KaitaiBytes::class, Pair(6,7), Pair(0,0), booleanArrayOfInts(0x07))
     }
+
+    @Test
+    fun testContentsKey() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "a", contents = listOf(
+                    StringOrInt.StringValue("test"),
+                    StringOrInt.IntValue(0xd8),
+                    StringOrInt.IntValue(0xd9),
+                )),
+            ),
+        )
+
+        val data = byteArrayOfInts(
+            0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected main result to be KaitaiResult, got ${result::class.simpleName}" }
+
+        val a = result.bytesListTree["a"]
+        checkElement(a, "a", KaitaiBytes::class, Pair(0,6), Pair(0,0), booleanArrayOfInts(0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9))
+
+        val wrongStruct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "a", contents = listOf(
+                    StringOrInt.StringValue("test"),
+                    StringOrInt.IntValue(0x68),
+                    StringOrInt.IntValue(0x69),
+                )),
+            ),
+        )
+
+        val wrongData = byteArrayOfInts(
+            0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9
+        )
+
+        val wrongDecoder = Kaitai("enum_types", wrongStruct)
+        try {
+            val result = wrongDecoder.decode(wrongData, 0)
+            check(false) {"Expected an Exception, but there was none."}
+        } catch (e: Exception) {
+            check(true) {"Uuuhhh. Something went wrong with the wrongDecoder."}
+        }
+    }
 }
