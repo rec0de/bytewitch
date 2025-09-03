@@ -5,13 +5,14 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 
 object DecoderListManager {
+    val builtinList: ChipList
     val builtinKaitaiList: ChipList
     val userKaitaiList: ChipList
 
     init {
         // Builtin decoder list
         val builtinListElement = document.getElementById("builtin-decoder-list") as HTMLDivElement
-        val builtinList = ChipList(builtinListElement, canEdit = false, canDelete = false)
+        builtinList = ChipList(builtinListElement, canEdit = false, canDelete = false)
         setupDecoderList(
             builtinList,
             ByteWitch.builtinDecoderListManager,
@@ -22,6 +23,15 @@ object DecoderListManager {
             builtinList.addItem(decoder.first, decoder.second, true)
         }
         builtinList.saveDefaultOrder()
+        builtinList.addEventListener("orderChanged", { ids ->
+            BuiltinDecoderStorage.reorderDecoderNames(ids)
+        })
+
+        val storedBuiltinDecoders = BuiltinDecoderStorage.listDecoderNames()
+        if (storedBuiltinDecoders.isNotEmpty()) {
+            builtinList.setOrder(storedBuiltinDecoders)
+        }
+        BuiltinDecoderStorage.reorderDecoderNames(builtinList.getItemIdsOrdered())
 
         // Builtin Kaitai decoder list
         val builtinKaitaiListElement = document.getElementById("builtin-kaitai-decoder-list") as HTMLDivElement
@@ -31,6 +41,9 @@ object DecoderListManager {
             ByteWitch.builtinKaitaiDecoderListManager,
             "builtin-kaitai",
         )
+        builtinKaitaiList.addEventListener("orderChanged", { ids ->
+            BuiltinKaitaiDecoderStorage.reorderDecoderNames(ids)
+        })
 
         // User Kaitai decoder list
         val userKaitaiListElement = document.getElementById("user-kaitai-decoder-list") as HTMLDivElement
@@ -113,5 +126,16 @@ object DecoderListManager {
 
     fun addUserKaitaiDecoder(id: String, name: String) {
         userKaitaiList.addItem(id, name, true)
+    }
+
+    fun finishBuiltinKaitaiDecoderSetup() {
+        console.log("finishBuiltinKaitaiDecoderSetup()")
+        builtinKaitaiList.saveDefaultOrder()
+
+        val storedBuiltinKaitaiDecoders = BuiltinKaitaiDecoderStorage.listDecoderNames()
+        if (storedBuiltinKaitaiDecoders.isNotEmpty()) {
+            builtinKaitaiList.setOrder(storedBuiltinKaitaiDecoders)
+        }
+        BuiltinKaitaiDecoderStorage.reorderDecoderNames(builtinKaitaiList.getItemIdsOrdered())
     }
 }

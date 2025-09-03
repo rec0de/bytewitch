@@ -171,6 +171,8 @@ object KaitaiUI {
 
             DecoderListManager.addBuiltinKaitaiDecoder(name, name)
         }
+
+        DecoderListManager.finishBuiltinKaitaiDecoderSetup()
     }
 
     private suspend fun loadManifest(): KaitaiManifest {
