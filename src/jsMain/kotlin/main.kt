@@ -52,7 +52,7 @@ fun main() {
         val addDataBox = document.getElementById("add_data") as HTMLElement
         val deleteDataBox = document.getElementById("delete_data") as HTMLElement
 
-        val liveDecode = document.getElementById("livedecode") as HTMLInputElement
+        val liveDecode = TwoWayCheckboxBinding(document.getElementById("livedecode") as HTMLInputElement, "livedecode")
         liveDecodeEnabled = liveDecode.checked
 
         decodeBtn.onclick = {
@@ -103,11 +103,10 @@ fun main() {
             TextareaUtils.removeTextArea()
         }
 
-        liveDecode.onchange = {
+        liveDecode.onChange = {
             liveDecodeEnabled = liveDecode.checked
             if (liveDecodeEnabled)
                 decode(false)
-            0.0
         }
 
         // init first textarea
