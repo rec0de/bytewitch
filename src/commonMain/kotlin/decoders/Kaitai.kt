@@ -1558,7 +1558,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     var float_point: Boolean = false
                     var exponential: Boolean = false
                     for ((index, char) in trimmedExpression.withIndex()) {
-                        if (!float_point && char == '.') { // FLOATS must contain exactly one '.'
+                        if (!float_point && char == '.' && trimmedExpression.length > index+1 && trimmedExpression[index+1].isDigit()) { // FLOATS must contain exactly one '.'
                             float_point = true
                             continue
                         }
