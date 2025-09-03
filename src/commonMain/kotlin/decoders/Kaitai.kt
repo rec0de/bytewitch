@@ -1389,33 +1389,33 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     )
                 }
 
-            '[' -> { // token ARRAY
-                var depth: Int = 0
-                var sqstring: Boolean = false
-                var dqstring: Boolean = false
-                for ((index, char) in trimmedExpression.withIndex()) {
-                    when (char.toString()) {
-                        "'" -> if (!dqstring) sqstring = !sqstring
-                        "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
-                            !dqstring
+                '[' -> { // token ARRAY
+                    var depth: Int = 0
+                    var sqstring: Boolean = false
+                    var dqstring: Boolean = false
+                    for ((index, char) in trimmedExpression.withIndex()) {
+                        when (char.toString()) {
+                            "'" -> if (!dqstring) sqstring = !sqstring
+                            "\"" -> if (!sqstring && (!dqstring || trimmedExpression[index - 1] != '\\')) dqstring =
+                                !dqstring
 
-                        "[" -> if (!(sqstring || dqstring)) depth++
-                        "]" -> {
-                            if (!(sqstring || dqstring)) {
-                                depth--
-                                if (depth == 0) {
-                                    breakIndex = index + 1
-                                    break
+                            "[" -> if (!(sqstring || dqstring)) depth++
+                            "]" -> {
+                                if (!(sqstring || dqstring)) {
+                                    depth--
+                                    if (depth == 0) {
+                                        breakIndex = index + 1
+                                        break
+                                    }
                                 }
                             }
                         }
                     }
+                    return Pair(
+                        Pair(TokenType.ARRAY, trimmedExpression.substring(1..breakIndex - 2)),
+                        trimmed + breakIndex
+                    )
                 }
-                return Pair(
-                    Pair(TokenType.ARRAY, trimmedExpression.substring(1..breakIndex - 2)),
-                    trimmed + breakIndex
-                )
-            }
 
                 '\'' -> { // token STRING with single quotation marks
                     for ((index, char) in trimmedExpression.withIndex()) {
@@ -1549,85 +1549,85 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             return Pair(Pair(TokenType.EMPTY, null), 0)
         }
 
-    fun tokenizeExpression(expression: String): MutableList<Pair<TokenType, dynamic>> {
-        var expression: String = expression
-        var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
-        while (expression != "") {
-            var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(expression)
-            tokens.add(token.first)
-            expression = expression.substring(token.second)
-            expression = expression.trimStart()
-        }
+        fun tokenizeExpression(expression: String): MutableList<Pair<TokenType, dynamic>> {
+            var actualExpression: String = expression
+            var tokens: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
+            while (actualExpression != "") {
+                var token: Pair<Pair<TokenType, dynamic>, Int> = nextToken(actualExpression)
+                if (token.first.first == TokenType.EMPTY) throw IllegalArgumentException("Tried to parse '$expression' which is an invalid expression.")
+                tokens.add(token.first)
+                actualExpression = actualExpression.substring(token.second)
+                actualExpression = actualExpression.trimStart()
+            }
 
             var tokensWithEnums: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var enum: Boolean = false
 
-        for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
-            if (!enum) {
-                if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
-                    tokensWithEnums.add(Pair(TokenType.ENUMCALL, token.second))
-                    enum = true
-                    continue
-                }
-                tokensWithEnums.add(token)
-            } else {
-                if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
-                    enum = false
+            for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
+                if (!enum) {
+                    if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
+                        tokensWithEnums.add(Pair(TokenType.ENUMCALL, token.second))
+                        enum = true
+                        continue
+                    }
                     tokensWithEnums.add(token)
                 } else {
-                    val tempEnum: String = tokensWithEnums.last().second
-                    tokensWithEnums.removeLast()
-                    tokensWithEnums.add(Pair(TokenType.ENUMCALL, tempEnum + token.second))
+                    if (token.first != TokenType.IDENTIFIER && token.first != TokenType.DOUBLECOLON) {
+                        enum = false
+                        tokensWithEnums.add(token)
+                    } else {
+                        val tempEnum: String = tokensWithEnums.last().second
+                        tokensWithEnums.removeLast()
+                        tokensWithEnums.add(Pair(TokenType.ENUMCALL, tempEnum + token.second))
+                    }
                 }
             }
-        }
 
             var tokensWithIndex: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
 
-        for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
-            if (token.first == TokenType.ARRAY) {
-                if (index > 0 &&
-                    (tokensWithEnums[index - 1].first == TokenType.IDENTIFIER ||
-                            tokensWithEnums[index - 1].first == TokenType.ARRAY ||
-                            tokensWithEnums[index - 1].first == TokenType.INDEX)
-                ) {
-                    tokensWithIndex.add(Pair(TokenType.INDEX, token.second))
-                    continue
+            for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
+                if (token.first == TokenType.ARRAY) {
+                    if (index > 0 &&
+                        (tokensWithEnums[index - 1].first == TokenType.IDENTIFIER ||
+                                tokensWithEnums[index - 1].first == TokenType.ARRAY ||
+                                tokensWithEnums[index - 1].first == TokenType.INDEX)
+                    ) {
+                        tokensWithIndex.add(Pair(TokenType.INDEX, token.second))
+                        continue
+                    }
                 }
+                tokensWithIndex.add(token)
             }
-            tokensWithIndex.add(token)
-        }
-
 
             var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var function: Boolean = false
 
-        for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
-            if (token.first == TokenType.IDENTIFIER &&
-                (token.second == "to_s" ||
-                        token.second == "substring" ||
-                        token.second == "to_i") &&
-                index + 1 < tokensWithIndex.size &&
-                tokensWithIndex[index + 1].first == TokenType.PARENTHESES
-            ) {
-                function = true
-            } else {
-                if (function) {
-                    val functionToken = Pair(tokensWithIndex[index - 1], token)
-                    tokensWithFunctions.add(
-                        Pair(
-                            TokenType.FUNCTION,
-                            functionToken
-                        )
-                    )
-                    function = false
+            for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
+                if (token.first == TokenType.IDENTIFIER &&
+                    (token.second == "to_s" ||
+                            token.second == "substring" ||
+                            token.second == "to_i") &&
+                    index + 1 < tokensWithIndex.size &&
+                    tokensWithIndex[index + 1].first == TokenType.PARENTHESES
+                ) {
+                    function = true
                 } else {
-                    tokensWithFunctions.add(token)
+                    if (function) {
+                        val functionToken = Pair(tokensWithIndex[index - 1], token)
+                        tokensWithFunctions.add(
+                            Pair(
+                                TokenType.FUNCTION,
+                                functionToken
+                            )
+                        )
+                        function = false
+                    } else {
+                        tokensWithFunctions.add(token)
+                    }
                 }
             }
+            return tokensWithFunctions
         }
-        return tokensWithFunctions
-    }
 
         fun parseExpressionInner(expression: String): Pair<TokenType, dynamic> {
             return parseTokens(tokenizeExpression(expression))
@@ -2098,7 +2098,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
                 val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
                 val repeatAmount : Long = if (seqElement.repeatExpr is StringOrInt.IntValue) {
-                    seqElement.repeatExpr
+                    seqElement.repeatExpr.value.toLong()
                 } else {
                     expressionParser.parseExpression(seqElement.repeatExpr.toString())
                 }
@@ -2109,7 +2109,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
                 val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
                 val repeatGuard : Boolean = if (seqElement.repeatUntil is StringOrBoolean.BooleanValue) {
-                    seqElement.repeatUntil
+                    seqElement.repeatUntil.value
                 } else {
                     expressionParser.parseExpression(seqElement.repeatUntil.toString())
                 }
