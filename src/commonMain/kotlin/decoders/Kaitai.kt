@@ -156,7 +156,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
     fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
         when (input.first) {
             TokenType.INTEGER -> {
-                return Pair(TokenType.STRING, input.second.toString())
+                return Pair(TokenType.STRING, (input.second as Long).toString())
             }
 
                 TokenType.BYTEARRAY, TokenType.ARRAY -> {
@@ -674,7 +674,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         bytesListTree[token.second]
                     } catch (e: Exception) {
                         val instance : KTSeq = currentScopeStruct.instances[token.second]!!
-                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first!!
+                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first?: throw RuntimeException("The referenced instance ${token.second} wasn't created because the if key was evaluated as false.")
                     }
 
                     parseReferenceHelper(targetElement)
@@ -826,7 +826,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                                 relevantBytesListTree.currentScopeStruct,
                                 relevantBytesListTree,
                                 relevantBytesListTree.ioStream,
-                                0, 0).first!!
+                                0, 0).first?: throw RuntimeException("The referenced instance ${op2.second} wasn't created because the if key was evaluated as false.")
                         }
                         parseReferenceHelper(targetElement)
                     }
@@ -1540,7 +1540,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     var float_point: Boolean = false
                     var exponential: Boolean = false
                     for ((index, char) in trimmedExpression.withIndex()) {
-                        if (!float_point && char == '.') { // FLOATS must contain exactly one '.'
+                        if (!float_point && char == '.' && trimmedExpression.length > index+1 && trimmedExpression[index+1].isDigit()) { // FLOATS must contain exactly one '.'
                             float_point = true
                             continue
                         }
@@ -2309,6 +2309,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
         if (instance.value != null) {  //valueInstances have entirely eperate handling from normal instances
+            if (!expressionParser.parseExpression(instance.ifCondition.toString())) {
+                return Triple(null, 0, 0)
+            }
             return Triple(
                 processValueInstance(
                     expressionParser.parseExpression(instance.value),
