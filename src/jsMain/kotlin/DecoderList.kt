@@ -295,14 +295,19 @@ class ChipList(
     }
 
     fun resetDefaultOrder() {
-        val defaultOrder = getDefaultOrder()
-        var referenceNode = itemStore[defaultOrder.last()]!!.node
-        defaultOrder.reversed().forEach { id ->
+        setOrder(getDefaultOrder())
+    }
+
+    fun setOrder(order: List<String>): Boolean {
+        if (order.toSet() != itemStore.keys) return false
+        var referenceNode = itemStore[order.last()]!!.node
+        order.reversed().forEach { id ->
             val reorderedNode = itemStore[id]!!.node
             node.insertBefore(reorderedNode, referenceNode)
             referenceNode = reorderedNode
         }
-        dispatchEvents("orderChanged", affectedIds = defaultOrder)
+        dispatchEvents("orderChanged", affectedIds = order)
+        return true
     }
 
     private fun dispatchEvents(vararg eventTypes: String, affectedIds: List<String> = listOf()) {
