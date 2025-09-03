@@ -7,6 +7,7 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.files.FileReader
 
 
 @Serializable
@@ -20,6 +21,7 @@ object KaitaiUI {
     private val kaitaiInput = TwoWayTextAreaBinding(document.getElementById("kaitaiinput") as HTMLTextAreaElement, "kaitai-live-struct")
     private val kaitaiValid = document.getElementById("kaitai-valid") as HTMLDivElement
     private val includeLiveStruct = TwoWayCheckboxBinding(document.getElementById("kaitai-live") as HTMLInputElement, "include-kaitai-live-struct")
+    private val uploadButton = document.getElementById("upload-parser") as HTMLButtonElement
     private var changedSinceLastDecode = true
 
     init {
@@ -60,6 +62,34 @@ object KaitaiUI {
                 decode(true)
             }
             0.0
+        }
+
+        uploadButton.onclick = {
+            val fileInput = document.createElement("input") as HTMLInputElement
+            fileInput.type = "file"
+            fileInput.accept = ".ksy"
+            fileInput.multiple = false
+
+            fileInput.onchange = {
+                val file = fileInput.files?.item(0)
+                if (file != null && (file.type == "text/x-kaitai-struct" || file.type == "text/plain")) {
+                    console.log("File selected: ${file.name}")
+                    val reader = FileReader()
+                    reader.onload = {
+                        val content = reader.result as String
+                        kaitaiInput.value = content
+                        nameInput.value = file.name.substringBeforeLast(".")
+                    }
+                    reader.onerror = {
+                        console.error("Failed to read file: ${reader.error?.message}")
+                    }
+                    reader.readAsText(file)
+                } else {
+                    console.error("Cannot load parser: Invalid file type")
+                }
+            }
+
+            fileInput.click()
         }
     }
 
