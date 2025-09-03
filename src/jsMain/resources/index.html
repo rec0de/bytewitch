@@ -87,8 +87,8 @@
         </h2>
         <div style="display: flex; flex-wrap: wrap; gap: 1rem">
             <div style="flex-grow: 1; flex-basis: 0;">
-              <input type="checkbox" id="ssfdecode" checked/>
-              <label for="ssfdecode">SwiftSegFinder Decoding</label>
+              <input type="checkbox" id="ssf-decode" checked/>
+              <label for="ssf-decode">SwiftSegFinder Decoding</label>
             </div>
             <div style="flex-grow: 1; flex-basis: 0;">
               <input type="checkbox" id="show-instances" checked/>
@@ -149,11 +149,13 @@
             <div></div>
             <label for="kaitai-name">Kaitai parser</label><input type="text" id="kaitai-name" placeholder="name"/>
             <button id="save-kaitai">save parser</button>
+            <div></div>
+            <button id="upload-parser">upload struct</button>
         </div>
     </div>
 </div>
 
-<div class="card" id="output"><i id="no_decode_yet">no valid decode yet</i></div>
+<div class="card" id="output"></div>
 
 <div class="card" id="bytefinder">
     <h3>Byte Finder</h3>

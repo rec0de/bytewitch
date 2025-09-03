@@ -52,12 +52,12 @@ fun main() {
         val addDataBox = document.getElementById("add_data") as HTMLElement
         val deleteDataBox = document.getElementById("delete_data") as HTMLElement
 
-        val liveDecode = document.getElementById("livedecode") as HTMLInputElement
+        val liveDecode = TwoWayCheckboxBinding(document.getElementById("livedecode") as HTMLInputElement, "livedecode")
         liveDecodeEnabled = liveDecode.checked
 
         decodeBtn.onclick = {
             tryhard = false
-            decode(false)
+            decode(true, force = !liveDecodeEnabled)
         }
 
         tryhardBtn.onclick = {
@@ -103,15 +103,30 @@ fun main() {
             TextareaUtils.removeTextArea()
         }
 
-        liveDecode.onchange = {
+        liveDecode.onChange = {
             liveDecodeEnabled = liveDecode.checked
             if (liveDecodeEnabled)
                 decode(false)
-            0.0
         }
 
-        // init first textarea
-        TextareaUtils.appendTextArea()
+        // check for data stored in session storage with key "input-data-N" where N is strictly increasing
+        // for each found key, append a text area. if a key is not found, stop
+        run {
+            var n = 0
+            while (true) {
+                val content = window.sessionStorage.getItem("input-data-$n")
+                if (content != null) {
+                    TextareaUtils.appendTextArea(content)
+                    n++
+                } else {
+                    break
+                }
+            }
+            if (n == 0) {
+                TextareaUtils.appendTextArea()
+            }
+        }
+        //TextareaUtils.appendTextArea()
 
         // a click anywhere clears any present selection
         // (as do specific keystrokes, but we'll see if we want to worry about those)
@@ -130,6 +145,8 @@ fun main() {
             }
         }
 
+        // force decode on page load
+        decode(isLiveDecoding = true, force = true)
     })
 }
 
@@ -145,16 +162,6 @@ fun clearSelections() {
 // decode one specific byte sequence
 fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     val output = document.getElementById("output") as HTMLDivElement
-    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
-    val hexview = document.getElementById("hexview") as HTMLDivElement
-    val textview = document.getElementById("textview") as HTMLDivElement
-    val noDecodeYet = document.getElementById("no_decode_yet") as HTMLElement
-
-    // Reset output
-    hexview.innerHTML = ""
-    textview.innerHTML = ""
-    bytefinder.style.display = "none"
-    noDecodeYet.style.display = "none"
 
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
@@ -163,28 +170,31 @@ fun decodeBytes(bytes: ByteArray, taIndex: Int) {
     val messageId = "message-output-$taIndex"
     var messageBox = document.getElementById(messageId) as? HTMLDivElement
 
-    if (result.isNotEmpty()) {
-        bytefinder.style.display = "flex"
+    if (messageBox == null) {
+        messageBox = document.createElement("DIV") as HTMLDivElement
+        messageBox.id = messageId
+        messageBox.classList.add("message-output") // apply layout CSS
+        output.appendChild(messageBox)
+    } else {
+        messageBox.innerHTML = "" // clear old content
+    }
+    val messageBoxTitle = document.createElement("H2") as HTMLHeadingElement
+    messageBoxTitle.innerHTML = "Input ${taIndex + 1}"
+    messageBox.appendChild(messageBoxTitle)
 
-        if (messageBox == null) {
-            messageBox = document.createElement("DIV") as HTMLDivElement
-            messageBox.id = messageId
-            messageBox.classList.add("message-output") // apply layout CSS
-            output.appendChild(messageBox)
-        } else {
-            messageBox.innerHTML = "" // clear old content
-        }
-
+    if (!result.isEmpty()) {
         result.forEach {
             messageBox.appendChild(renderByteWitchResult(it, taIndex))
         }
-
         if (ssfEnabled) {
             messageBox.appendChild(decodeWithSSF(bytes, taIndex))
         }
     } else {
-        messageBox?.remove()
-        noDecodeYet.style.display = "block"
+        if (bytes.isNotEmpty()) {
+            messageBox.appendChild(document.createTextNode("No decoder could parse the input"))
+        } else {
+            messageBox.appendChild(document.createTextNode("No valid input to parse"))
+        }
     }
 }
 
@@ -235,7 +245,20 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 }
 
 // decode all text areas
+// force: forces a decode even if the content has not changed (e.g., when decoders have changed)
 fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
+    // don't decode if "live decode" is disabled and decode is not called from the "decode" button
+    if (!(isLiveDecoding || liveDecodeEnabled)) return
+
+    // clear bytefinder
+    val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+    val hexview = document.getElementById("hexview") as HTMLDivElement
+    val textview = document.getElementById("textview") as HTMLDivElement
+    bytefinder.style.display = "none"
+    hexview.innerHTML = ""
+    textview.innerHTML = ""
+    // if any result is not empty, it will make the bytefinder visible
+
     val textareas = document.querySelectorAll(".input_area")
     for (i in 0 until textareas.length) {
         // get bytes from textarea
@@ -252,8 +275,12 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
             lastInputBytes[i] = bytes
             decodeBytes(bytes, i)
         }
-        //console.log("textarea $i: force=$force, hasChangedSinceLastDecode=${KaitaiUI.hasChangedSinceLastDecode()}, inputChanged=$inputChanged")
 
+        // set bytefinder visible if any results have been generated
+        val messageBox = document.getElementById("message-output-$i") as HTMLDivElement
+        if (messageBox.children.length > 1) {
+            bytefinder.style.display = "flex"
+        }
     }
 
     KaitaiUI.setChangedSinceLastDecode(false)
