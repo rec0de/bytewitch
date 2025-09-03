@@ -36,6 +36,8 @@ class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by inner
 class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray, val currentScopeStruct: KTStruct) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
     var kaitaiElement : KaitaiElement? = null
+    var isRoot : Boolean = false
+    var imports = mutableListOf<String>()
 
     // getter and setters for integer ids already implemented, now we do them for strings aswell, as ids are unique
     operator fun get(id : String): KaitaiElement {
@@ -57,12 +59,20 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
     var root: MutableKaitaiTree? = null
         get() {
             var rootCandidate: MutableKaitaiTree = this
-            while (rootCandidate.parent != null) {
+            while (!isRoot && rootCandidate.parent != null) {
                 rootCandidate = rootCandidate.parent!!
             }
             return rootCandidate
         }
         private set
+
+    fun getRoot() : MutableKaitaiTree {
+        var rootCandidate: MutableKaitaiTree = this
+        while (!isRoot && rootCandidate.parent != null) {
+            rootCandidate = rootCandidate.parent!!
+        }
+        return rootCandidate
+    }
 }
 
 class Type(val type: String?) {
@@ -76,17 +86,19 @@ class Type(val type: String?) {
     var isBinary: Boolean = false
 }
 
-class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String) : ByteWitchDecoder {
+class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String = "") : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
 
     private val importedStructs = mutableMapOf<String, KTStruct>()
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
+            /*
             val imports = kaitaiStruct.meta?.imports
             if (imports != null) {
                 importedStructs.putAll(importTypes(imports))
             }
+             */
 
             val id = kaitaiStruct.meta?.id ?: name
             processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
@@ -167,14 +179,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val repeatIndex: Int?,
         val currentRepeatElement: KaitaiElement?,
     ) {
-    //******************************************************************************************************************
-    //*                                                 methods                                                        *
-    //******************************************************************************************************************
-    fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
-        when (input.first) {
-            TokenType.INTEGER -> {
-                return Pair(TokenType.STRING, input.second.toString())
-            }
+        //******************************************************************************************************************
+        //*                                                 methods                                                        *
+        //******************************************************************************************************************
+        fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
+            when (input.first) {
+                TokenType.INTEGER -> {
+                    return Pair(TokenType.STRING, input.second.toString())
+                }
 
                 TokenType.BYTEARRAY, TokenType.ARRAY -> {
                     if (encoding != "UTF-8" && encoding != "ASCII") {
@@ -1773,39 +1785,69 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return true
     }
 
-    fun importTypes(imports: List<String>) : Map<String, KTStruct> {
-        val result = mutableMapOf<String, KTStruct>()
-        for (import in imports) {
-            val currentPath = if (import.startsWith("/")) {
-                emptyList<String>()
-            } else {
-                canonicalPath.split("/").dropLast(1)
-            }
-            val importPath = import.split("/").filter { it != "." && it != "" }
-            for (part in importPath) {
-                if (part == "..") {
-                    currentPath.dropLast(1)
-                } else {
-                    currentPath + part
-                }
-            }
-            val canonicalPath = currentPath.joinToString(separator = "/")
-
-            val struct = ByteWitch.findKaitaiStructByPath(canonicalPath)
-            checkNotNull(struct) { "Could not find imported file at path $canonicalPath for import $import" }
-            val name = struct.meta?.id ?: import.substringAfterLast("/")
-            result[name] = struct
+    /**
+     * Imports a Kaitai document based on the name and the path of the current document.
+     *
+     * @param import name of the Kaitai document, can be a relative or absolute path.
+     * @param currentPath the path of the current Kaitai document, on which a relative import will be based.
+     *
+     * @return a [Pair] of the canonical path of the imported Kaitai and the imported [Kaitai][KTStruct] itself.
+     */
+    fun importType(import: String, currentPath: String) : Pair<String, KTStruct>? {
+        val currentPath = if (import.startsWith("/")) {
+            mutableListOf()
+        } else {
+            currentPath.split("/").filter { it.isNotBlank() }.dropLast(1).toMutableList()
         }
-        return result
+        val importPath = import.split("/").filter { it != "." && it.isNotBlank() }
+        for (part in importPath) {
+            if (part == "..") {
+                currentPath.dropLast(1)
+            } else {
+                currentPath.add(part)
+            }
+        }
+        val canonicalPath = "/" + currentPath.joinToString(separator = "/")
+
+        return ByteWitch.findKaitaiStructByPath(canonicalPath)?.let { Pair(canonicalPath, it) }
     }
 
-    fun getImportedType(path: String) : KTStruct? {
-        val elements = path.split("::", limit = 2)
-        val type = importedStructs[elements[0]]
-        if (type != null && elements.size == 2) {
-            return getCustomType(type, elements[1]) // go one scope deeper
+    fun getImportedType(path: String, bytesListTree: MutableKaitaiTree) : KTStruct? {
+        val imports = bytesListTree.getRoot().imports.associateBy { it.substringAfterLast("/") }
+        console.log("Imports: $imports")
+        console.log("Type: $path")
+        val pathElements = path.split("::", limit = 2)
+        console.log("First path: ${pathElements[0]}")
+        val importedType = imports[pathElements[0]]?.let { importType(it, canonicalPath) }
+        if (importedType != null) {
+            return if (pathElements.size > 1) {
+                getCustomType(importedType.second, pathElements[1])
+            } else {
+                importedType.second
+            }
+            //type.isRoot = true
+            //bytesListTree.isRoot = true
+            //bytesListTree.imports = importedType.second.meta?.imports?.toMutableList() ?: mutableListOf()
         }
-        return type
+        return null
+    }
+
+    fun getImportedEnum(path: String, bytesListTree: MutableKaitaiTree) : KTEnum? {
+        val imports = bytesListTree.getRoot().imports.associateBy { it.substringAfterLast("/") }
+        console.log("Imports: $imports")
+        console.log("Type: $path")
+        val pathElements = path.split("::", limit = 2)
+        console.log("First path: ${pathElements[0]}")
+        if (pathElements.size == 2) {
+            val importedType = imports[pathElements[0]]?.let { importType(it, canonicalPath) }
+            if (importedType != null) {
+                return getEnum(importedType.second, pathElements[1])
+                //type.isRoot = true
+                //bytesListTree.isRoot = true
+                //bytesListTree.imports = importedType.second.meta?.imports?.toMutableList() ?: mutableListOf()
+            }
+        }
+        return null
     }
 
     /**
@@ -1902,9 +1944,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(parentScopeStruct, type.type)?:
+                getCustomType(parentScopeStruct, type.type) ?:
                 getCustomType(kaitaiStruct, type.type) ?:
-                getImportedType(type.type)
+                getImportedType(type.type, bytesListTree)
+
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
             } else {  // parse builtin type
@@ -2017,9 +2060,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
                     type.usedDisplayStyle == DisplayStyle.BOOLEAN)
         ) {
-            val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum)?:
-                                getEnum(parentScopeStruct, seqElement.enum)?:
-                                getEnum(kaitaiStruct, seqElement.enum)
+            val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
+                                getEnum(parentScopeStruct, seqElement.enum) ?:
+                                getEnum(kaitaiStruct, seqElement.enum) ?:
+                                getImportedEnum(seqElement.enum, bytesListTree)
+
             if (path != null) {
                 if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
                     if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
@@ -2143,11 +2188,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTreeForInnerList.parent = bytesListTree.parent
-        if (bytesListTree.parent != null) {
-            bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
-        } else {
-            bytesListTreeForInnerList.byteOrder = ByteOrder.BIG
-        }
+        bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent?.byteOrder ?: ByteOrder.BIG
+
         var repeatIndex = 0
         while (true) {
             val triple = processSingleSeqElement(
@@ -2382,11 +2424,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         */
         val bytesListTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTree.parent = parentBytesListTree
-        if (bytesListTree.parent != null) {
-            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
-        } else {
-            bytesListTree.byteOrder = ByteOrder.BIG
-        }
+        bytesListTree.byteOrder = bytesListTree.parent?.byteOrder ?: ByteOrder.BIG
         currentScopeStruct.meta?.endian?.let { endian ->
             bytesListTree.byteOrder = when (endian) {
                 is KTEndian.Primitive -> {
@@ -2399,6 +2437,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     entry.toByteOrder()
                 }
             }
+        }
+        if (bytesListTree.parent == null) {
+            console.log("[SEQ] Set imports")
+            bytesListTree.isRoot = true
+            bytesListTree.imports = currentScopeStruct.meta?.imports?.toMutableList() ?: mutableListOf()
+        } else {
+            console.log("[SEQ] We have a parent")
         }
 
         var dataSizeOfSequenceInBits = 0
