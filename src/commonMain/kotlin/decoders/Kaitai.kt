@@ -92,7 +92,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val id = kaitaiStruct.meta?.id ?: name
             processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, null, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
-            console.error("[$name] $e")
             throw Exception("[$name] Unexpected Exception has been thrown:\n$e")
         }
         return result
