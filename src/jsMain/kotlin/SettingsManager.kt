@@ -5,20 +5,25 @@ import org.w3c.dom.asList
 
 object SettingsManager {
 
-    private val ssfDecodingCheckbox = document.getElementById("ssfdecode") as HTMLInputElement
-    private val showInstancesCheckbox = document.getElementById("show-instances") as HTMLInputElement
+    private val ssfDecodingBinding = TwoWayCheckboxBinding(
+        document.getElementById("ssf-decode") as HTMLInputElement,
+        "ssf-decode"
+    )
+    private val showInstancesBinding = TwoWayCheckboxBinding(
+        document.getElementById("show-instances") as HTMLInputElement,
+        "show-instances"
+    )
 
     init {
-        ssfEnabled = ssfDecodingCheckbox.checked
-        ssfDecodingCheckbox.onchange = {
-            ssfEnabled = ssfDecodingCheckbox.checked
+        ssfEnabled = ssfDecodingBinding.checked
+        ssfDecodingBinding.onChange = { checked ->
+            ssfEnabled = checked
             decode(false, force = true)
         }
 
-        showInstances = showInstancesCheckbox.checked
-        showInstancesCheckbox.onchange = {
-            showInstances = showInstancesCheckbox.checked
-            // TODO: hide/show all displayed instances with display:none/block
+        showInstances = showInstancesBinding.checked
+        showInstancesBinding.onChange = { checked ->
+            showInstances = checked
             document.getElementsByClassName("kaitai-instance").asList().forEach {
                 (it as? HTMLDivElement)?.style?.display = if (showInstances) "block" else "none"
             }
