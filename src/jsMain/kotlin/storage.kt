@@ -1,3 +1,35 @@
+
+object BuiltinDecoderStorage {
+    private const val KEY_NAME_LIST = "builtinDecoderNames"
+
+    fun listDecoderNames(): List<String> {
+        return localStorage.getItem(KEY_NAME_LIST)?.let { list ->
+            list.split(";").filter { decoder -> decoder.isNotBlank() }
+        } ?: emptyList()
+    }
+
+    fun reorderDecoderNames(newOrder: List<String>): Boolean {
+        localStorage.setItem(KEY_NAME_LIST, newOrder.joinToString(";"))
+        return true
+    }
+}
+
+object BuiltinKaitaiDecoderStorage {
+    private const val KEY_NAME_LIST = "builtinKaitaiDecoderNames"
+
+    fun listDecoderNames(): List<String> {
+        return localStorage.getItem(KEY_NAME_LIST)?.let { list ->
+            list.split(";").filter { decoder -> decoder.isNotBlank() }
+        } ?: emptyList()
+    }
+
+    fun reorderDecoderNames(newOrder: List<String>): Boolean {
+        localStorage.setItem(KEY_NAME_LIST, newOrder.joinToString(";"))
+        return true
+    }
+}
+
+
 object KaitaiStorage {
     private const val KEY_NAME_LIST = "kaitaiStructNames"
     private const val KEY_STRUCT_PREFIX = "kaitaiStruct-"

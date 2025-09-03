@@ -17,7 +17,7 @@
     --generic-highlight: #b98346;
     --neutral: #a0a0a0;
     --neutral-highlight: #838383;
-    --kaitai: #c9a074;
+    --kaitai: #c9a0742f;
     --kaitai-highlight: #b98346;
     --rowgap: 0.3rem;
     --sans: Lato, Roboto, Helvetica, sans-serif;
@@ -358,6 +358,15 @@ button:hover {
     background: var(--kaitai);
 }
 
+.kaitai {
+    display: flex;
+    gap: var(--rowgap);
+    align-items: start;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
 .asn1 {
     background: var(--asn);
 }
@@ -598,7 +607,6 @@ button:hover {
     border-radius: 0.5rem;
     padding: 1rem;
     background-color: #f9f9f9;
-    margin-bottom: 1rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;

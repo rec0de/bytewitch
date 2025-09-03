@@ -521,15 +521,45 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
                 var sqString: Boolean = false
                 var dqString: Boolean = false
+                var brackets: Boolean = false
+                var parentheses: Boolean = false
+                var depth: Int = 0
+
                 // add logic here to support more complex arrays: nested arrays, entries with complex expression containing more commas
                 for ((index, char) in array.withIndex()) {
-                    if (char == ',' && !sqString && !dqString) {
+                    if (char == ',' && !sqString && !dqString && depth == 0) {
                         slice = index
                         break
                     } else if (char == '\'' && !dqString) {
                         sqString = !sqString
                     } else if (char == '"' && !sqString) {
                         dqString = !dqString
+                    } else if ((char == '[' && !sqString && !dqString && !parentheses) || brackets) {
+                        when(char) {
+                            '[' -> {
+                                brackets = true
+                                depth++
+                            }
+                            ']' -> {
+                                depth--
+                                if (depth == 0) {
+                                    brackets = false
+                                }
+                            }
+                        }
+                    } else if ((char == '(' && !sqString && !dqString && !brackets) || parentheses) {
+                        when(char) {
+                            '(' -> {
+                                parentheses = true
+                                depth++
+                            }
+                            ')' -> {
+                                depth--
+                                if (depth == 0) {
+                                    parentheses = false
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -616,6 +646,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     is KaitaiSignedInteger -> Pair(TokenType.INTEGER, targetElement.value)
                     is KaitaiFloat -> Pair(TokenType.FLOAT, targetElement.value)
                     is KaitaiBytes -> Pair(TokenType.BYTEARRAY, (targetElement.value as List<Long>).map {Pair(TokenType.INTEGER, it)})
+                    is KaitaiString -> Pair(TokenType.STRING, targetElement.value)
                     else -> {
                         throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
                     }
@@ -1388,10 +1419,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             }
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.PARENTHESES, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    if (depth == 0) {
+                        return Pair(
+                            Pair(TokenType.PARENTHESES, trimmedExpression.substring(1..breakIndex - 2)),
+                            trimmed + breakIndex
+                        )
+                    } else {
+                        return Pair(Pair(TokenType.EMPTY, null), 0)
+                    }
                 }
 
                 '[' -> { // token ARRAY
@@ -1416,36 +1451,40 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                             }
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.ARRAY, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    return if (depth == 0) {
+                        Pair(
+                            Pair(TokenType.ARRAY, trimmedExpression.substring(1..breakIndex - 2)),
+                            trimmed + breakIndex
+                        )
+                    } else {
+                        Pair(Pair(TokenType.EMPTY, null), 0)
+                    }
                 }
 
                 '\'' -> { // token STRING with single quotation marks
                     for ((index, char) in trimmedExpression.withIndex()) {
                         if (char == '\'' && index != 0) {
                             breakIndex = index + 1
-                            break
+                            return Pair(
+                                Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                                trimmed + breakIndex
+                            )
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    Pair(Pair(TokenType.EMPTY, null), 0)
                 }
 
                 '"' -> { // token STRING with double quotation marks
                     for ((index, char) in trimmedExpression.withIndex()) {
                         if (char == '"' && index != 0) {
                             breakIndex = index + 1
-                            break
+                            return Pair(
+                                Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                                trimmed + breakIndex
+                            )
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    Pair(Pair(TokenType.EMPTY, null), 0)
                 }
             }
 
@@ -2534,7 +2573,7 @@ class KaitaiResult(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
                     doc.renderHTML() +
                 "</div>"
@@ -2560,7 +2599,7 @@ class KaitaiList(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                     "${bytesListTree.joinToString(", ", "${id}[", "]") { it.renderHTML() }}" +
                 "</div>"
     }
@@ -2585,7 +2624,7 @@ class KaitaiBytes(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()})h" +
                     doc.renderHTML() +
                 "</div>"
@@ -2603,7 +2642,7 @@ abstract class KaitaiNumber(
     abstract val suffix: String
 
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                     "${id}(${parseValueAsString()})${suffix}" +
                     doc.renderHTML() +
                 "</div>"
@@ -2685,7 +2724,7 @@ class KaitaiBoolean(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                 "${id}(${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean})b" +
                 doc.renderHTML() +
                 "</div>"
@@ -2699,7 +2738,7 @@ class KaitaiString(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String})utf8" +
                     doc.renderHTML() +
                 "</div>"
@@ -2714,7 +2753,7 @@ class KaitaiEnum(
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
                    "${id}(${enum.second})enum" +
                    doc.renderHTML() +
                "</div>"

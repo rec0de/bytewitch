@@ -49,6 +49,10 @@ object ByteWitch {
             updateActiveOrderedDecoders()
         }
 
+        fun getDecoder(id: String): DecoderType? {
+            return decoders[id]
+        }
+
         fun hasDecoder(id: String): Boolean {
             return decoders.containsKey(id)
         }
