@@ -29,12 +29,14 @@ object KaitaiUI {
             val name = nameInput.value.trim()
             val inputValue = getInputValue()
             if (name.isNotEmpty() && inputValue.isNotEmpty()) {
-                addParser(name, inputValue)
-                // clear fields to indicate successful save
-                nameInput.value = ""
-                kaitaiInput.value = ""
-                // force decode when parser is saved
-                decode(false, force = true)
+                val success = addParser(name, inputValue)
+                if (success) {
+                    // clear fields to indicate successful save
+                    nameInput.value = ""
+                    kaitaiInput.value = ""
+                    // force decode when parser is saved
+                    decode(false, force = true)
+                }
             } else {
                 console.warn("Kaitai name and input cannot be empty")
             }
@@ -180,19 +182,19 @@ object KaitaiUI {
         return Json.decodeFromString(manifestContent)
     }
 
-    private fun addParser(name: String, kaitaiStruct: String) {
+    private fun addParser(name: String, kaitaiStruct: String): Boolean {
         val decoderExists = ByteWitch.userKaitaiDecoderListManager.hasDecoder(name)
         val success = ByteWitch.registerUserKaitaiDecoder(name, kaitaiStruct)
-        if (success) {
-            // Save the new Kaitai decoder to local storage
-            val saved = KaitaiStorage.saveStruct(name, kaitaiStruct)
-            if (!saved) {
-                console.error("Failed to save Kaitai Struct: $name")
-            }
-
-            if (!decoderExists) {
-                DecoderListManager.addUserKaitaiDecoder(name, name)
-            }
+        if (!success) return false
+        // Save the new Kaitai decoder to local storage
+        val saved = KaitaiStorage.saveStruct(name, kaitaiStruct)
+        if (!saved) {
+            console.error("Failed to save Kaitai Struct: $name")
+            return false
         }
+        if (!decoderExists) {
+            DecoderListManager.addUserKaitaiDecoder(name, name)
+        }
+        return true
     }
 }
