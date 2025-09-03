@@ -145,7 +145,8 @@ fun main() {
             }
         }
 
-        decode(isLiveDecoding = false, force = false)
+        // force decode on page load
+        decode(isLiveDecoding = true, force = true)
     })
 }
 

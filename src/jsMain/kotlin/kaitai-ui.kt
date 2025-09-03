@@ -1,8 +1,10 @@
+import kaitai.JsYaml
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToDynamic
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
@@ -115,6 +117,16 @@ object KaitaiUI {
 
     fun setChangedSinceLastDecode(value: Boolean) {
         changedSinceLastDecode = value
+    }
+
+    fun cloneBuiltinKaitai(id: String) {
+        ByteWitch.builtinKaitaiDecoderListManager.getDecoder(id)?.let { decoder ->
+            val jsonParser = Json {
+                ignoreUnknownKeys = true
+            }
+            kaitaiInput.value = JsYaml.dump(jsonParser.encodeToDynamic(decoder.kaitaiStruct))
+            nameInput.value = id
+        }
     }
 
     fun editUserKaitai(id: String) {

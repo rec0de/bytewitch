@@ -35,7 +35,7 @@ object DecoderListManager {
 
         // Builtin Kaitai decoder list
         val builtinKaitaiListElement = document.getElementById("builtin-kaitai-decoder-list") as HTMLDivElement
-        builtinKaitaiList = ChipList(builtinKaitaiListElement, canEdit = false, canDelete = false)
+        builtinKaitaiList = ChipList(builtinKaitaiListElement, canEdit = true, canDelete = false)
         setupDecoderList(
             builtinKaitaiList,
             ByteWitch.builtinKaitaiDecoderListManager,
@@ -43,6 +43,9 @@ object DecoderListManager {
         )
         builtinKaitaiList.addEventListener("orderChanged", { ids ->
             BuiltinKaitaiDecoderStorage.reorderDecoderNames(ids)
+        })
+        builtinKaitaiList.addEventListener("itemEdited", { ids ->
+            KaitaiUI.cloneBuiltinKaitai(ids.first())
         })
 
         // User Kaitai decoder list
