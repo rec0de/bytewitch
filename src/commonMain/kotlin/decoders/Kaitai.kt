@@ -1820,7 +1820,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             val elements = typeNameWithParams.split("(", limit = 2)
             val typeName: String = elements[0]
             type = Type(typeName)
-            parsedParamsData = expressionParser.parseExpression("[${elements[1].dropLast(1)}]")  //drop closing bracket
+            if (elements.size >= 2) {
+                parsedParamsData = expressionParser.parseExpression("[${elements[1].dropLast(1)}]")  //drop closing bracket
+            }
         } else {
             type = Type(null)
         }
