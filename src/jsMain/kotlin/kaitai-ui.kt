@@ -152,7 +152,7 @@ object KaitaiUI {
             if (ksyContent != null) {
                 // Register the Kaitai Struct decoder
                 val canonicalPath = if (kaitaiName.startsWith("/")) kaitaiName else "/$kaitaiName"
-                val success = ByteWitch.registerUserKaitaiDecoder(kaitaiName, ksyContent, canonicalPath)
+                val success = ByteWitch.registerKaitaiDecoder(kaitaiName, ksyContent, canonicalPath, ByteWitch.KaitaiDecoderType.USER)
                 if (!success) {
                     console.error("Failed to register Kaitai Struct: $kaitaiName")
                     continue
@@ -178,7 +178,7 @@ object KaitaiUI {
 
             // Register the Kaitai Struct decoder
             val name = path.substringBeforeLast(".")
-            val success = ByteWitch.registerBuiltinKaitaiDecoder(name, ksyContent, "/$name")
+            val success = ByteWitch.registerKaitaiDecoder(name, ksyContent, "/$name", ByteWitch.KaitaiDecoderType.BUILTIN)
             if (!success) {
                 throw Error("Failed to register Kaitai Struct: $name")
             }
@@ -201,7 +201,7 @@ object KaitaiUI {
     private fun addParser(name: String, kaitaiStruct: String): Boolean {
         val decoderExists = ByteWitch.userKaitaiDecoderListManager.hasDecoder(name)
         val canonicalPath = if (name.startsWith("/")) name else "/$name"
-        val success = ByteWitch.registerUserKaitaiDecoder(name, kaitaiStruct, canonicalPath)
+        val success = ByteWitch.registerKaitaiDecoder(name, kaitaiStruct, canonicalPath, ByteWitch.KaitaiDecoderType.USER)
         if (!success) return false
         // Save the new Kaitai decoder to local storage
         val saved = KaitaiStorage.saveStruct(name, kaitaiStruct)
