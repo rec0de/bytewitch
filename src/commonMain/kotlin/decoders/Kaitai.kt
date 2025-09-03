@@ -2433,8 +2433,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
-                val elementId = seqElement.id
-                checkNotNull(seqElement.id) { "Sequence element id must not be null" }
+                val elementId = seqElement.id?: ""
                 val triple = processOneOrManySeqElements(
                     elementId,
                     seqElement,
