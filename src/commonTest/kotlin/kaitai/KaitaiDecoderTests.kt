@@ -435,7 +435,7 @@ class KaitaiDecoderTests {
     fun testRepeatKey() {
         val struct = KTStruct(
             seq = listOf(
-                KTSeq(id = "repeat_by_expr", size = StringOrInt.IntValue(1), repeat = KTRepeat.EXPR, repeatExpr = "3"),
+                KTSeq(id = "repeat_by_expr", size = StringOrInt.IntValue(1), repeat = KTRepeat.EXPR, repeatExpr = StringOrInt.StringValue("3")),
                 KTSeq(id = "set_size", size = StringOrInt.IntValue(4), type = KTType.Primitive("repeating_sub")),
                 KTSeq(id = "simple_eos", type = KTType.Primitive("simple_sub"), repeat = KTRepeat.EOS)
             ),

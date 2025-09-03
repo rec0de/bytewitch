@@ -6,7 +6,6 @@ import bitmage.hex
 import bitmage.padLeft
 import bitmage.toBooleanArray
 import bitmage.toByteArray
-import bitmage.toInt
 import bitmage.toMinimalAmountOfBytes
 import bitmage.toUInt
 import bitmage.toUTF8String
@@ -17,6 +16,7 @@ import kaitai.KTSeq
 import kaitai.KTStruct
 import kaitai.KTType
 import kaitai.KTValid
+import kaitai.StringOrBoolean
 import kaitai.StringOrInt
 import kaitai.toByteOrder
 import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
@@ -33,7 +33,7 @@ class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by inner
 }
 
 // acts just like a MutableList except it also has the added features specifically for Kaitai stuff
-class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray) : MutableList<KaitaiElement> by innerList {
+class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray, val currentScopeStruct: KTStruct) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
     var kaitaiElement : KaitaiElement? = null
 
@@ -796,9 +796,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                         val targetElement = try {
                             (op1.second as MutableKaitaiTree)[op2.second as String]
                         } catch (e: Exception) {
-                            throw NotImplementedError("Actual exception is $e, which is expected if you mistyped or tried to access an element from the wrong scope. If the element you tried to access should exist, but only doesn't because it has not been parsed yet.. well we thought this would never occur.")
-                            val instance : KTSeq = currentScopeStruct.instances[op2.second as String]!!
-                            processInstance(op2.second as String, instance, parentScopeStruct, currentScopeStruct, (op1.second as MutableKaitaiTree), ioStream, 0, 0).first!!
+                            //throw NotImplementedError("Actual exception is $e, which is expected if you mistyped or tried to access an element from the wrong scope. If the element you tried to access should exist, but only doesn't because it has not been parsed yet.. well we thought this would never occur.")
+                            val relevantBytesListTree = op1.second as MutableKaitaiTree
+                            val instance : KTSeq = relevantBytesListTree.currentScopeStruct.instances[op2.second as String]!!
+                            processInstance(
+                                op2.second as String,
+                                instance,
+                                relevantBytesListTree.parent?.currentScopeStruct,
+                                relevantBytesListTree.currentScopeStruct,
+                                relevantBytesListTree,
+                                relevantBytesListTree.ioStream,
+                                0, 0).first!!
                         }
                         parseReferenceHelper(targetElement)
                     }
@@ -2053,7 +2061,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream)
+        val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTreeForInnerList.parent = bytesListTree.parent
         if (bytesListTree.parent != null) {
             bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
@@ -2088,13 +2096,24 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 }
             } else if (seqElement.repeat == KTRepeat.EXPR) {
                 checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
-                if (repeatIndex >= parseValue(seqElement.repeatExpr, bytesListTree).toByteArray().toInt(ByteOrder.BIG)) {
+                val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
+                val repeatAmount : Long = if (seqElement.repeatExpr is StringOrInt.IntValue) {
+                    seqElement.repeatExpr
+                } else {
+                    expressionParser.parseExpression(seqElement.repeatExpr.toString())
+                }
+                if (repeatIndex >= repeatAmount) {
                     break
                 }
             } else if (seqElement.repeat == KTRepeat.UNTIL) {
                 checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
                 val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
-                if (expressionParser.parseExpression(seqElement.repeatUntil)) {
+                val repeatGuard : Boolean = if (seqElement.repeatUntil is StringOrBoolean.BooleanValue) {
+                    seqElement.repeatUntil
+                } else {
+                    expressionParser.parseExpression(seqElement.repeatUntil.toString())
+                }
+                if (repeatGuard) {
                     break
                 }
             }
@@ -2168,9 +2187,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         expressionResult: dynamic,
         id: String,
         ioStream: BooleanArray,
-        instanceDoc: KaitaiDoc,
-        parentBytesListTree: MutableKaitaiTree
-        ): KaitaiElement {
+        currentScopeStruct: KTStruct,
+        parentBytesListTree: MutableKaitaiTree,
+        instanceDoc: KaitaiDoc
+    ): KaitaiElement {
         return when(expressionResult) {
             is Long -> { // token integer
                 KaitaiSignedInteger(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
@@ -2200,9 +2220,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 if (expressionResult is BytesList<Long>) {//(expressionResult as List<dynamic>).all {it is Long && it in 0L..255L}) { // token bytearray
                     KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
                 } else { // token array
-                    val bytesListTree: MutableKaitaiTree = MutableKaitaiTree(ioStream = ioStream)
+                    val bytesListTree: MutableKaitaiTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
                     bytesListTree.parent = parentBytesListTree
-                    bytesListTree.addAll((expressionResult as List<dynamic>).map {processValueInstanceHelper(it, id, ioStream, instanceDoc, bytesListTree)}) // TODO ioStream or ioSubStream
+                    bytesListTree.addAll((expressionResult as List<dynamic>).map {processValueInstanceHelper(
+                        it,
+                        id,
+                        ioStream,
+                        currentScopeStruct,
+                        bytesListTree,
+                        instanceDoc,
+                    )}) // TODO ioStream or ioSubStream
                     KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), instanceDoc, true)
                 }
             }
@@ -2225,7 +2252,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
         if (instance.value != null) {  //valueInstances have entirely eperate handling from normal instances
-            return Triple(processValueInstanceHelper(expressionParser.parseExpression(instance.value), id, ioStream, KaitaiDoc(instance.doc, instance.docRef), bytesListTree), 0, 0)
+            return Triple(
+                processValueInstanceHelper(
+                    expressionParser.parseExpression(instance.value),
+                    id,
+                    ioStream,
+                    currentScopeStruct,
+                    bytesListTree,
+                    KaitaiDoc(instance.doc, instance.docRef)
+                ),
+                0,
+                0
+            )
         }
 
         //normal instance here, which behave like seqElements, except they can do a little bit more
@@ -2262,7 +2300,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         test and 0b00111000 >> 3 = -> 001
         oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
         */
-        val bytesListTree = MutableKaitaiTree(ioStream = ioStream)
+        val bytesListTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTree.parent = parentBytesListTree
         if (bytesListTree.parent != null) {
             bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder

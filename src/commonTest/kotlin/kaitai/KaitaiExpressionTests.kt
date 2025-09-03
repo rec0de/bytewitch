@@ -21,7 +21,7 @@ class KaitaiExpressionTests {
     @Test
     fun tokenizerTest() {
         val kaitai = Kaitai("tokenizer", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "13_37  "
         var result:  MutableList<Pair<Kaitai.TokenType, dynamic>> = expressionParser.tokenizeExpression(expression)
@@ -199,7 +199,7 @@ class KaitaiExpressionTests {
     @Test
     fun operationsTest() {
         val kaitai = Kaitai("operations", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "-5 + 6 + 3.3 + -2.0"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -345,7 +345,7 @@ class KaitaiExpressionTests {
     @Test
     fun arrayTest() {
         val kaitai = Kaitai("array", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "[3, 3+1, 3 << 2, 7 / 2, ]"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -371,12 +371,12 @@ class KaitaiExpressionTests {
                 KTSeq(id = "a", type = KTType.Primitive("u1")),
                 KTSeq(id = "b", type = KTType.Primitive("u1")),
                 KTSeq(id = "c", size = StringOrInt.StringValue("a")),
-                KTSeq(id = "d", size = StringOrInt.StringValue("b"), repeat = KTRepeat.EXPR, repeatExpr = "2"),
-                KTSeq(id = "e", size = StringOrInt.StringValue("_index"), repeat = KTRepeat.EXPR, repeatExpr = "3"),
+                KTSeq(id = "d", size = StringOrInt.StringValue("b"), repeat = KTRepeat.EXPR, repeatExpr = StringOrInt.StringValue("2")),
+                KTSeq(id = "e", size = StringOrInt.StringValue("_index"), repeat = KTRepeat.EXPR, repeatExpr = StringOrInt.StringValue("3")),
                 KTSeq(id = "f0", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[0] == [0x08]")),  // false
                 KTSeq(id = "f1", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[1] == [0x08]")),  // true
                 KTSeq(id = "f2", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("e[2][1] == 0x10")),  // true
-                KTSeq(id = "g", type = KTType.Primitive("s1"), repeat = KTRepeat.UNTIL, repeatUntil = "_ == -1"),
+                KTSeq(id = "g", type = KTType.Primitive("s1"), repeat = KTRepeat.UNTIL, repeatUntil = StringOrBoolean.StringValue("_ == -1")),
             ),
         )
 

@@ -26,7 +26,7 @@ class KaitaiInstancesTests {
                 KTSeq(id = "string", size = StringOrInt.IntValue(1), type = KTType.Primitive("str")),
                 KTSeq(id = "boolean", type = KTType.Primitive("b1")),
                 KTSeq(id = "bytes", size = StringOrInt.IntValue(4)),
-                KTSeq(id = "list", type = KTType.Primitive("u1"), repeat = KTRepeat.EXPR, repeatExpr = "3"),
+                KTSeq(id = "list", type = KTType.Primitive("u1"), repeat = KTRepeat.EXPR, repeatExpr = StringOrInt.StringValue("3")),
                 KTSeq(id = "result", type = KTType.Primitive("sub")),
                 KTSeq(id = "enum", type = KTType.Primitive("u1"), enum = "ip_protocols"),
             ),
@@ -107,7 +107,7 @@ class KaitaiInstancesTests {
             0x11, // enum = udp
         )
 
-        val decoder = Kaitai("example", struct)
+        val decoder = Kaitai("valueInstances", struct)
         val result = decoder.decode(data, 0)
 
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
@@ -179,7 +179,7 @@ class KaitaiInstancesTests {
             0x03, 0x04, 0x05, 0x05  // b
         )
 
-        val decoder = Kaitai("example", struct)
+        val decoder = Kaitai("quasiForwardReference", struct)
         val result = decoder.decode(data, 0)
 
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
@@ -188,6 +188,64 @@ class KaitaiInstancesTests {
         checkElement(a, "a", KaitaiUnsignedInteger::class, Pair(0, 1), Pair(0, 0), booleanArrayOfInts(0x02))
         val b = result.bytesListTree["b"]
         checkElement(b, "b", KaitaiBytes::class, Pair(1, 3), Pair(0, 0), booleanArrayOfInts(0x03, 0x04))
+
+        val i = result.bytesListTree["i"]
+        checkElement(i, "i", KaitaiUnsignedInteger::class, value = booleanArrayOfInts(0x02))
+    }
+
+    @Test
+    fun instanceInParentTest() {
+        val struct = KTStruct(
+            meta = KTMeta(
+                id = "instanceInParent",
+            ),
+            seq = listOf(
+                KTSeq(id = "a", type = KTType.Primitive("u1")),
+                KTSeq(id = "b", type = KTType.Primitive("sub")),
+                KTSeq(id = "c", type = KTType.Primitive("sub"), size = StringOrInt.StringValue("2")),
+            ),
+            types = mapOf(
+                Pair(
+                    "sub",
+                    KTStruct(
+                        seq = listOf(
+                            KTSeq(
+                                id = "x", size = StringOrInt.StringValue("_parent.i"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            instances = mapOf(
+                Pair("i", KTSeq(type = KTType.Primitive("u1"))),  // referenced by b.x
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x02,  // both a and i
+            0x03, 0x04,  // b
+            0x05, 0x06,  // c, with substream
+        )
+
+        val decoder = Kaitai("instanceInParent", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        val a = result.bytesListTree["a"]
+        checkElement(a, "a", KaitaiUnsignedInteger::class, Pair(0, 1), Pair(0, 0), booleanArrayOfInts(0x02))
+
+        val b = result.bytesListTree["b"]
+        check(b is KaitaiResult) { "Expected KaitaiResult, got ${b::class.simpleName}" }
+        checkElement(b, "b", KaitaiResult::class, Pair(1, 3), Pair(0, 0), booleanArrayOfInts(0x03, 0x04))
+        val bx = b.bytesListTree["x"]
+        checkElement(bx, "x", KaitaiBytes::class, Pair(1, 3), Pair(0, 0), booleanArrayOfInts(0x03, 0x04))
+
+        val c = result.bytesListTree["c"]
+        check(c is KaitaiResult) { "Expected KaitaiResult, got ${c::class.simpleName}" }
+        checkElement(c, "c", KaitaiResult::class, Pair(3, 5), Pair(0, 0), booleanArrayOfInts(0x05, 0x06))
+        val cx = c.bytesListTree["x"]
+        checkElement(cx, "x", KaitaiBytes::class, Pair(3, 5), Pair(0, 0), booleanArrayOfInts(0x05, 0x06))
 
         val i = result.bytesListTree["i"]
         checkElement(i, "i", KaitaiUnsignedInteger::class, value = booleanArrayOfInts(0x02))

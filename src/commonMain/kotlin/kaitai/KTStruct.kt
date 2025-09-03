@@ -77,9 +77,9 @@ data class KTSeq(
 
     val repeat: KTRepeat? = null,
     @SerialName("repeat-expr")
-    val repeatExpr: String? = null,
+    val repeatExpr: StringOrInt? = null,
     @SerialName("repeat-until")
-    val repeatUntil: String? = null,
+    val repeatUntil: StringOrBoolean? = null,
 
     @SerialName("if")
     val ifCondition: StringOrBoolean = StringOrBoolean.BooleanValue(true),
