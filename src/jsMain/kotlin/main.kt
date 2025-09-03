@@ -57,7 +57,7 @@ fun main() {
 
         decodeBtn.onclick = {
             tryhard = false
-            decode(false)
+            decode(true, force = !liveDecodeEnabled)
         }
 
         tryhardBtn.onclick = {
@@ -244,7 +244,11 @@ private fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 }
 
 // decode all text areas
+// force: forces a decode even if the content has not changed (e.g., when decoders have changed)
 fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
+    // don't decode if "live decode" is disabled and decode is not called from the "decode" button
+    if (!(isLiveDecoding || liveDecodeEnabled)) return
+
     // clear bytefinder
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
     val hexview = document.getElementById("hexview") as HTMLDivElement
