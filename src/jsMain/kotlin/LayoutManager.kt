@@ -3,7 +3,7 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 
 object LayoutManager {
-    
+
     private val settingsBtn = document.getElementById("settings-btn") as HTMLButtonElement
     private val kaitaiBtn = document.getElementById("kaitai-btn") as HTMLButtonElement
     private val container = document.getElementById("container") as HTMLDivElement
@@ -16,6 +16,10 @@ object LayoutManager {
     init {
         settingsBtn.onclick = { toggleSettings() }
         kaitaiBtn.onclick = { toggleKaitai() }
+
+        toggleSettings(forceVisible = sessionStorage.getItem("settings-visible")?.toBoolean() ?: settingsVisible)
+        toggleKaitai(forceVisible = sessionStorage.getItem("kaitai-visible")?.toBoolean() ?: kaitaiVisible)
+
         updateLayout()
     }
 
@@ -30,15 +34,17 @@ object LayoutManager {
         }
     }
 
-    fun toggleSettings() {
-        settingsVisible = !settingsVisible
+    fun toggleSettings(forceVisible: Boolean? = null) {
+        settingsVisible = forceVisible ?: !settingsVisible
+        sessionStorage.setItem("settings-visible", settingsVisible.toString())
         settingsBtn.textContent = if (settingsVisible) "hide settings" else "show settings"
         settingsCard.classList.toggle("card-hidden", !settingsVisible)
         updateLayout()
     }
 
-    fun toggleKaitai() {
-        kaitaiVisible = !kaitaiVisible
+    fun toggleKaitai(forceVisible: Boolean? = null) {
+        kaitaiVisible = forceVisible ?: !kaitaiVisible
+        sessionStorage.setItem("kaitai-visible", kaitaiVisible.toString())
         kaitaiBtn.textContent = if (kaitaiVisible) "hide kaitai" else "show kaitai"
         kaitaiCard.classList.toggle("card-hidden", !kaitaiVisible)
         updateLayout()
