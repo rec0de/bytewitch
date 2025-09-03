@@ -122,7 +122,7 @@ fun rerenderSSF(msgIndex: Int, parsed: SSFParsedMessage) {
         return
 
     val messageBox = document.getElementById("message-output-$msgIndex") as HTMLDivElement
-    val oldWrapper = messageBox.querySelector(".ssf") as HTMLDivElement
+    val oldWrapper = messageBox.querySelector(".ssf") as? HTMLDivElement ?: return
 
     // create new div with new SSF content
     val temp = document.createElement("div") as HTMLDivElement

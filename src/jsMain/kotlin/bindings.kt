@@ -1,17 +1,14 @@
-import kotlinx.browser.document
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.properties.Delegates
 
-// TODO: Convert the storage to a session storage
-class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
-    private val inputElement = document.getElementById(elementId) as HTMLTextAreaElement
+class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = null) {
 
-    var value: String by Delegates.observable(inputElement.value) { _, _, newValue ->
-        inputElement.value = newValue
+    var value: String by Delegates.observable(element.value) { _, _, newValue ->
+        element.value = newValue
         // TODO: Should this be debounced?
         storageKey?.also {
-            localStorage.setItem(it, newValue)
+            sessionStorage.setItem(it, newValue)
         }
     }
 
@@ -19,26 +16,51 @@ class TwoWayTextAreaBinding(elementId: String, storageKey: String? = null) {
 
     init {
         storageKey?.also { key ->
-            localStorage.getItem(key)?.also { storedValue ->
+            sessionStorage.getItem(key)?.let { storedValue ->
                 value = storedValue
-            }
+            } ?: sessionStorage.setItem(key, value)
         }
 
-        inputElement.oninput = {
-            value = inputElement.value
+        element.addEventListener("input", {
+            value = element.value
             onInput?.invoke(value)
-        }
+        })
     }
 }
 
-// TODO: Convert the storage to a session storage
-class TwoWayCheckboxBinding(elementId: String, storageKey: String? = null) {
-    private val checkboxElement = document.getElementById(elementId) as HTMLInputElement
+class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String? = null) {
 
-    var checked: Boolean by Delegates.observable(checkboxElement.checked) { _, _, newValue ->
-        checkboxElement.checked = newValue
+    var value: String by Delegates.observable(element.value) { _, _, newValue ->
+        element.value = newValue
+        // TODO: Should this be debounced?
         storageKey?.also {
-            localStorage.setItem(it, newValue.toString())
+            sessionStorage.setItem(it, newValue)
+        }
+    }
+
+    var onInput: ((value: String) -> Unit)? = null
+
+    init {
+        storageKey?.also { key ->
+            sessionStorage.getItem(key)?.let { storedValue ->
+                value = storedValue
+            } ?: sessionStorage.setItem(key, value)
+        }
+
+        // use addEventListener to avoid overwriting (or being overwritten by) other listeners
+        element.addEventListener("input", {
+            value = element.value
+            onInput?.invoke(value)
+        })
+    }
+}
+
+class TwoWayCheckboxBinding(val element: HTMLInputElement, storageKey: String? = null) {
+
+    var checked: Boolean by Delegates.observable(element.checked) { _, _, newValue ->
+        element.checked = newValue
+        storageKey?.also {
+            sessionStorage.setItem(it, newValue.toString())
         }
     }
 
@@ -46,14 +68,14 @@ class TwoWayCheckboxBinding(elementId: String, storageKey: String? = null) {
 
     init {
         storageKey?.also { key ->
-            localStorage.getItem(key)?.toBoolean()?.also { storedValue ->
+            sessionStorage.getItem(key)?.toBoolean()?.let { storedValue ->
                 checked = storedValue
-            }
+            } ?: sessionStorage.setItem(key, checked.toString())
         }
 
-        checkboxElement.onchange = {
-            checked = checkboxElement.checked
+        element.addEventListener("change", {
+            checked = element.checked
             onChange?.invoke(checked)
-        }
+        })
     }
 }

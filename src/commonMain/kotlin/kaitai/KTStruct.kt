@@ -15,7 +15,6 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.element
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonObject
@@ -53,6 +52,8 @@ data class KTMeta(
     val imports: List<String> = emptyList(),
 
     val endian: KTEndian? = null,
+    @SerialName("bit-endian")
+    val bitEndian: KTEndianEnum? = null,
 
     val doc: String? = null,
     @Serializable(with = StringOrArraySerializer::class)
@@ -78,9 +79,9 @@ data class KTSeq(
 
     val repeat: KTRepeat? = null,
     @SerialName("repeat-expr")
-    val repeatExpr: String? = null,
+    val repeatExpr: StringOrInt? = null,
     @SerialName("repeat-until")
-    val repeatUntil: String? = null,
+    val repeatUntil: StringOrBoolean? = null,
 
     @SerialName("if")
     val ifCondition: StringOrBoolean = StringOrBoolean.BooleanValue(true),
@@ -127,8 +128,21 @@ sealed class KTType {
     ) : KTType()
 }
 
+@Serializable(with = KTEndianSerializer::class)
+sealed class KTEndian {
+    @Serializable
+    data class Primitive(val value: KTEndianEnum) : KTEndian()
+
+    @Serializable
+    data class Switch(
+        @SerialName("switch-on")
+        val switchOn: String,
+        val cases: Map<String, KTEndianEnum>,
+    ) : KTEndian()
+}
+
 @Serializable
-enum class KTEndian {
+enum class KTEndianEnum {
     @SerialName("le")
     LE,
 
@@ -271,6 +285,38 @@ object KTTypeSerializer : KSerializer<KTType> {
     }
 }
 
+object KTEndianSerializer : KSerializer<KTEndian> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("KTEndian") {
+        element<String>("switch-on", isOptional = true)
+        element<Map<String, String>>("cases", isOptional = true)
+    }
+
+    override fun deserialize(decoder: Decoder) : KTEndian {
+        val jsonDecoder = decoder as JsonDecoder
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> {
+                KTEndian.Primitive(
+                    jsonDecoder.json.decodeFromJsonElement(KTEndianEnum.serializer(), element)
+                )
+            }
+
+            is JsonObject -> {
+                jsonDecoder.json.decodeFromJsonElement(KTEndian.Switch.serializer(), element)
+            }
+
+            else -> throw SerializationException("Invalid KTEndian format")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: KTEndian) {
+        when (value) {
+            is KTEndian.Primitive -> encoder.encodeSerializableValue(KTEndianEnum.serializer(), value.value)
+            is KTEndian.Switch -> encoder.encodeSerializableValue(KTEndian.Switch.serializer(), value)
+        }
+    }
+}
+
 object KTValidSerializer : KSerializer<KTValid> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("KTValid") {
         element<String?>("eq")
@@ -357,7 +403,7 @@ object KTEnumValueSerializer : KSerializer<KTEnumValue> {
 
             is JsonPrimitive ->
                 KTEnumValue(
-                    id = Json.decodeFromJsonElement(StringOrBoolean.serializer(), element),
+                    id = jsonDecoder.json.decodeFromJsonElement(StringOrBoolean.serializer(), element),
                 )
 
             else -> throw SerializationException("Expected object or primitive for KTEnumValue")
@@ -431,9 +477,9 @@ object StringOrIntSerializer : KSerializer<StringOrInt> {
 
 
 // Extension functions
-fun KTEndian.toByteOrder(): ByteOrder {
+fun KTEndianEnum.toByteOrder(): ByteOrder {
     return when (this) {
-        KTEndian.LE -> ByteOrder.LITTLE
-        KTEndian.BE -> ByteOrder.BIG
+        KTEndianEnum.LE -> ByteOrder.LITTLE
+        KTEndianEnum.BE -> ByteOrder.BIG
     }
 }

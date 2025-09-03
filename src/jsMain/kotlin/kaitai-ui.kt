@@ -3,9 +3,12 @@ import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToDynamic
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.files.FileReader
 
 
 @Serializable
@@ -14,27 +17,33 @@ data class KaitaiManifest(
 )
 
 object KaitaiUI {
-    private val nameInput = document.getElementById("kaitai-name") as HTMLInputElement
-    private val addButton = document.getElementById("add-kaitai") as HTMLButtonElement
-    private val kaitaiInput = TwoWayTextAreaBinding("kaitaiinput")
+    private val nameInput = TwoWayInputBinding(document.getElementById("kaitai-name") as HTMLInputElement, "kaitai-name-input")
+    private val saveButton = document.getElementById("save-kaitai") as HTMLButtonElement
+    private val kaitaiInput = TwoWayTextAreaBinding(document.getElementById("kaitaiinput") as HTMLTextAreaElement, "kaitai-live-struct")
     private val kaitaiValid = document.getElementById("kaitai-valid") as HTMLDivElement
-    private val bundledLegendContainer = document.getElementById("kaitai-bundled-legend") as HTMLDivElement
-    private val legendContainer = document.getElementById("kaitai-legend") as HTMLDivElement
-    private val includeLiveStruct = TwoWayCheckboxBinding("kaitai-live")
+    private val includeLiveStruct = TwoWayCheckboxBinding(document.getElementById("kaitai-live") as HTMLInputElement, "include-kaitai-live-struct")
+    private val uploadButton = document.getElementById("upload-parser") as HTMLButtonElement
     private var changedSinceLastDecode = true
 
     init {
-        addButton.onclick = {
+        saveButton.onclick = {
             val name = nameInput.value.trim()
             val inputValue = getInputValue()
             if (name.isNotEmpty() && inputValue.isNotEmpty()) {
-                addParser(name, inputValue)
+                val success = addParser(name, inputValue)
+                if (success) {
+                    // clear fields to indicate successful save
+                    nameInput.value = ""
+                    kaitaiInput.value = ""
+                    // force decode when parser is saved
+                    decode(false, force = true)
+                }
             } else {
                 console.warn("Kaitai name and input cannot be empty")
             }
         }
 
-        if (getInputValue().isNotEmpty()) {
+        if (includeLiveStruct.checked && getInputValue().isNotEmpty()) {
             updateLiveDecoder(getInputValue())
         }
 
@@ -55,7 +64,34 @@ object KaitaiUI {
             if (liveDecodeEnabled) {
                 decode(true)
             }
-            0.0
+        }
+
+        uploadButton.onclick = {
+            val fileInput = document.createElement("input") as HTMLInputElement
+            fileInput.type = "file"
+            fileInput.accept = ".ksy"
+            fileInput.multiple = false
+
+            fileInput.onchange = {
+                val file = fileInput.files?.item(0)
+                if (file != null && (file.type == "text/x-kaitai-struct" || file.type == "text/plain")) {
+                    console.log("File selected: ${file.name}")
+                    val reader = FileReader()
+                    reader.onload = {
+                        val content = reader.result as String
+                        kaitaiInput.value = content
+                        nameInput.value = file.name.substringBeforeLast(".")
+                    }
+                    reader.onerror = {
+                        console.error("Failed to read file: ${reader.error?.message}")
+                    }
+                    reader.readAsText(file)
+                } else {
+                    console.error("Cannot load parser: Invalid file type")
+                }
+            }
+
+            fileInput.click()
         }
     }
 
@@ -81,6 +117,33 @@ object KaitaiUI {
         changedSinceLastDecode = value
     }
 
+    fun cloneBuiltinKaitai(id: String) {
+        window.fetch("kaitai/$id.ksy").then { response ->
+            if (!response.ok) {
+                console.error("Failed to load Kaitai Struct: ${response.statusText}")
+                return@then
+            }
+            response.text().then { ksyContent ->
+                kaitaiInput.value = ksyContent
+                nameInput.value = id.substringAfterLast("/")
+            }
+        }
+    }
+
+    fun editUserKaitai(id: String) {
+        val ksyContent = KaitaiStorage.loadStruct(id)
+        if (ksyContent == null) {
+            console.error("User Kaitai $id not found in local storage")
+            return;
+        }
+        kaitaiInput.value = ksyContent
+        nameInput.value = id
+    }
+
+    fun removeUserKaitai(id: String) {
+        KaitaiStorage.deleteStruct(id)
+    }
+
     fun loadKaitaiStructsFromStorage() {
         val names = KaitaiStorage.listStructNames()
         for (kaitaiName in names) {
@@ -89,13 +152,13 @@ object KaitaiUI {
             if (ksyContent != null) {
                 // Register the Kaitai Struct decoder
                 val canonicalPath = if (kaitaiName.startsWith("/")) kaitaiName else "/$kaitaiName"
-                val success = ByteWitch.registerKaitaiDecoder(kaitaiName, ksyContent, canonicalPath)
+                val success = ByteWitch.registerUserKaitaiDecoder(kaitaiName, ksyContent, canonicalPath)
                 if (!success) {
                     console.error("Failed to register Kaitai Struct: $kaitaiName")
                     continue
                 }
 
-                addParserToUI(kaitaiName)
+                DecoderListManager.addUserKaitaiDecoder(kaitaiName, kaitaiName)
             } else {
                 console.warn("Kaitai Struct $kaitaiName not found in storage")
             }
@@ -115,13 +178,15 @@ object KaitaiUI {
 
             // Register the Kaitai Struct decoder
             val name = path.substringBeforeLast(".")
-            val success = ByteWitch.registerBundledKaitaiDecoder(name, ksyContent, "/$name")
+            val success = ByteWitch.registerBuiltinKaitaiDecoder(name, ksyContent, "/$name")
             if (!success) {
                 throw Error("Failed to register Kaitai Struct: $name")
             }
 
-            addParserToUI(name, bundled = true)
+            DecoderListManager.addBuiltinKaitaiDecoder(name, name)
         }
+
+        DecoderListManager.finishBuiltinKaitaiDecoderSetup()
     }
 
     private suspend fun loadManifest(): KaitaiManifest {
@@ -133,29 +198,20 @@ object KaitaiUI {
         return Json.decodeFromString(manifestContent)
     }
 
-    private fun addParser(name: String, kaitaiStruct: String) {
+    private fun addParser(name: String, kaitaiStruct: String): Boolean {
+        val decoderExists = ByteWitch.userKaitaiDecoderListManager.hasDecoder(name)
         val canonicalPath = if (name.startsWith("/")) name else "/$name"
-        val success = ByteWitch.registerKaitaiDecoder(name, kaitaiStruct, canonicalPath)
-        if (success) {
-            // Save the new Kaitai decoder to local storage
-            val saved = KaitaiStorage.saveStruct(name, kaitaiStruct)
-            if (!saved) {
-                console.error("Failed to save Kaitai Struct: $name")
-            }
-
-            addParserToUI(name)
+        val success = ByteWitch.registerUserKaitaiDecoder(name, kaitaiStruct, canonicalPath)
+        if (!success) return false
+        // Save the new Kaitai decoder to local storage
+        val saved = KaitaiStorage.saveStruct(name, kaitaiStruct)
+        if (!saved) {
+            console.error("Failed to save Kaitai Struct: $name")
+            return false
         }
-    }
-
-    private fun addParserToUI(name: String, bundled: Boolean = false) {
-        val parserDiv = document.createElement("DIV") as HTMLDivElement
-        parserDiv.classList.add("kaitai")
-        parserDiv.innerHTML = name
-
-        if (bundled) {
-            bundledLegendContainer.appendChild(parserDiv)
-        } else {
-            legendContainer.appendChild(parserDiv)
+        if (!decoderExists) {
+            DecoderListManager.addUserKaitaiDecoder(name, name)
         }
+        return true
     }
 }
