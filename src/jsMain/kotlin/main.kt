@@ -122,6 +122,9 @@ fun main() {
                     break
                 }
             }
+            if (n == 0) {
+                TextareaUtils.appendTextArea()
+            }
         }
         //TextareaUtils.appendTextArea()
 
