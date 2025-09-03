@@ -1,6 +1,7 @@
 package decoders
 
 import bitmage.ByteOrder
+import bitmage.booleanArrayOfInts
 import bitmage.fromBytes
 import bitmage.hex
 import bitmage.padLeft
@@ -97,23 +98,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return result
     }
 
-    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): dynamic {
-        // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
-        if (reference.startsWith("_root.")) //_root.magic
-            return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
-        else if (reference.startsWith("_parent."))
-            return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
-        else (
-                if (reference.contains("."))
-                    return parseReference(
-                        reference.substringAfter("."),
-                        bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!
-                    )
-                else
-                    return bytesListTree[reference]!!.value
-                )
-    }
-
     // specifically for ExpressionParser
     enum class TokenType(val symbol: String) {
         INTEGER(""),
@@ -165,7 +149,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int,
         val repeatIndex: Int?,
-        val currentRepeatElement: KaitaiElement?,
+        val currentElement: KaitaiElement?,
     ) {
     //******************************************************************************************************************
     //*                                                 methods                                                        *
@@ -659,11 +643,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         fun parseIdentifier(token: Pair<TokenType, String>): Pair<TokenType, dynamic> {
             return when (token.second) {
                 "_" -> {
-                    val targetElement = currentRepeatElement
-                    if (targetElement != null) {
-                        parseReferenceHelper(targetElement)
+                    if (currentElement != null) {
+                        parseReferenceHelper(currentElement)
                     } else {
-                        throw RuntimeException("The identifier _ cannot be used outside of repeat.")
+                        throw RuntimeException("The element (referenced by _) has not been parsed yet.")
                     }
                 }
 
@@ -1703,26 +1686,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         }
     }
 
-    fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
-        return parseValue(listOf(value), bytesListTree)
-    }
-
-    fun parseValue(value: List<String>, bytesListTree: MutableKaitaiTree) : BooleanArray {
-        var fullyFlatArray = booleanArrayOf()
-        for (element in value) {
-            if (element.toIntOrNull() != null) {
-                fullyFlatArray += element.toInt().toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
-            } else {
-                try {
-                    fullyFlatArray += parseReference(element, bytesListTree) as BooleanArray
-                } catch (e: Exception) {
-                    fullyFlatArray += element.encodeToByteArray().toBooleanArray()
-                }
-            }
-        }
-        return fullyFlatArray
-    }
-
     fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, expressionParser: ExpressionParser): V? {
         cases.forEach { (key, value) ->
             if (key != "_") {
@@ -1735,40 +1698,43 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return cases["_"]
     }
 
-    fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
-        return parseValue(contents, bytesListTree).contentEquals(dataBytes)
+    fun parseContents(contents: List<StringOrInt>) : BooleanArray {
+        var byteArray : ByteArray = byteArrayOf()
+        for (element in contents) {
+            if (element is StringOrInt.IntValue) {
+                byteArray += element.value.toByte()
+            } else {
+                byteArray += element.toString().encodeToByteArray()
+            }
+        }
+        return byteArray.toBooleanArray()
     }
 
     // TODO: refactor
-    fun checkValidKey(valid: KTValid, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
+    fun checkValidKey(valid: KTValid, expressionParser: ExpressionParser) : Boolean {
         if (valid.min != null || valid.max != null) {
-            val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
             if (valid.min != null) {
-                val parsedValidMin = parseValue(valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-                if (parsedValue < parsedValidMin) {
+                if (expressionParser.parseExpression("_ < ${valid.min}")) {
                     return false
                 }
             }
             if (valid.max != null) {
-                val parsedValidMax = parseValue(valid.max, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-                if (parsedValue > parsedValidMax) {
+                if (expressionParser.parseExpression("_ > ${valid.max}")) {
                     return false
                 }
             }
             return true
         } else if (valid.anyOf != null) {
             for (entry in valid.anyOf) {
-                if (parseValue(entry, bytesListTree).contentEquals(dataBytes)) {
+                if (expressionParser.parseExpression("_ == $entry")) {
                     return true
                 }
             }
             return false
         } else if (valid.expr != null) {
-            // TODO parse arbitrary expression
-            return true
+            return expressionParser.parseExpression(valid.expr)
         } else if (valid.eq != null) {
-            val valueToCheckAgainst = parseValue(valid.eq, bytesListTree)
-            return valueToCheckAgainst.padLeft(dataBytes.size - valueToCheckAgainst.size).contentEquals(dataBytes)
+            return expressionParser.parseExpression("_ == ${valid.eq}")
         }
         return true
     }
@@ -1870,7 +1836,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
-            type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size
+            type.sizeInBits = parseContents(seqElement.contents).size
             type.sizeIsKnown = true
         }
 
@@ -2095,11 +2061,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             }
         }
 
-        if (seqElement.contents != null && !checkContentsKey(seqElement.contents, ioSubStream, bytesListTree)) {
+        if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(kaitaiElement.value)) {
             throw Exception("Value of bytes does not align with expected contents value.")
         }
 
-        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ioSubStream, bytesListTree)) {
+        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, kaitaiElement))) {
             throw Exception("Value of bytes does not align with expected valid value.")
         }
 
