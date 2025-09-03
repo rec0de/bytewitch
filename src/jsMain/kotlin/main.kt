@@ -142,6 +142,7 @@ fun main() {
             }
         }
 
+        decode(isLiveDecoding = false, force = false)
     })
 }
 
@@ -266,7 +267,6 @@ fun decode(isLiveDecoding: Boolean, force: Boolean = false) {
             lastInputBytes[i] = bytes
             decodeBytes(bytes, i)
         }
-        //console.log("textarea $i: force=$force, hasChangedSinceLastDecode=${KaitaiUI.hasChangedSinceLastDecode()}, inputChanged=$inputChanged")
 
         // set bytefinder visible if any results have been generated
         val messageBox = document.getElementById("message-output-$i") as HTMLDivElement
