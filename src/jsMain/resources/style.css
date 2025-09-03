@@ -598,7 +598,6 @@ button:hover {
     border-radius: 0.5rem;
     padding: 1rem;
     background-color: #f9f9f9;
-    margin-bottom: 1rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
