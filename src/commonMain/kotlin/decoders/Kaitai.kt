@@ -1460,26 +1460,26 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     for ((index, char) in trimmedExpression.withIndex()) {
                         if (char == '\'' && index != 0) {
                             breakIndex = index + 1
-                            break
+                            return Pair(
+                                Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                                trimmed + breakIndex
+                            )
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    Pair(Pair(TokenType.EMPTY, null), 0)
                 }
 
                 '"' -> { // token STRING with double quotation marks
                     for ((index, char) in trimmedExpression.withIndex()) {
                         if (char == '"' && index != 0) {
                             breakIndex = index + 1
-                            break
+                            return Pair(
+                                Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
+                                trimmed + breakIndex
+                            )
                         }
                     }
-                    return Pair(
-                        Pair(TokenType.STRING, trimmedExpression.substring(1..breakIndex - 2)),
-                        trimmed + breakIndex
-                    )
+                    Pair(Pair(TokenType.EMPTY, null), 0)
                 }
             }
 
