@@ -1,6 +1,7 @@
 package kaitai
 
 import bitmage.ByteOrder
+import decoders.KaitaiEnum
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,6 +36,8 @@ data class KTStruct(
     @SerialName("doc-ref")
     val docRef: List<String>? = null,
 
+    val params: List<KTParam> = emptyList(),
+
     val seq: List<KTSeq> = emptyList(),
 
     val types: Map<String, KTStruct> = emptyMap(),
@@ -57,6 +60,20 @@ data class KTMeta(
     @Serializable(with = StringOrArraySerializer::class)
     @SerialName("doc-ref")
     val docRef: List<String>? = null,
+)
+
+@Serializable
+data class KTParam(
+    val id: String? = null,
+
+    val type: String? = null,
+
+    val doc: String? = null,
+    @Serializable(with = StringOrArraySerializer::class)
+    @SerialName("doc-ref")
+    val docRef: List<String>? = null,
+
+    val enum: String? = null,
 )
 
 @Serializable
