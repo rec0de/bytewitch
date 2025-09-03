@@ -478,29 +478,29 @@ class KaitaiDecoderTests {
         val repeat_by_expr = result.bytesListTree["repeat_by_expr"]
         checkElement(repeat_by_expr, "repeat_by_expr", KaitaiList::class, Pair(0,3), Pair(0, 0), booleanArrayOfInts(0xaa, 0xbb, 0xcc))
         val aa0 = repeat_by_expr.bytesListTree!![0]
-        checkElement(aa0, "repeat_by_expr", KaitaiBytes::class, Pair(0,1), Pair(0, 0), booleanArrayOfInts(0xaa))
+        checkElement(aa0, "0", KaitaiBytes::class, Pair(0,1), Pair(0, 0), booleanArrayOfInts(0xaa))
         val aa1 = repeat_by_expr.bytesListTree!![1]
-        checkElement(aa1, "repeat_by_expr", KaitaiBytes::class, Pair(1,2), Pair(0, 0), booleanArrayOfInts(0xbb))
+        checkElement(aa1, "1", KaitaiBytes::class, Pair(1,2), Pair(0, 0), booleanArrayOfInts(0xbb))
         val aa2 = repeat_by_expr.bytesListTree!![2]
-        checkElement(aa2, "repeat_by_expr", KaitaiBytes::class, Pair(2,3), Pair(0, 0), booleanArrayOfInts(0xcc))
+        checkElement(aa2, "2", KaitaiBytes::class, Pair(2,3), Pair(0, 0), booleanArrayOfInts(0xcc))
 
         val set_size = result.bytesListTree["set_size"]
         checkElement(set_size, "set_size", KaitaiResult::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
         val set_size_x = set_size.bytesListTree!!["x"]
         checkElement(set_size_x, "x", KaitaiList::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
         val set_size_x_0 = set_size_x.bytesListTree!![0]
-        checkElement(set_size_x_0, "x", KaitaiBytes::class, Pair(3,5), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
+        checkElement(set_size_x_0, "0", KaitaiBytes::class, Pair(3,5), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
         val set_size_x_1 = set_size_x.bytesListTree!![1]
-        checkElement(set_size_x_1, "x", KaitaiBytes::class, Pair(5,7), Pair(0, 0),booleanArrayOfInts(0x33, 0x44))
+        checkElement(set_size_x_1, "1", KaitaiBytes::class, Pair(5,7), Pair(0, 0),booleanArrayOfInts(0x33, 0x44))
 
         val simple_eos = result.bytesListTree["simple_eos"]
         checkElement(simple_eos, "simple_eos", KaitaiList::class, Pair(7,9), Pair(0, 0), booleanArrayOfInts(0x12, 0x34))
         val simple_eos_0 = simple_eos.bytesListTree!![0]
-        checkElement(simple_eos_0, "simple_eos", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
+        checkElement(simple_eos_0, "0", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_0_a = simple_eos_0.bytesListTree!!["a"]
         checkElement(simple_eos_0_a, "a", KaitaiBytes::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_1 = simple_eos.bytesListTree!![1]
-        checkElement(simple_eos_1, "simple_eos", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
+        checkElement(simple_eos_1, "1", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
         val simple_eos_1_a = simple_eos_1.bytesListTree!!["a"]
         checkElement(simple_eos_1_a, "a", KaitaiBytes::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
 

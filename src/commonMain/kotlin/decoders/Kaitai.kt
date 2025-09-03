@@ -2136,7 +2136,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         var repeatIndex = 0
         while (true) {
             val triple = processSingleSeqElement(
-                elementId,
+                repeatIndex.toString(),
                 seqElement,
                 KaitaiElementKind.SEQELEMENT,
                 currentScopeStruct,
