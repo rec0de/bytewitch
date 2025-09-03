@@ -65,7 +65,6 @@ object KaitaiUI {
             if (liveDecodeEnabled) {
                 decode(true)
             }
-            0.0
         }
 
         uploadButton.onclick = {
@@ -120,12 +119,15 @@ object KaitaiUI {
     }
 
     fun cloneBuiltinKaitai(id: String) {
-        ByteWitch.builtinKaitaiDecoderListManager.getDecoder(id)?.let { decoder ->
-            val jsonParser = Json {
-                ignoreUnknownKeys = true
+        window.fetch("kaitai/$id.ksy").then { response ->
+            if (!response.ok) {
+                console.error("Failed to load Kaitai Struct: ${response.statusText}")
+                return@then
             }
-            kaitaiInput.value = JsYaml.dump(jsonParser.encodeToDynamic(decoder.kaitaiStruct))
-            nameInput.value = id
+            response.text().then { ksyContent ->
+                kaitaiInput.value = ksyContent
+                nameInput.value = id.substringAfterLast("/")
+            }
         }
     }
 
