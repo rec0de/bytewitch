@@ -2310,16 +2310,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 } else { // token array
                     val bytesListTree: MutableKaitaiTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
                     bytesListTree.parent = parentBytesListTree
-                    bytesListTree.addAll((expressionResult as List<dynamic>).map {
+                    bytesListTree.addAll((expressionResult as List<dynamic>).withIndex().map { (i, it) ->
                         processValueInstance(
                             it,
-                            id,
-                            ioStream,
+                            i.toString(),
+                            ioStream,  // TODO ioStream or ioSubStream?
                             currentScopeStruct,
                             bytesListTree,
                             doc,
                         )
-                    }) // TODO ioStream or ioSubStream
+                    })
                     KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
                 }
             }
