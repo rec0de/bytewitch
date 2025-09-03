@@ -27,8 +27,10 @@ enum class DisplayStyle {
     HEX, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING, ENUM, BOOLEAN
 }
 
-enum class KaitaiElementKind {
-    SEQELEMENT, INSTANCE, PARAMETER
+enum class KaitaiElementKind(val cssClass: String) {
+    SEQELEMENT("kaitai-seq-element"),
+    INSTANCE("kaitai-instance"),
+    PARAMETER("kaitai-parameter"),
 }
 
 class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by innerList {
@@ -2267,7 +2269,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         parentBytesListTree: MutableKaitaiTree,
         doc: KaitaiDoc
     ) : KaitaiElement {
-        return processOffSequenceData(expressionResult, id, ioStream, currentScopeStruct, parentBytesListTree, doc, KaitaiElementKind.PARAMETER)
+        return processOffSequenceData(expressionResult, id, ioStream, currentScopeStruct, parentBytesListTree, doc, KaitaiElementKind.INSTANCE)
     }
 
     private fun processOffSequenceData(
@@ -2573,7 +2575,7 @@ class KaitaiResult(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
                     doc.renderHTML() +
                 "</div>"
@@ -2599,7 +2601,7 @@ class KaitaiList(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${bytesListTree.joinToString(", ", "${id}[", "]") { it.renderHTML() }}" +
                 "</div>"
     }
@@ -2624,7 +2626,7 @@ class KaitaiBytes(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()})h" +
                     doc.renderHTML() +
                 "</div>"
@@ -2642,7 +2644,7 @@ abstract class KaitaiNumber(
     abstract val suffix: String
 
     override fun renderHTML(): String {
-        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${parseValueAsString()})${suffix}" +
                     doc.renderHTML() +
                 "</div>"
@@ -2724,7 +2726,7 @@ class KaitaiBoolean(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                 "${id}(${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean})b" +
                 doc.renderHTML() +
                 "</div>"
@@ -2738,7 +2740,7 @@ class KaitaiString(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String})utf8" +
                     doc.renderHTML() +
                 "</div>"
@@ -2753,7 +2755,7 @@ class KaitaiEnum(
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"kaitai roundbox tooltip ${if (kaitaiElementKind == KaitaiElementKind.INSTANCE) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                    "${id}(${enum.second})enum" +
                    doc.renderHTML() +
                "</div>"
