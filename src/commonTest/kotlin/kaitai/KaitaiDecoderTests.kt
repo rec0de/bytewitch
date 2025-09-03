@@ -1201,4 +1201,90 @@ class KaitaiDecoderTests {
         val fieldNumberBodyDefault = result.bytesListTree["number_body_default"]
         checkElement(fieldNumberBodyDefault, "number_body_default", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "number_body_default(1025)u")
     }
+
+    @Test
+    fun testSimpleParametricTypes() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "pre", type = KTType.Primitive("firstsub")),
+                KTSeq(id = "with_params", type = KTType.Primitive("sub_with_params(2, true, pre)")),
+            ),
+            types = mapOf(
+                Pair(
+                    "firstsub",
+                    KTStruct(
+                        seq = listOf(
+                            KTSeq(id = "i", type = KTType.Primitive("u1")),
+                            KTSeq(id = "j", type = KTType.Primitive("u1")),
+                        )
+                    ),
+                ),
+                Pair(
+                    "sub_with_params",
+                    KTStruct(
+                        params = listOf(
+                            KTParam(
+                                id = "len",
+                                type = "u1",
+                            ),
+                            KTParam(
+                                id = "toggle",
+                                type = "bool",
+                            ),
+                            KTParam(
+                                id = "custom_type",
+                                type = "firstsub",
+                            ),
+                        ),
+                        seq = listOf(
+                            KTSeq(id = "x", size = StringOrInt.StringValue("len")),
+                            KTSeq(id = "y1", size = StringOrInt.StringValue("2"), ifCondition = StringOrBoolean.StringValue("toggle")),
+                            KTSeq(id = "y2", size = StringOrInt.StringValue("2"), ifCondition = StringOrBoolean.StringValue("not toggle")),
+                            KTSeq(id = "z1", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("custom_type.i == 0x02")),
+                            KTSeq(id = "z2", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("custom_type.j == 0x02")),
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x01, 0x02, // pre
+            0x03, 0x04, // x
+            0x05, 0x06, // y
+            0x07, // z
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        val pre = result.bytesListTree["pre"]
+        checkElement(pre, "pre", KaitaiResult::class, Pair(0,2), Pair(0,0), booleanArrayOfInts(0x01, 0x02))
+
+        val with_params = result.bytesListTree["with_params"]
+        check(with_params is KaitaiResult) { "Expected with params to be KaitaiResult, got ${with_params::class.simpleName}" }
+
+        val x = with_params.bytesListTree["x"]
+        checkElement(x, "x", KaitaiBytes::class, Pair(2,4), Pair(0,0), booleanArrayOfInts(0x03, 0x04))
+
+        val y1 = with_params.bytesListTree["y1"]
+        checkElement(y1, "y1", KaitaiBytes::class, Pair(4,6), Pair(0,0), booleanArrayOfInts(0x05, 0x06))
+        try {
+            with_params.bytesListTree["y2"]
+            check(false)
+        } catch (e: Exception) {
+            check(e.message == "Could not find element with id y2") {"Exception \"Could not find element with id y2\" was expected but $e was thrown."}
+        }
+
+        try {
+            with_params.bytesListTree["z1"]
+            check(false)
+        } catch (e: Exception) {
+            check(e.message == "Could not find element with id z1") {"Exception \"Could not find element with id z1\" was expected but $e was thrown."}
+        }
+        val z2 = with_params.bytesListTree["z2"]
+        checkElement(z2, "z2", KaitaiBytes::class, Pair(6,7), Pair(0,0), booleanArrayOfInts(0x07))
+    }
 }
