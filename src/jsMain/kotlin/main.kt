@@ -109,8 +109,21 @@ fun main() {
                 decode(false)
         }
 
-        // init first textarea
-        TextareaUtils.appendTextArea()
+        // check for data stored in session storage with key "input-data-N" where N is strictly increasing
+        // for each found key, append a text area. if a key is not found, stop
+        run {
+            var n = 0
+            while (true) {
+                val content = window.sessionStorage.getItem("input-data-$n")
+                if (content != null) {
+                    TextareaUtils.appendTextArea(content)
+                    n++
+                } else {
+                    break
+                }
+            }
+        }
+        //TextareaUtils.appendTextArea()
 
         // a click anywhere clears any present selection
         // (as do specific keystrokes, but we'll see if we want to worry about those)
