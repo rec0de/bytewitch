@@ -91,17 +91,8 @@ class Type(val type: String?) {
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String = "") : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
 
-    private val importedStructs = mutableMapOf<String, KTStruct>()
-
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
-            /*
-            val imports = kaitaiStruct.meta?.imports
-            if (imports != null) {
-                importedStructs.putAll(importTypes(imports))
-            }
-             */
-
             val id = kaitaiStruct.meta?.id ?: name
             processSeq(
                 id,
@@ -1736,7 +1727,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return byteArray.toBooleanArray()
     }
 
-    // TODO: refactor
     fun checkValidKey(valid: KTValid, expressionParser: ExpressionParser) : Boolean {
         if (valid.min != null || valid.max != null) {
             if (valid.min != null) {
@@ -2482,7 +2472,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         if (isRoot) {
-            console.log("[SEQ] We are root named $customTypeName at path $canonicalPath with imports $imports")
             bytesListTree.isRoot = true
             bytesListTree.rootStruct = currentScopeStruct
             bytesListTree.customTypeName = customTypeName
