@@ -366,6 +366,14 @@ button:hover {
     max-width: 100%;
 }
 
+.kaitai-instance {
+    outline: 2px solid yellow;
+}
+
+.kaitai-parameter {
+    outline: 2px solid darkgreen;
+}
+
 .asn1 {
     background: var(--asn);
 }
