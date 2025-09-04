@@ -158,15 +158,15 @@ object ByteWitch {
         // TODO: Add an index for faster lookup if needed
 
         // Search in user decoders first
-        val registeredDecoder = userKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
-        if (registeredDecoder != null) {
-            return registeredDecoder.kaitaiStruct
+        val userDecoder = userKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (userDecoder != null) {
+            return userDecoder.kaitaiStruct
         }
 
         // Then search in builtin decoders
-        val bundledDecoder = builtinKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
-        if (bundledDecoder != null) {
-            return bundledDecoder.kaitaiStruct
+        val builtinDecoder = builtinKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (builtinDecoder != null) {
+            return builtinDecoder.kaitaiStruct
         }
 
         // Not found
