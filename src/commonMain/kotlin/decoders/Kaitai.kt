@@ -135,6 +135,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         NOTEQUAL("!="),
         LSHIFT("<<"),
         RSHIFT(">>"),
+        BITWISENOT("~"),
         BITWISEAND("&"),
         BITWISEOR("|"),
         BITWISEXOR("^"),
@@ -861,7 +862,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val unaryPrecedence = mapOf( // unary tokens
             TokenType.PLUS to ::parseUnaryPlus,
             TokenType.MINUS to ::parseUnaryMinus,
-            TokenType.BOOLEANNOT to ::parseBooleanNot
+            TokenType.BOOLEANNOT to ::parseBooleanNot,
+            TokenType.BITWISENOT to ::parseBitwiseNot, // TODO Bitwise Not aka invert aka ~ (not in the User Guide)
         )
 
         fun parseUnaryPlus(
@@ -895,7 +897,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     !op.second
                 )
             else
-                throw Exception("Cannot apply logical or to non boolean")
+                throw Exception("Cannot apply logical not to non boolean")
+        }
+
+        fun parseBitwiseNot(tokens: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, Long> {
+            throw NotImplementedError("Bitwise not is not implemented properly.")
+            val op: Pair<TokenType, Long> = parseTokens(tokens)
+            return if (op.first == TokenType.INTEGER)
+                Pair(
+                    TokenType.INTEGER,
+                    op.second.inv()
+                )
+            else
+                throw Exception("Cannot apply bitwise not to non integer")
         }
 
         //******************************************************************************************************************
@@ -907,16 +921,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             mapOf(TokenType.MUL to ::parseMul, TokenType.DIV to ::parseDiv, TokenType.MODULO to ::parseModulo),
             mapOf(TokenType.PLUS to ::parsePlus, TokenType.MINUS to ::parseMinus),
             mapOf(TokenType.LSHIFT to ::parseLShift, TokenType.RSHIFT to ::parseRShift),
+            mapOf(TokenType.BITWISEAND to ::parseBitwiseAnd),
+            mapOf(TokenType.BITWISEXOR to ::parseBitwiseXor),
+            mapOf(TokenType.BITWISEOR to ::parseBitwiseOr),
             mapOf(
                 TokenType.LESS to ::parseLess,
                 TokenType.LESSEQUAL to ::parseLessEqual,
                 TokenType.GREATER to ::parseGreater,
-                TokenType.GREATEREQUAL to ::parseGreaterEqual
+                TokenType.GREATEREQUAL to ::parseGreaterEqual,
+                TokenType.EQUAL to ::parseEqual,
+                TokenType.NOTEQUAL to ::parseNotEqual
             ),
-            mapOf(TokenType.EQUAL to ::parseEqual, TokenType.NOTEQUAL to ::parseNotEqual),
-            mapOf(TokenType.BITWISEAND to ::parseBitwiseAnd),
-            mapOf(TokenType.BITWISEXOR to ::parseBitwiseXor),
-            mapOf(TokenType.BITWISEOR to ::parseBitwiseOr),
             mapOf(TokenType.BOOLEANAND to ::parseBooleanAnd),
             mapOf(TokenType.BOOLEANOR to ::parseBooleanOr),
         )
@@ -1343,7 +1358,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             return Pair(TokenType.EMPTY, null)
         }
 
-        val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".")
+        val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".", "~")
         val operators2 = setOf("<=", ">=", "==", "!=", "<<", ">>", "::")
 
         val operatorMap: Map<String, TokenType> = TokenType.entries.associateBy { it.symbol }
@@ -1383,7 +1398,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     Pair(getOperator2(trimmedExpression.substring(0..1)), trimmedExpression.substring(0..1)),
                     trimmed + 2
                 )
-            if (trimmedExpression[0].toString() in operators) // one symbol tokens: "+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", "."
+            if (trimmedExpression[0].toString() in operators) // one symbol tokens: "+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".", "~"
                 return Pair(Pair(getOperator(trimmedExpression[0]), trimmedExpression[0].toString()), trimmed + 1)
 
             var breakIndex: Int = 0
@@ -1900,11 +1915,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 seqElement.type.type
             }
             is KTType.Switch -> {
-                val entry = processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, expressionParser)
-                checkNotNull(entry) { "No matching case found" }
-                entry
+                processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, expressionParser)
             }
             null -> null
+        }
+
+        if (typeNameWithParams == null && (seqElement.size == null && !seqElement.sizeEos && seqElement.terminator == null && seqElement.contents == null)) {
+            throw RuntimeException("No way to determine size. Aborting.")
         }
 
         var type : Type
@@ -2049,6 +2066,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
         }
 
+        // we verify contents as soon as we have ioSubstream known to stop further processing asap
+        if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(ioSubStream)) {
+            throw Exception("Value of bytes does not align with expected contents value.")
+        }
+
         // get the enum value
         var enum: Pair<KTEnum?, String> = Pair(null, "")
         if (seqElement.enum != null &&
@@ -2152,10 +2174,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 // displayStyle.HEX as the fallback (even if it's a known type or whatever)
                 else -> KaitaiBytes(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
             }
-        }
-
-        if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(kaitaiElement.value)) {
-            throw Exception("Value of bytes does not align with expected contents value.")
         }
 
         if (seqElement.valid != null && !checkValidKey(seqElement.valid, ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, kaitaiElement))) {
