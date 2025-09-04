@@ -129,7 +129,6 @@ button:hover {
     background: var(--content-back);
     height: fit-content;
     max-width: 100%;
-    overflow: hidden;
     gap: 1rem;
 }
 
