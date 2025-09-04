@@ -53,6 +53,8 @@ data class KTMeta(
     val id: String? = null,
     val title: String? = null,
 
+    val imports: List<String> = emptyList(),
+
     val endian: KTEndian? = null,
     @SerialName("bit-endian")
     val bitEndian: KTEndianEnum? = null,

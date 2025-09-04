@@ -1,5 +1,6 @@
 import bitmage.fromHex
 import decoders.*
+import kaitai.KTStruct
 import kaitai.KaitaiParser
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -109,28 +110,28 @@ object ByteWitch {
         }
     }
 
-    fun registerBuiltinKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
-        val struct = KaitaiParser.parseYaml(kaitaiStruct)
-        if (struct == null) {
-            Logger.log("Failed to parse Kaitai struct for $name")
-            return false
-        }
-
-        val decoder = Kaitai(name, struct)
-        builtinKaitaiDecoderListManager.setDecoder(name, decoder)
-        Logger.log("Registered bundled Kaitai decoder: $name")
-        return true
+    enum class KaitaiDecoderType {
+        BUILTIN,
+        USER
     }
 
-    fun registerUserKaitaiDecoder(name: String, kaitaiStruct: String): Boolean {
+    fun registerKaitaiDecoder(name: String, kaitaiStruct: String, canonicalPath: String, type: KaitaiDecoderType): Boolean {
         val struct = KaitaiParser.parseYaml(kaitaiStruct)
         if (struct == null) {
-            Logger.log("Failed to parse Kaitai struct for $name")
+            Logger.log("Failed to parse Kaitai struct for $name ($type)")
             return false
         }
-        val decoder = Kaitai(name, struct)
-        userKaitaiDecoderListManager.setDecoder(name, decoder)
-        Logger.log("Registered Kaitai decoder: $name")
+        val decoder = Kaitai(name, struct, canonicalPath)
+        when (type) {
+            KaitaiDecoderType.BUILTIN -> {
+                builtinKaitaiDecoderListManager.setDecoder(name, decoder)
+            }
+
+            KaitaiDecoderType.USER -> {
+                userKaitaiDecoderListManager.setDecoder(name, decoder)
+            }
+        }
+        Logger.log("Registered bundled Kaitai decoder: $name ($type)")
         return true
     }
 
@@ -148,9 +149,29 @@ object ByteWitch {
             return false
         }
         //console.log(struct)
-        kaitaiLiveDecoder = Kaitai("Live", struct)
+        kaitaiLiveDecoder = Kaitai("Live", struct, "/Live")
         Logger.log("Set Kaitai live decoder")
         return true
+    }
+
+    fun findKaitaiStructByPath(canonicalPath: String) : KTStruct? {
+        // TODO: Add an index for faster lookup if needed
+
+        // Search in user decoders first
+        val userDecoder = userKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (userDecoder != null) {
+            return userDecoder.kaitaiStruct
+        }
+
+        // Then search in builtin decoders
+        val builtinDecoder = builtinKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (builtinDecoder != null) {
+            return builtinDecoder.kaitaiStruct
+        }
+
+        // Not found
+        Logger.log("Kaitai struct not found for path: $canonicalPath")
+        return null
     }
 
     fun getAllDecoders(): List<ByteWitchDecoder> {

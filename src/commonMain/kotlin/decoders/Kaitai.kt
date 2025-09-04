@@ -43,6 +43,11 @@ class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by inner
 class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray, val currentScopeStruct: KTStruct) : MutableList<KaitaiElement> by innerList {
     var byteOrder = ByteOrder.BIG
     var kaitaiElement : KaitaiElement? = null
+    var isRoot : Boolean = false
+    var rootStruct : KTStruct? = null
+    var customTypeName : String? = null
+    var canonicalPath : String? = null
+    var imports : List<String>? = null
 
     // getter and setters for integer ids already implemented, now we do them for strings aswell, as ids are unique
     operator fun get(id : String): KaitaiElement {
@@ -58,18 +63,14 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
     }
 
     var parent: MutableKaitaiTree? = null
-        get() { return field }
-        set(value) {field = value}
 
-    var root: MutableKaitaiTree? = null
-        get() {
-            var rootCandidate: MutableKaitaiTree = this
-            while (rootCandidate.parent != null) {
-                rootCandidate = rootCandidate.parent!!
-            }
-            return rootCandidate
+    fun getRoot() : MutableKaitaiTree {
+        var rootCandidate: MutableKaitaiTree = this
+        while (!isRoot && rootCandidate.parent != null) {
+            rootCandidate = rootCandidate.parent!!
         }
-        private set
+        return rootCandidate
+    }
 }
 
 class Type(val type: String?) {
@@ -80,17 +81,34 @@ class Type(val type: String?) {
     var terminator: Int? = null
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var customType: KTStruct? = null
+    var customTypeName: String? = null
+    var canonicalPath: String? = null
+    var imports: List<String>? = null
     var isBinary: Boolean = false
     var params: Map<String, Any>? = null
 }
 
-class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder {
+class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String = "") : ByteWitchDecoder {
     override val name = "Kaitai-$kaitaiName"
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         val result = try {  // JS Exceptions don't get simply logged to console but instead trigger the big red overlay. We convert JS Errors to Kotlin Exceptions here
             val id = kaitaiStruct.meta?.id ?: name
-            processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, null, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            processSeq(
+                id,
+                null,
+                parentBytesListTree = null,
+                null,
+                kaitaiStruct,
+                null,
+                data.toBooleanArray(),
+                sourceOffset,
+                _offsetInDatastreamInBits = 0,
+                isRoot = true,
+                customTypeName = id,
+                canonicalPath,
+                kaitaiStruct.meta?.imports
+            )
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
             throw Exception("[$name] Unexpected Exception has been thrown:\n$e")
         }
@@ -150,14 +168,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         val repeatIndex: Int?,
         val currentElement: KaitaiElement?,
     ) {
-    //******************************************************************************************************************
-    //*                                                 methods                                                        *
-    //******************************************************************************************************************
-    fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
-        when (input.first) {
-            TokenType.INTEGER -> {
-                return Pair(TokenType.STRING, (input.second as Long).toString())
-            }
+        //******************************************************************************************************************
+        //*                                                 methods                                                        *
+        //******************************************************************************************************************
+        fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
+            when (input.first) {
+                TokenType.INTEGER -> {
+                    return Pair(TokenType.STRING, (input.second as Long).toString())
+                }
 
                 TokenType.BYTEARRAY, TokenType.ARRAY -> {
                     if (encoding != "UTF-8" && encoding != "ASCII") {
@@ -666,7 +684,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 }
 
                 "_root" -> {
-                    Pair(TokenType.KAITAITREE, bytesListTree.root)
+                    Pair(TokenType.KAITAITREE, bytesListTree.getRoot())
                 }
 
                 else -> {
@@ -805,7 +823,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     }
 
                     "_root" -> {
-                        Pair(TokenType.KAITAITREE, (op1.second as MutableKaitaiTree).root)
+                        Pair(TokenType.KAITAITREE, (op1.second as MutableKaitaiTree).getRoot())
                     }
 
                     "_io" -> {
@@ -1709,7 +1727,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return byteArray.toBooleanArray()
     }
 
-    // TODO: refactor
     fun checkValidKey(valid: KTValid, expressionParser: ExpressionParser) : Boolean {
         if (valid.min != null || valid.max != null) {
             if (valid.min != null) {
@@ -1738,7 +1755,77 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         return true
     }
 
-    // TODO: add support for imports
+    /**
+     * Imports a Kaitai document based on the name and the path of the current document.
+     *
+     * @param import name of the Kaitai document, can be a relative or absolute path.
+     * @param currentPath the path of the current Kaitai document, on which a relative import will be based.
+     *
+     * @return a [Pair] of the canonical path of the imported Kaitai and the imported [Kaitai][KTStruct] itself.
+     */
+    fun importType(import: String, currentPath: String) : Pair<String, KTStruct>? {
+        val currentPath = if (import.startsWith("/")) {
+            mutableListOf()
+        } else {
+            currentPath.split("/").filter { it.isNotBlank() }.dropLast(1).toMutableList()
+        }
+        val importPath = import.split("/").filter { it != "." && it.isNotBlank() }
+        for (part in importPath) {
+            if (part == "..") {
+                currentPath.dropLast(1)
+            } else {
+                currentPath.add(part)
+            }
+        }
+        val canonicalPath = "/" + currentPath.joinToString(separator = "/")
+
+        return ByteWitch.findKaitaiStructByPath(canonicalPath)?.let { Pair(canonicalPath, it) }
+    }
+
+    fun getImportedType(type: Type, bytesListTree: MutableKaitaiTree) : KTStruct? {
+        checkNotNull(type.type) { "Type must be specified for an import." }
+        val root = bytesListTree.getRoot()
+        val imports = root.imports?.associateBy { it.substringAfterLast("/") } ?: emptyMap()
+        val pathElements = type.type.split("::", limit = 2)
+
+        val rootStruct = root.rootStruct
+        val importedType = if (pathElements[0] == root.customTypeName && rootStruct != null) {
+            Pair(root.canonicalPath ?: canonicalPath, rootStruct)
+        } else {
+            imports[pathElements[0]]?.let { importType(it, canonicalPath) }
+        }
+        if (importedType != null) {
+            type.customTypeName = importedType.second.meta?.id
+            type.canonicalPath = importedType.first
+            type.imports = importedType.second.meta?.imports
+            return if (pathElements.size > 1) {
+                getCustomType(importedType.second, pathElements[1])
+            } else {
+                importedType.second
+            }
+        }
+        return null
+    }
+
+    fun getImportedEnum(path: String, bytesListTree: MutableKaitaiTree) : KTEnum? {
+        val root = bytesListTree.getRoot()
+        val imports = root.imports?.associateBy { it.substringAfterLast("/") } ?: emptyMap()
+        val pathElements = path.split("::", limit = 2)
+        if (pathElements.size == 2) {
+            val importedType = if (pathElements[0] == root.customTypeName) {
+                root.rootStruct
+            } else {
+                imports[pathElements[0]]?.let {
+                    importType(it, root.canonicalPath ?: canonicalPath)?.second
+                }
+            }
+            if (importedType != null) {
+                return getEnum(importedType, pathElements[1])
+            }
+        }
+        return null
+    }
+
     /**
      * check if there is a fitting custom type defined in the current scope
      * @param path: might be just a type or prefixed by a path via "::"
@@ -1846,8 +1933,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(parentScopeStruct, type.type)?:
-                getCustomType(kaitaiStruct, type.type)
+                getCustomType(parentScopeStruct, type.type) ?:
+                getCustomType(kaitaiStruct, type.type) ?:
+                getImportedType(type, bytesListTree)
+
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
 
@@ -1960,8 +2049,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
             ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
         }
 
-
-
         // get the enum value
         var enum: Pair<KTEnum?, String> = Pair(null, "")
         if (seqElement.enum != null &&
@@ -1969,9 +2056,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
                     type.usedDisplayStyle == DisplayStyle.BOOLEAN)
         ) {
-            val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum)?:
-                                getEnum(parentScopeStruct, seqElement.enum)?:
-                                getEnum(kaitaiStruct, seqElement.enum)
+            val path: KTEnum? = getEnum(currentScopeStruct, seqElement.enum) ?:
+                                getEnum(parentScopeStruct, seqElement.enum) ?:
+                                getEnum(kaitaiStruct, seqElement.enum) ?:
+                                getImportedEnum(seqElement.enum, bytesListTree)
+
             if (path != null) {
                 if (type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
                     if (path[Int.fromBytes(ioSubStream.toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
@@ -2031,7 +2120,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 type.params,
                 ioSubStream,
                 sourceOffsetInBits + dataSizeOfSequenceInBits,
-                if (type.sizeInBits != 0) 0 else offsetInDatastreamInBits  // reset offset in case of substream
+                if (type.sizeInBits != 0) 0 else offsetInDatastreamInBits,  // reset offset in case of substream
+                isRoot = type.canonicalPath != null,
+                type.customTypeName,
+                type.canonicalPath,
+                type.imports
             )
 
             if (seqElement.doc == null && seqElement.docRef == null) {
@@ -2048,6 +2141,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                 (sourceOffsetInBits + dataSizeOfSequenceInBits + type.sizeInBits) % 8
             )
             val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
+
             kaitaiElement = when (type.usedDisplayStyle) {
                 DisplayStyle.BOOLEAN -> KaitaiBoolean(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
                 DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
@@ -2095,11 +2189,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
         val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTreeForInnerList.parent = bytesListTree.parent
-        if (bytesListTree.parent != null) {
-            bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent!!.byteOrder
-        } else {
-            bytesListTreeForInnerList.byteOrder = ByteOrder.BIG
-        }
+        bytesListTreeForInnerList.byteOrder = bytesListTreeForInnerList.parent?.byteOrder ?: ByteOrder.BIG
+
         var repeatIndex = 0
         while (true) {
             val triple = processSingleSeqElement(
@@ -2351,7 +2442,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
 
     fun processSeq(
         parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
-        customTypeParams: Map<String, Any>?, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int
+        customTypeParams: Map<String, Any>?, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int,
+        isRoot: Boolean, customTypeName: String?, canonicalPath: String?, imports: List<String>?
     ) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
@@ -2364,11 +2456,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
         */
         val bytesListTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTree.parent = parentBytesListTree
-        if (bytesListTree.parent != null) {
-            bytesListTree.byteOrder = bytesListTree.parent!!.byteOrder
-        } else {
-            bytesListTree.byteOrder = ByteOrder.BIG
-        }
+        bytesListTree.byteOrder = bytesListTree.parent?.byteOrder ?: ByteOrder.BIG
         currentScopeStruct.meta?.endian?.let { endian ->
             bytesListTree.byteOrder = when (endian) {
                 is KTEndian.Primitive -> {
@@ -2381,6 +2469,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct) : ByteWitchDecoder 
                     entry.toByteOrder()
                 }
             }
+        }
+
+        if (isRoot) {
+            bytesListTree.isRoot = true
+            bytesListTree.rootStruct = currentScopeStruct
+            bytesListTree.customTypeName = customTypeName
+            bytesListTree.canonicalPath = canonicalPath
+            bytesListTree.imports = imports
         }
 
         if (customTypeParams != null) {

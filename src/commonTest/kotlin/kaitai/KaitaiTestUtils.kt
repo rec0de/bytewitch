@@ -1,7 +1,6 @@
 package kaitai
 
 import decoders.KaitaiElement
-import decoders.KaitaiResult
 import kotlin.reflect.KClass
 
 object KaitaiTestUtils {
@@ -20,7 +19,7 @@ object KaitaiTestUtils {
         }
         if (elementClass != null) {
             check(elementClass.isInstance(element)) {
-                "Expected '$id' to be of type ${elementClass::class.simpleName}, got ${element::class.simpleName}"
+                "Expected '$id' to be of type ${elementClass.simpleName}, got ${element::class.simpleName}"
             }
         }
         if (sourceByteRange != null) {
