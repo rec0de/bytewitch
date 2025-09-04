@@ -1,6 +1,7 @@
 package kaitai
 
 import bitmage.ByteOrder
+import decoders.KaitaiEnum
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -34,6 +36,8 @@ data class KTStruct(
     @Serializable(with = StringOrArraySerializer::class)
     @SerialName("doc-ref")
     val docRef: List<String>? = null,
+
+    val params: List<KTParam> = emptyList(),
 
     val seq: List<KTSeq> = emptyList(),
 
@@ -62,6 +66,20 @@ data class KTMeta(
 )
 
 @Serializable
+data class KTParam(
+    val id: String? = null,
+
+    val type: String? = null,
+
+    val doc: String? = null,
+    @Serializable(with = StringOrArraySerializer::class)
+    @SerialName("doc-ref")
+    val docRef: List<String>? = null,
+
+    val enum: String? = null,
+)
+
+@Serializable
 data class KTSeq(
     val id: String? = null,
 
@@ -70,8 +88,8 @@ data class KTSeq(
     @SerialName("doc-ref")
     val docRef: List<String>? = null,
 
-    @Serializable(with = StringOrArraySerializer::class)
-    val contents: List<String>? = null,
+    @Serializable(with = ArrayOfStringOrIntSerializer::class)
+    val contents: List<StringOrInt>? = null,
 
     val valid: KTValid? = null,
 
@@ -244,6 +262,30 @@ object StringOrArraySerializer : KSerializer<List<String>> {
             encoder.encodeString(value.first())
         } else {
             encoder.encodeSerializableValue(ListSerializer(String.serializer()), value)
+        }
+    }
+}
+
+// Custom serializers
+object ArrayOfStringOrIntSerializer : KSerializer<List<StringOrInt>> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ArrayOfStringOrInt", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): List<StringOrInt> {
+        val jsonDecoder = decoder as JsonDecoder
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonArray -> element.map { jsonDecoder.json.decodeFromJsonElement(StringOrInt.serializer(), it) }
+            is JsonPrimitive -> listOf(StringOrInt.StringValue(element.content))
+            else -> throw SerializationException("Expected string or array")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<StringOrInt>) {
+        if (value.size == 1) {
+            encoder.encodeSerializableValue(StringOrInt.serializer(), value.first())
+        } else {
+            encoder.encodeSerializableValue(ListSerializer(StringOrInt.serializer()), value)
         }
     }
 }

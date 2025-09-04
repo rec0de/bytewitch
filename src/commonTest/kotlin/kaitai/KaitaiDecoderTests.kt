@@ -478,29 +478,29 @@ class KaitaiDecoderTests {
         val repeat_by_expr = result.bytesListTree["repeat_by_expr"]
         checkElement(repeat_by_expr, "repeat_by_expr", KaitaiList::class, Pair(0,3), Pair(0, 0), booleanArrayOfInts(0xaa, 0xbb, 0xcc))
         val aa0 = repeat_by_expr.bytesListTree!![0]
-        checkElement(aa0, "repeat_by_expr", KaitaiBytes::class, Pair(0,1), Pair(0, 0), booleanArrayOfInts(0xaa))
+        checkElement(aa0, "0", KaitaiBytes::class, Pair(0,1), Pair(0, 0), booleanArrayOfInts(0xaa))
         val aa1 = repeat_by_expr.bytesListTree!![1]
-        checkElement(aa1, "repeat_by_expr", KaitaiBytes::class, Pair(1,2), Pair(0, 0), booleanArrayOfInts(0xbb))
+        checkElement(aa1, "1", KaitaiBytes::class, Pair(1,2), Pair(0, 0), booleanArrayOfInts(0xbb))
         val aa2 = repeat_by_expr.bytesListTree!![2]
-        checkElement(aa2, "repeat_by_expr", KaitaiBytes::class, Pair(2,3), Pair(0, 0), booleanArrayOfInts(0xcc))
+        checkElement(aa2, "2", KaitaiBytes::class, Pair(2,3), Pair(0, 0), booleanArrayOfInts(0xcc))
 
         val set_size = result.bytesListTree["set_size"]
         checkElement(set_size, "set_size", KaitaiResult::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
         val set_size_x = set_size.bytesListTree!!["x"]
         checkElement(set_size_x, "x", KaitaiList::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
         val set_size_x_0 = set_size_x.bytesListTree!![0]
-        checkElement(set_size_x_0, "x", KaitaiBytes::class, Pair(3,5), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
+        checkElement(set_size_x_0, "0", KaitaiBytes::class, Pair(3,5), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
         val set_size_x_1 = set_size_x.bytesListTree!![1]
-        checkElement(set_size_x_1, "x", KaitaiBytes::class, Pair(5,7), Pair(0, 0),booleanArrayOfInts(0x33, 0x44))
+        checkElement(set_size_x_1, "1", KaitaiBytes::class, Pair(5,7), Pair(0, 0),booleanArrayOfInts(0x33, 0x44))
 
         val simple_eos = result.bytesListTree["simple_eos"]
         checkElement(simple_eos, "simple_eos", KaitaiList::class, Pair(7,9), Pair(0, 0), booleanArrayOfInts(0x12, 0x34))
         val simple_eos_0 = simple_eos.bytesListTree!![0]
-        checkElement(simple_eos_0, "simple_eos", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
+        checkElement(simple_eos_0, "0", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_0_a = simple_eos_0.bytesListTree!!["a"]
         checkElement(simple_eos_0_a, "a", KaitaiBytes::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_1 = simple_eos.bytesListTree!![1]
-        checkElement(simple_eos_1, "simple_eos", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
+        checkElement(simple_eos_1, "1", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
         val simple_eos_1_a = simple_eos_1.bytesListTree!!["a"]
         checkElement(simple_eos_1_a, "a", KaitaiBytes::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
 
@@ -1200,5 +1200,138 @@ class KaitaiDecoderTests {
         // Validate field number_body_default
         val fieldNumberBodyDefault = result.bytesListTree["number_body_default"]
         checkElement(fieldNumberBodyDefault, "number_body_default", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "number_body_default(1025)u")
+    }
+
+    @Test
+    fun testSimpleParametricTypes() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "pre", type = KTType.Primitive("firstsub")),
+                KTSeq(id = "with_params", type = KTType.Primitive("sub_with_params(2, true, pre)")),
+            ),
+            types = mapOf(
+                Pair(
+                    "firstsub",
+                    KTStruct(
+                        seq = listOf(
+                            KTSeq(id = "i", type = KTType.Primitive("u1")),
+                            KTSeq(id = "j", type = KTType.Primitive("u1")),
+                        )
+                    ),
+                ),
+                Pair(
+                    "sub_with_params",
+                    KTStruct(
+                        params = listOf(
+                            KTParam(
+                                id = "len",
+                                type = "u1",
+                            ),
+                            KTParam(
+                                id = "toggle",
+                                type = "bool",
+                            ),
+                            KTParam(
+                                id = "custom_type",
+                                type = "firstsub",
+                            ),
+                        ),
+                        seq = listOf(
+                            KTSeq(id = "x", size = StringOrInt.StringValue("len")),
+                            KTSeq(id = "y1", size = StringOrInt.StringValue("2"), ifCondition = StringOrBoolean.StringValue("toggle")),
+                            KTSeq(id = "y2", size = StringOrInt.StringValue("2"), ifCondition = StringOrBoolean.StringValue("not toggle")),
+                            KTSeq(id = "z1", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("custom_type.i == 0x02")),
+                            KTSeq(id = "z2", size = StringOrInt.StringValue("1"), ifCondition = StringOrBoolean.StringValue("custom_type.j == 0x02")),
+                        )
+                    )
+                )
+            )
+        )
+
+        val data = byteArrayOfInts(
+            0x01, 0x02, // pre
+            0x03, 0x04, // x
+            0x05, 0x06, // y
+            0x07, // z
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
+
+        val pre = result.bytesListTree["pre"]
+        checkElement(pre, "pre", KaitaiResult::class, Pair(0,2), Pair(0,0), booleanArrayOfInts(0x01, 0x02))
+
+        val with_params = result.bytesListTree["with_params"]
+        check(with_params is KaitaiResult) { "Expected with params to be KaitaiResult, got ${with_params::class.simpleName}" }
+
+        val x = with_params.bytesListTree["x"]
+        checkElement(x, "x", KaitaiBytes::class, Pair(2,4), Pair(0,0), booleanArrayOfInts(0x03, 0x04))
+
+        val y1 = with_params.bytesListTree["y1"]
+        checkElement(y1, "y1", KaitaiBytes::class, Pair(4,6), Pair(0,0), booleanArrayOfInts(0x05, 0x06))
+        try {
+            with_params.bytesListTree["y2"]
+            check(false)
+        } catch (e: Exception) {
+            check(e.message == "Could not find element with id y2") {"Exception \"Could not find element with id y2\" was expected but $e was thrown."}
+        }
+
+        try {
+            with_params.bytesListTree["z1"]
+            check(false)
+        } catch (e: Exception) {
+            check(e.message == "Could not find element with id z1") {"Exception \"Could not find element with id z1\" was expected but $e was thrown."}
+        }
+        val z2 = with_params.bytesListTree["z2"]
+        checkElement(z2, "z2", KaitaiBytes::class, Pair(6,7), Pair(0,0), booleanArrayOfInts(0x07))
+    }
+
+    @Test
+    fun testContentsKey() {
+        val struct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "a", contents = listOf(
+                    StringOrInt.StringValue("test"),
+                    StringOrInt.IntValue(0xd8),
+                    StringOrInt.IntValue(0xd9),
+                )),
+            ),
+        )
+
+        val data = byteArrayOfInts(
+            0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9
+        )
+
+        val decoder = Kaitai("enum_types", struct)
+        val result = decoder.decode(data, 0)
+
+        check(result is KaitaiResult) { "Expected main result to be KaitaiResult, got ${result::class.simpleName}" }
+
+        val a = result.bytesListTree["a"]
+        checkElement(a, "a", KaitaiBytes::class, Pair(0,6), Pair(0,0), booleanArrayOfInts(0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9))
+
+        val wrongStruct = KTStruct(
+            seq = listOf(
+                KTSeq(id = "a", contents = listOf(
+                    StringOrInt.StringValue("test"),
+                    StringOrInt.IntValue(0x68),
+                    StringOrInt.IntValue(0x69),
+                )),
+            ),
+        )
+
+        val wrongData = byteArrayOfInts(
+            0x74, 0x65, 0x73, 0x74, 0xd8, 0xd9
+        )
+
+        val wrongDecoder = Kaitai("enum_types", wrongStruct)
+        try {
+            val result = wrongDecoder.decode(wrongData, 0)
+            check(false) {"Expected an Exception, but there was none."}
+        } catch (e: Exception) {
+            check(true) {"Uuuhhh. Something went wrong with the wrongDecoder."}
+        }
     }
 }

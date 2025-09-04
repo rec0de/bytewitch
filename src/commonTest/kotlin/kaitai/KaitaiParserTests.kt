@@ -56,7 +56,7 @@ class KaitaiParserTests {
               - id: magic3
                 contents: [CAFE, 0, BABE]
               - id: magic4
-                contents: [foo, 0, A, 0xa, 42]
+                contents: [foo, "0", A, "0x0a", "42"]
               - id: magic5
                 contents: [1, 0x55, '▒,3', 3]
         """.trimIndent()
@@ -69,32 +69,32 @@ class KaitaiParserTests {
 
         // Check field magic1
         check(struct.seq[0].id == "magic1") { "Expected first field id to be 'magic1', got '${struct.seq[0].id}'" }
-        check(struct.seq[0].contents == listOf("JFIF")) {
-            "Expected field 'magic1' contents to be [JFIF], got '${struct.seq[0].contents}'"
+        check(struct.seq[0].contents == listOf(StringOrInt.StringValue("JFIF"))) {
+            "Expected field 'magic1' contents to be [\"JFIF\"], got ${struct.seq[0].contents}"
         }
 
         // Check field magic2
         check(struct.seq[1].id == "magic2") { "Expected second field id to be 'magic2', got '${struct.seq[1].id}'" }
-        check(struct.seq[1].contents == listOf("202", "254", "186", "190")) {
-            "Expected field 'magic2' contents to be [202, 254, 186, 190], got '${struct.seq[1].contents}'"
+        check(struct.seq[1].contents == listOf(StringOrInt.IntValue(202), StringOrInt.IntValue(254), StringOrInt.IntValue(186), StringOrInt.IntValue(190))) {
+            "Expected field 'magic2' contents to be [202, 254, 186, 190], got ${struct.seq[1].contents}"
         }
 
         // Check field magic3
         check(struct.seq[2].id == "magic3") { "Expected third field id to be 'magic3', got '${struct.seq[2].id}'" }
-        check(struct.seq[2].contents == listOf("CAFE", "0", "BABE")) {
-            "Expected field 'magic3' contents to be [CAFE, 0, BABE], got '${struct.seq[2].contents}'"
+        check(struct.seq[2].contents == listOf(StringOrInt.StringValue("CAFE"), StringOrInt.IntValue(0), StringOrInt.StringValue("BABE"))) {
+            "Expected field 'magic3' contents to be [\"CAFE\", 0, \"BAB0\"], got ${struct.seq[2].contents}"
         }
 
         // Check field magic4
         check(struct.seq[3].id == "magic4") { "Expected fourth field id to be 'magic4', got '${struct.seq[3].id}'" }
-        check(struct.seq[3].contents == listOf("foo", "0", "A", "10", "42")) {
-            "Expected field 'magic4' contents to be [foo, 0, A, 10, 42], got '${struct.seq[3].contents}'"
+        check(struct.seq[3].contents == listOf(StringOrInt.StringValue("foo"), StringOrInt.StringValue("0"), StringOrInt.StringValue("A"),StringOrInt.StringValue("0x0a"), StringOrInt.StringValue("42"))) {
+            "Expected field 'magic4' contents to be [\"foo\", \"0\", \"A\", \"0xa\", \"42\"], got ${struct.seq[3].contents}"
         }
 
         // Check field magic5
         check(struct.seq[4].id == "magic5") { "Expected fifth field id to be 'magic5', got '${struct.seq[4].id}'" }
-        check(struct.seq[4].contents == listOf("1", "85", "▒,3", "3")) {
-            "Expected field 'magic5' contents to be [1, 85, '▒,3', 3], got '${struct.seq[4].contents}'"
+        check(struct.seq[4].contents == listOf(StringOrInt.IntValue(1), StringOrInt.IntValue(85), StringOrInt.StringValue("▒,3"), StringOrInt.IntValue(3))) {
+            "Expected field 'magic5' contents to be [1, 85, \"▒,3\", 3], got ${struct.seq[4].contents}"
         }
     }
 

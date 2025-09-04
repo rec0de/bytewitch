@@ -1,6 +1,7 @@
 package decoders
 
 import bitmage.ByteOrder
+import bitmage.booleanArrayOfInts
 import bitmage.fromBytes
 import bitmage.hex
 import bitmage.padLeft
@@ -25,6 +26,12 @@ import org.intellij.markdown.parser.MarkdownParser
 
 enum class DisplayStyle {
     HEX, SIGNED_INTEGER, UNSIGNED_INTEGER, FLOAT, STRING, ENUM, BOOLEAN
+}
+
+enum class KaitaiElementKind(val cssClass: String) {
+    SEQELEMENT("kaitai-seq-element"),
+    INSTANCE("kaitai-instance"),
+    PARAMETER("kaitai-parameter"),
 }
 
 class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by innerList {
@@ -84,6 +91,7 @@ class Type(val type: String?) {
     var usedDisplayStyle: DisplayStyle = DisplayStyle.HEX
     var customType: KTStruct? = null
     var isBinary: Boolean = false
+    var params: Map<String, Any>? = null
 }
 
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String = "") : ByteWitchDecoder {
@@ -101,29 +109,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
              */
 
             val id = kaitaiStruct.meta?.id ?: name
-            processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
+            processSeq(id, null, parentBytesListTree = null, null, kaitaiStruct, null, data.toBooleanArray(), sourceOffset, _offsetInDatastreamInBits = 0)
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
-            console.error("[$name] $e")
             throw Exception("[$name] Unexpected Exception has been thrown:\n$e")
         }
         return result
-    }
-
-    fun parseReference(reference: String, bytesListTree: MutableKaitaiTree): dynamic {
-        // if it is not a valid reference, i.e. there exists no element in the seq with the id @param: reference, then an exception is thrown
-        if (reference.startsWith("_root.")) //_root.magic
-            return parseReference(reference.removePrefix("_root."), bytesListTree.root!!)
-        else if (reference.startsWith("_parent."))
-            return parseReference(reference.removePrefix("_parent."), bytesListTree.parent!!)
-        else (
-                if (reference.contains("."))
-                    return parseReference(
-                        reference.substringAfter("."),
-                        bytesListTree[reference.substringBefore(".")]!!.bytesListTree!!
-                    )
-                else
-                    return bytesListTree[reference]!!.value
-                )
     }
 
     // specifically for ExpressionParser
@@ -177,7 +167,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int,
         val repeatIndex: Int?,
-        val currentRepeatElement: KaitaiElement?,
+        val currentElement: KaitaiElement?,
     ) {
         //******************************************************************************************************************
         //*                                                 methods                                                        *
@@ -185,7 +175,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
             when (input.first) {
                 TokenType.INTEGER -> {
-                    return Pair(TokenType.STRING, input.second.toString())
+                    return Pair(TokenType.STRING, (input.second as Long).toString())
                 }
 
                 TokenType.BYTEARRAY, TokenType.ARRAY -> {
@@ -671,11 +661,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         fun parseIdentifier(token: Pair<TokenType, String>): Pair<TokenType, dynamic> {
             return when (token.second) {
                 "_" -> {
-                    val targetElement = currentRepeatElement
-                    if (targetElement != null) {
-                        parseReferenceHelper(targetElement)
+                    if (currentElement != null) {
+                        parseReferenceHelper(currentElement)
                     } else {
-                        throw RuntimeException("The identifier _ cannot be used outside of repeat.")
+                        throw RuntimeException("The element (referenced by _) has not been parsed yet.")
                     }
                 }
 
@@ -704,7 +693,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         bytesListTree[token.second]
                     } catch (e: Exception) {
                         val instance : KTSeq = currentScopeStruct.instances[token.second]!!
-                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first!!
+                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first?: throw RuntimeException("The referenced instance ${token.second} wasn't created because the if key was evaluated as false.")
                     }
 
                     parseReferenceHelper(targetElement)
@@ -856,7 +845,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                                 relevantBytesListTree.currentScopeStruct,
                                 relevantBytesListTree,
                                 relevantBytesListTree.ioStream,
-                                0, 0).first!!
+                                0, 0).first?: throw RuntimeException("The referenced instance ${op2.second} wasn't created because the if key was evaluated as false.")
                         }
                         parseReferenceHelper(targetElement)
                     }
@@ -1570,7 +1559,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     var float_point: Boolean = false
                     var exponential: Boolean = false
                     for ((index, char) in trimmedExpression.withIndex()) {
-                        if (!float_point && char == '.') { // FLOATS must contain exactly one '.'
+                        if (!float_point && char == '.' && trimmedExpression.length > index+1 && trimmedExpression[index+1].isDigit()) { // FLOATS must contain exactly one '.'
                             float_point = true
                             continue
                         }
@@ -1715,26 +1704,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
     }
 
-    fun parseValue(value: String, bytesListTree: MutableKaitaiTree) : BooleanArray {
-        return parseValue(listOf(value), bytesListTree)
-    }
-
-    fun parseValue(value: List<String>, bytesListTree: MutableKaitaiTree) : BooleanArray {
-        var fullyFlatArray = booleanArrayOf()
-        for (element in value) {
-            if (element.toIntOrNull() != null) {
-                fullyFlatArray += element.toInt().toMinimalAmountOfBytes(ByteOrder.BIG).toBooleanArray()
-            } else {
-                try {
-                    fullyFlatArray += parseReference(element, bytesListTree) as BooleanArray
-                } catch (e: Exception) {
-                    fullyFlatArray += element.encodeToByteArray().toBooleanArray()
-                }
-            }
-        }
-        return fullyFlatArray
-    }
-
     fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, expressionParser: ExpressionParser): V? {
         cases.forEach { (key, value) ->
             if (key != "_") {
@@ -1747,40 +1716,43 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return cases["_"]
     }
 
-    fun checkContentsKey(contents: List<String>, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
-        return parseValue(contents, bytesListTree).contentEquals(dataBytes)
+    fun parseContents(contents: List<StringOrInt>) : BooleanArray {
+        var byteArray : ByteArray = byteArrayOf()
+        for (element in contents) {
+            if (element is StringOrInt.IntValue) {
+                byteArray += element.value.toByte()
+            } else {
+                byteArray += element.toString().encodeToByteArray()
+            }
+        }
+        return byteArray.toBooleanArray()
     }
 
     // TODO: refactor
-    fun checkValidKey(valid: KTValid, dataBytes: BooleanArray, bytesListTree: MutableKaitaiTree) : Boolean {
+    fun checkValidKey(valid: KTValid, expressionParser: ExpressionParser) : Boolean {
         if (valid.min != null || valid.max != null) {
-            val parsedValue = dataBytes.toByteArray().toUInt(ByteOrder.BIG)
             if (valid.min != null) {
-                val parsedValidMin = parseValue(valid.min, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-                if (parsedValue < parsedValidMin) {
+                if (expressionParser.parseExpression("_ < ${valid.min}")) {
                     return false
                 }
             }
             if (valid.max != null) {
-                val parsedValidMax = parseValue(valid.max, bytesListTree).toByteArray().toUInt(ByteOrder.BIG)
-                if (parsedValue > parsedValidMax) {
+                if (expressionParser.parseExpression("_ > ${valid.max}")) {
                     return false
                 }
             }
             return true
         } else if (valid.anyOf != null) {
             for (entry in valid.anyOf) {
-                if (parseValue(entry, bytesListTree).contentEquals(dataBytes)) {
+                if (expressionParser.parseExpression("_ == $entry")) {
                     return true
                 }
             }
             return false
         } else if (valid.expr != null) {
-            // TODO parse arbitrary expression
-            return true
+            return expressionParser.parseExpression(valid.expr)
         } else if (valid.eq != null) {
-            val valueToCheckAgainst = parseValue(valid.eq, bytesListTree)
-            return valueToCheckAgainst.padLeft(dataBytes.size - valueToCheckAgainst.size).contentEquals(dataBytes)
+            return expressionParser.parseExpression("_ == ${valid.eq}")
         }
         return true
     }
@@ -1919,21 +1891,34 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     }
 
     fun parseType(parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree, expressionParser: ExpressionParser) : Type {
-        var type = when (seqElement.type) {
+         val typeNameWithParams : String? = when (seqElement.type) {
             is KTType.Primitive -> {
-                Type(seqElement.type.type)
+                seqElement.type.type
             }
             is KTType.Switch -> {
                 val entry = processSwitchOn(seqElement.type.switchOn, seqElement.type.cases, expressionParser)
                 checkNotNull(entry) { "No matching case found" }
-                Type(entry)
+                entry
             }
-            null -> { Type(null) }
+            null -> null
+        }
+
+        var type : Type
+        var parsedParamsData: List<Any> = emptyList()
+        if (typeNameWithParams != null) {
+            val elements = typeNameWithParams.split("(", limit = 2)
+            val typeName: String = elements[0]
+            type = Type(typeName)
+            if (elements.size >= 2) {
+                parsedParamsData = expressionParser.parseExpression("[${elements[1].dropLast(1)}]")  //drop closing bracket
+            }
+        } else {
+            type = Type(null)
         }
 
         type.byteOrder = bytesListTree.byteOrder
         if (seqElement.contents != null) {
-            type.sizeInBits = parseValue(seqElement.contents, bytesListTree).size
+            type.sizeInBits = parseContents(seqElement.contents).size
             type.sizeIsKnown = true
         }
 
@@ -1950,6 +1935,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
             if (customTypeCandidate != null) {  // parse custom type aka subtypes
                 type.customType = customTypeCandidate
+
+                // TODO Add some form type checking for params
+                require(type.customType!!.params.size == parsedParamsData.size) {"Amount of parameters passed to ${type.type} is not the same as expected amount of parameters."}
+                val paramNames = type.customType!!.params.map { param -> param.id }
+                require(paramNames.all{it != null}) {"At least one of the parameter names is null, which seems incorrect."}
+
+                type.params = paramNames.filterNotNull().zip(parsedParamsData).toMap()
             } else {  // parse builtin type
                 type = parseBuiltinType(type)
             }
@@ -1983,7 +1975,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     private fun processSingleSeqElement(
         elementId: String,
         seqElement: KTSeq,
-        isInstance: Boolean,
+        kaitaiElementKind: KaitaiElementKind,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -2121,6 +2113,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 bytesListTree,
                 currentScopeStruct,
                 type.customType!!,
+                type.params,
                 ioSubStream,
                 sourceOffsetInBits + dataSizeOfSequenceInBits,
                 if (type.sizeInBits != 0) 0 else offsetInDatastreamInBits  // reset offset in case of substream
@@ -2142,22 +2135,22 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val elementDoc = KaitaiDoc(seqElement.doc, seqElement.docRef)
 
             kaitaiElement = when (type.usedDisplayStyle) {
-                DisplayStyle.BOOLEAN -> KaitaiBoolean(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
-                DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
-                DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
-                DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
-                DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
-                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance, enum)
+                DisplayStyle.BOOLEAN -> KaitaiBoolean(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
+                DisplayStyle.STRING -> KaitaiString(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
+                DisplayStyle.SIGNED_INTEGER -> KaitaiSignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
+                DisplayStyle.UNSIGNED_INTEGER -> KaitaiUnsignedInteger(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
+                DisplayStyle.FLOAT -> KaitaiFloat(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
+                DisplayStyle.ENUM -> KaitaiEnum(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind, enum)
                 // displayStyle.HEX as the fallback (even if it's a known type or whatever)
-                else -> KaitaiBytes(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, isInstance)
+                else -> KaitaiBytes(elementId, type.byteOrder, ioStream, ioSubStream, sourceByteRange, sourceRangeBitOffset, elementDoc, kaitaiElementKind)
             }
         }
 
-        if (seqElement.contents != null && !checkContentsKey(seqElement.contents, ioSubStream, bytesListTree)) {
+        if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(kaitaiElement.value)) {
             throw Exception("Value of bytes does not align with expected contents value.")
         }
 
-        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ioSubStream, bytesListTree)) {
+        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, kaitaiElement))) {
             throw Exception("Value of bytes does not align with expected valid value.")
         }
 
@@ -2174,7 +2167,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun processManySeqElements(
         elementId: String,
         seqElement: KTSeq,
-        isInstance: Boolean,
+        kaitaiElementKind: KaitaiElementKind,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -2193,9 +2186,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         var repeatIndex = 0
         while (true) {
             val triple = processSingleSeqElement(
-                elementId,
+                repeatIndex.toString(),
                 seqElement,
-                false,
+                KaitaiElementKind.SEQELEMENT,
                 currentScopeStruct,
                 bytesListTree,
                 ioStream,
@@ -2248,7 +2241,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         val kaitaiList = KaitaiList(
             elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-            KaitaiDoc(undefined, undefined), isInstance
+            KaitaiDoc(undefined, undefined), kaitaiElementKind
         )
         kaitaiList.bytesListTree.kaitaiElement = kaitaiList
         return Triple(
@@ -2261,7 +2254,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun processOneOrManySeqElements(
         elementId: String,
         seqElement: KTSeq,
-        isInstance: Boolean,
+        kaitaiElementKind: KaitaiElementKind,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -2279,7 +2272,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             processManySeqElements(
                 elementId,
                 seqElement,
-                isInstance,
+                kaitaiElementKind,
                 currentScopeStruct,
                 bytesListTree,
                 ioStream,
@@ -2292,7 +2285,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             processSingleSeqElement(
                 elementId,
                 seqElement,
-                isInstance,
+                kaitaiElementKind,
                 currentScopeStruct,
                 bytesListTree,
                 ioStream,
@@ -2305,54 +2298,79 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
     }
 
-    private fun processValueInstanceHelper(
+    private fun processParameter(
         expressionResult: dynamic,
         id: String,
         ioStream: BooleanArray,
         currentScopeStruct: KTStruct,
         parentBytesListTree: MutableKaitaiTree,
-        instanceDoc: KaitaiDoc
+        doc: KaitaiDoc
+    ) : KaitaiElement {
+        return processOffSequenceData(expressionResult, id, ioStream, currentScopeStruct, parentBytesListTree, doc, KaitaiElementKind.PARAMETER)
+    }
+
+    private fun processValueInstance(
+        expressionResult: dynamic,
+        id: String,
+        ioStream: BooleanArray,
+        currentScopeStruct: KTStruct,
+        parentBytesListTree: MutableKaitaiTree,
+        doc: KaitaiDoc
+    ) : KaitaiElement {
+        return processOffSequenceData(expressionResult, id, ioStream, currentScopeStruct, parentBytesListTree, doc, KaitaiElementKind.INSTANCE)
+    }
+
+    private fun processOffSequenceData(
+        expressionResult: dynamic,
+        id: String,
+        ioStream: BooleanArray,
+        currentScopeStruct: KTStruct,
+        parentBytesListTree: MutableKaitaiTree,
+        doc: KaitaiDoc,
+        kaitaiElementKind: KaitaiElementKind,
     ): KaitaiElement {
         return when(expressionResult) {
             is Long -> { // token integer
-                KaitaiSignedInteger(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                KaitaiSignedInteger(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is Double-> { // token float
-                KaitaiFloat(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                KaitaiFloat(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is String -> { // token string
-                KaitaiString(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                KaitaiString(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is Boolean -> { // token boolean
-                KaitaiBoolean(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                KaitaiBoolean(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is BooleanArray -> { // token stream
-                KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is Pair<KTEnum, String> -> { // token enum
-                KaitaiEnum(id, ByteOrder.BIG, ioStream, booleanArrayOf(), Pair(0, 0), Pair(0, 0), instanceDoc, true, expressionResult)
+                KaitaiEnum(id, ByteOrder.BIG, ioStream, booleanArrayOf(), Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind, expressionResult)
             }
             is MutableKaitaiTree -> {
                 val temp = expressionResult.kaitaiElement!!
-                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, true)
+                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind)
                 result.bytesListTree.kaitaiElement = result
                 result
             }
             is List<dynamic> -> {
                 if (expressionResult is BytesList<Long>) {//(expressionResult as List<dynamic>).all {it is Long && it in 0L..255L}) { // token bytearray
-                    KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                    KaitaiBytes(id, ByteOrder.BIG, ioStream, expressionResult, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
                 } else { // token array
                     val bytesListTree: MutableKaitaiTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
                     bytesListTree.parent = parentBytesListTree
-                    bytesListTree.addAll((expressionResult as List<dynamic>).map {processValueInstanceHelper(
-                        it,
-                        id,
-                        ioStream,
-                        currentScopeStruct,
-                        bytesListTree,
-                        instanceDoc,
-                    )}) // TODO ioStream or ioSubStream
-                    KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), instanceDoc, true)
+                    bytesListTree.addAll((expressionResult as List<dynamic>).withIndex().map { (i, it) ->
+                        processValueInstance(
+                            it,
+                            i.toString(),
+                            ioStream,  // TODO ioStream or ioSubStream?
+                            currentScopeStruct,
+                            bytesListTree,
+                            doc,
+                        )
+                    })
+                    KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
                 }
             }
             else -> {
@@ -2374,8 +2392,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
         if (instance.value != null) {  //valueInstances have entirely eperate handling from normal instances
+            if (!expressionParser.parseExpression(instance.ifCondition.toString())) {
+                return Triple(null, 0, 0)
+            }
             return Triple(
-                processValueInstanceHelper(
+                processValueInstance(
                     expressionParser.parseExpression(instance.value),
                     id,
                     ioStream,
@@ -2400,7 +2421,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return processOneOrManySeqElements(
             id,
             instance,
-            true,
+            KaitaiElementKind.INSTANCE,
             currentScopeStruct,
             bytesListTree,
             actualIoStream,
@@ -2411,8 +2432,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         )
     }
 
-    fun processSeq(parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
-                   ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int) : KaitaiElement {
+    fun processSeq(
+        parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
+        customTypeParams: Map<String, Any>?, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int
+    ) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
         /*
         Entweder data als ByteArray und Bitshiften
@@ -2446,15 +2469,29 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             console.log("[SEQ] We have a parent")
         }
 
+        if (customTypeParams != null) {
+            for (param in customTypeParams) {
+                bytesListTree.add(
+                    processParameter(
+                        param.value,
+                        param.key,
+                        ioStream,
+                        currentScopeStruct,
+                        bytesListTree,
+                        KaitaiDoc(null, null),
+                    )
+                )
+            }
+        }
+
         var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
-                val elementId = seqElement.id
-                checkNotNull(seqElement.id) { "Sequence element id must not be null" }
+                val elementId = seqElement.id?: ""
                 val triple = processOneOrManySeqElements(
                     elementId,
                     seqElement,
-                    false,
+                    KaitaiElementKind.SEQELEMENT,
                     currentScopeStruct,
                     bytesListTree,
                     ioStream,
@@ -2498,7 +2535,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        val kaitaiResult = KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc, false)
+        val kaitaiResult = KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc, KaitaiElementKind.SEQELEMENT)
         kaitaiResult.bytesListTree.kaitaiElement = kaitaiResult
         return kaitaiResult
     }
@@ -2511,7 +2548,7 @@ interface KaitaiElement : ByteWitchResult {
     var endianness: ByteOrder
     var doc: KaitaiDoc
     val ioStream: BooleanArray
-    val isInstance: Boolean
+    val kaitaiElementKind: KaitaiElementKind
 }
 
 class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
@@ -2588,10 +2625,10 @@ class KaitaiResult(
     override val id: String, override var endianness: ByteOrder,
     override val bytesListTree: MutableKaitaiTree,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
                     doc.renderHTML() +
                 "</div>"
@@ -2602,7 +2639,7 @@ class KaitaiResult(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                if (!element.isInstance) result += element.value as BooleanArray
+                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
             }
             return result
         }
@@ -2614,10 +2651,10 @@ class KaitaiList(
     override val id: String, override var endianness: ByteOrder,
     override val bytesListTree: MutableKaitaiTree,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${bytesListTree.joinToString(", ", "${id}[", "]") { it.renderHTML() }}" +
                 "</div>"
     }
@@ -2627,7 +2664,7 @@ class KaitaiList(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                if (!element.isInstance) result += element.value as BooleanArray
+                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
             }
             return result
         }
@@ -2639,10 +2676,10 @@ class KaitaiBytes(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()})h" +
                     doc.renderHTML() +
                 "</div>"
@@ -2655,12 +2692,12 @@ abstract class KaitaiNumber(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     abstract val suffix: String
 
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${parseValueAsString()})${suffix}" +
                     doc.renderHTML() +
                 "</div>"
@@ -2673,8 +2710,8 @@ class KaitaiSignedInteger(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
-) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, isInstance) {
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, kaitaiElementKind) {
     override val suffix: String = "s"
 
     override fun parseValueAsString(): String {
@@ -2697,8 +2734,8 @@ class KaitaiUnsignedInteger(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: BooleanArray,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
-) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, isInstance) {
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, kaitaiElementKind) {
     override val suffix: String = "u"
 
     override fun parseValueAsString(): String {
@@ -2717,8 +2754,8 @@ class KaitaiFloat(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
-) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, isInstance) {
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
+) : KaitaiNumber(id, endianness, ioStream, value, sourceByteRange, sourceRangeBitOffset, doc, kaitaiElementKind) {
     override val suffix: String = "f"
 
     override fun parseValueAsString(): String {
@@ -2739,10 +2776,10 @@ class KaitaiBoolean(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                 "${id}(${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean})b" +
                 doc.renderHTML() +
                 "</div>"
@@ -2753,10 +2790,10 @@ class KaitaiString(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return  "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String})utf8" +
                     doc.renderHTML() +
                 "</div>"
@@ -2767,11 +2804,11 @@ class KaitaiEnum(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: BooleanArray,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val isInstance: Boolean,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
     override fun renderHTML(): String {
-        return "<div class=\"generic roundbox tooltip ${if (isInstance) "kaitai-instance" else ""}\" $byteRangeDataTags>" +
+        return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                    "${id}(${enum.second})enum" +
                    doc.renderHTML() +
                "</div>"

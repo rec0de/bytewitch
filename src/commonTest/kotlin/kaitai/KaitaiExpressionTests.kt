@@ -8,14 +8,11 @@ import decoders.Kaitai
 import decoders.MutableKaitaiTree
 import decoders.Kaitai.TokenType
 import decoders.KaitaiBytes
-import decoders.KaitaiEnum
 import decoders.KaitaiList
 import decoders.KaitaiResult
 import decoders.KaitaiSignedInteger
 import decoders.KaitaiUnsignedInteger
 import kaitai.KaitaiTestUtils.checkElement
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToDynamic
 
 class KaitaiExpressionTests {
     @Test
@@ -401,18 +398,18 @@ class KaitaiExpressionTests {
         val d = result.bytesListTree["d"]
         checkElement(d, "d", KaitaiList::class, Pair(3, 7), Pair(0,0), booleanArrayOfInts(0x04, 0x05, 0x06, 0x07))
         val d0 = d.bytesListTree!![0]
-        checkElement(d0, "d", KaitaiBytes::class, Pair(3, 5), Pair(0,0), booleanArrayOfInts(0x04, 0x05))
+        checkElement(d0, "0", KaitaiBytes::class, Pair(3, 5), Pair(0,0), booleanArrayOfInts(0x04, 0x05))
         val d1 = d.bytesListTree!![1]
-        checkElement(d1, "d", KaitaiBytes::class, Pair(5, 7), Pair(0,0), booleanArrayOfInts(0x06, 0x07))
+        checkElement(d1, "1", KaitaiBytes::class, Pair(5, 7), Pair(0,0), booleanArrayOfInts(0x06, 0x07))
 
         val e = result.bytesListTree["e"]
         checkElement(e, "e", KaitaiList::class, Pair(7, 10), Pair(0,0), booleanArrayOfInts(0x08, 0x09, 0x10))
         val e0 = e.bytesListTree!![0]
-        checkElement(e0, "e", KaitaiBytes::class, Pair(7, 7), Pair(0,0), booleanArrayOfInts())
+        checkElement(e0, "0", KaitaiBytes::class, Pair(7, 7), Pair(0,0), booleanArrayOfInts())
         val e1 = e.bytesListTree!![1]
-        checkElement(e1, "e", KaitaiBytes::class, Pair(7, 8), Pair(0,0), booleanArrayOfInts(0x08))
+        checkElement(e1, "1", KaitaiBytes::class, Pair(7, 8), Pair(0,0), booleanArrayOfInts(0x08))
         val e2 = e.bytesListTree!![2]
-        checkElement(e2, "e", KaitaiBytes::class, Pair(8, 10), Pair(0,0), booleanArrayOfInts(0x09, 0x10))
+        checkElement(e2, "2", KaitaiBytes::class, Pair(8, 10), Pair(0,0), booleanArrayOfInts(0x09, 0x10))
 
         try {
             result.bytesListTree["f0"]
@@ -428,11 +425,11 @@ class KaitaiExpressionTests {
         val g = result.bytesListTree["g"]
         checkElement(g, "g", KaitaiList::class, Pair(12, 15), Pair(0,0), booleanArrayOfInts(0x13, 0x14, 0xff))
         val g0 = g.bytesListTree!![0]
-        checkElement(g0, "g", KaitaiSignedInteger::class, Pair(12, 13), Pair(0,0), booleanArrayOfInts(0x13))
+        checkElement(g0, "0", KaitaiSignedInteger::class, Pair(12, 13), Pair(0,0), booleanArrayOfInts(0x13))
         val g1 = g.bytesListTree!![1]
-        checkElement(g1, "g", KaitaiSignedInteger::class, Pair(13, 14), Pair(0,0), booleanArrayOfInts(0x14))
+        checkElement(g1, "1", KaitaiSignedInteger::class, Pair(13, 14), Pair(0,0), booleanArrayOfInts(0x14))
         val g2 = g.bytesListTree!![2]
-        checkElement(g2, "g", KaitaiSignedInteger::class, Pair(14, 15), Pair(0,0), booleanArrayOfInts(0xff))
+        checkElement(g2, "2", KaitaiSignedInteger::class, Pair(14, 15), Pair(0,0), booleanArrayOfInts(0xff))
         try {
             g.bytesListTree!![3]
             check(false)
