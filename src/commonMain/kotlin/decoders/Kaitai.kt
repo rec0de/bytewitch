@@ -1920,10 +1920,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             null -> null
         }
 
-        if (typeNameWithParams == null && (seqElement.size == null && !seqElement.sizeEos && seqElement.terminator == null && seqElement.contents == null)) {
-            throw RuntimeException("No way to determine size. Aborting.")
-        }
-
         var type : Type
         var parsedParamsData: List<Any> = emptyList()
         if (typeNameWithParams != null) {
@@ -1967,6 +1963,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 type = parseBuiltinType(type)
             }
         }
+
+        if (typeNameWithParams == null && (seqElement.size == null && !seqElement.sizeEos && seqElement.terminator == null && seqElement.contents == null)) {
+            type.sizeInBits = 0
+            type.sizeIsKnown = true
+        }
+
         if (seqElement.size != null) {  // we do this last, because in some cases other sizes can be overwritten
             if (seqElement.size is StringOrInt.IntValue) {
                 type.sizeInBits = seqElement.size.value * 8
