@@ -1,5 +1,6 @@
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.dom.events.KeyboardEvent
 import kotlin.properties.Delegates
 
 class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = null) {
@@ -13,6 +14,7 @@ class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = nu
     }
 
     var onInput: ((value: String) -> Unit)? = null
+    var onEnterPressed: ((value: String) -> Unit)? = null
 
     init {
         storageKey?.also { key ->
@@ -25,6 +27,12 @@ class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = nu
             value = element.value
             onInput?.invoke(value)
         })
+
+        element.addEventListener("keydown", { event ->
+            if ((event as KeyboardEvent).key == "Enter") {
+                onEnterPressed?.invoke(value)
+            }
+        })
     }
 }
 
@@ -32,13 +40,14 @@ class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String
 
     var value: String by Delegates.observable(element.value) { _, _, newValue ->
         element.value = newValue
+        onChange?.invoke(newValue)
         // TODO: Should this be debounced?
         storageKey?.also {
             sessionStorage.setItem(it, newValue)
         }
     }
 
-    var onInput: ((value: String) -> Unit)? = null
+    var onChange: ((value: String) -> Unit)? = null
 
     init {
         storageKey?.also { key ->
@@ -50,7 +59,6 @@ class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String
         // use addEventListener to avoid overwriting (or being overwritten by) other listeners
         element.addEventListener("input", {
             value = element.value
-            onInput?.invoke(value)
         })
     }
 }

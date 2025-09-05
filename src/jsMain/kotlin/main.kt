@@ -27,7 +27,6 @@ var showSegmentWiseAlignment = true
 
 // settings
 var ssfEnabled = true
-var showInstances = true
 
 fun main() {
     window.addEventListener("load", {

@@ -21,11 +21,16 @@ object SettingsManager {
             decode(false, force = true)
         }
 
-        showInstances = showInstancesBinding.checked
+        val outputDiv = document.getElementById("output") as HTMLDivElement
+        if (showInstancesBinding.checked) {
+            outputDiv.classList.remove("kaitai-instances-hidden")
+        } else {
+            outputDiv.classList.add("kaitai-instances-hidden")
+        }
         showInstancesBinding.onChange = { checked ->
-            showInstances = checked
-            document.getElementsByClassName("kaitai-instance").asList().forEach {
-                (it as? HTMLDivElement)?.style?.display = if (showInstances) "block" else "none"
+            when (checked) {
+                true -> outputDiv.classList.remove("kaitai-instances-hidden")
+                false -> outputDiv.classList.add("kaitai-instances-hidden")
             }
         }
     }

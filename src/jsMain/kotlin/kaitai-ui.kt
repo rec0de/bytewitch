@@ -26,7 +26,7 @@ object KaitaiUI {
     private var changedSinceLastDecode = true
 
     init {
-        saveButton.onclick = {
+        val saveKaitaiCallback = {
             val name = nameInput.value.trim()
             val inputValue = getInputValue()
             if (name.isNotEmpty() && inputValue.isNotEmpty()) {
@@ -42,12 +42,14 @@ object KaitaiUI {
                 console.warn("Kaitai name and input cannot be empty")
             }
         }
+        saveButton.onclick = { saveKaitaiCallback() }
+        nameInput.onEnterPressed = { saveKaitaiCallback() }
 
         if (includeLiveStruct.checked && getInputValue().isNotEmpty()) {
             updateLiveDecoder(getInputValue())
         }
 
-        kaitaiInput.onInput = {
+        kaitaiInput.onChange = {
             if (includeLiveStruct.checked) {
                 updateLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
