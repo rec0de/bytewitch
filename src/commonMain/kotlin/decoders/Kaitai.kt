@@ -1171,7 +1171,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 // kotlin does not support comparing different values of different types
                 // it is also not mentioned in the user guide, thus considered undefined behaviour (e.g. can we compare a float to an int?)
 
-                throw RuntimeException("Cannot compare ${op1.first} wih ${op2.first}")
+                throw RuntimeException("Cannot compare ${op1.first}: ${op1.second} with ${op2.first}: ${op2.second}")
                 // return Pair(TokenType.BOOLEAN, false) // would also be possible
             }
         }
@@ -1733,19 +1733,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun checkValidKey(valid: KTValid, expressionParser: ExpressionParser) : Boolean {
         if (valid.min != null || valid.max != null) {
             if (valid.min != null) {
-                if (expressionParser.parseExpression("_ < ${valid.min}")) {
+                if (expressionParser.parseExpression("_ < (${valid.min})")) {
                     return false
                 }
             }
             if (valid.max != null) {
-                if (expressionParser.parseExpression("_ > ${valid.max}")) {
+                if (expressionParser.parseExpression("_ > (${valid.max})")) {
                     return false
                 }
             }
             return true
         } else if (valid.anyOf != null) {
             for (entry in valid.anyOf) {
-                if (expressionParser.parseExpression("_ == $entry")) {
+                if (expressionParser.parseExpression("_ == ($entry)")) {
                     return true
                 }
             }
@@ -1753,7 +1753,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         } else if (valid.expr != null) {
             return expressionParser.parseExpression(valid.expr)
         } else if (valid.eq != null) {
-            return expressionParser.parseExpression("_ == ${valid.eq}")
+            return expressionParser.parseExpression("_ == (${valid.eq})")
         }
         return true
     }
@@ -1915,7 +1915,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val typeName: String = elements[0]
             type = Type(typeName)
             if (elements.size >= 2) {
-                parsedParamsData = expressionParser.parseExpression("[${elements[1].dropLast(1)}]")  //drop closing bracket
+                parsedParamsData = expressionParser.parseExpression("[${elements[1].trimEnd().dropLast(1)}]")  //drop closing bracket
             }
         } else {
             type = Type(null)
