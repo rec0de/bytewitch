@@ -1,5 +1,6 @@
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.dom.events.KeyboardEvent
 import kotlin.properties.Delegates
 
 class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = null) {
@@ -13,6 +14,7 @@ class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = nu
     }
 
     var onInput: ((value: String) -> Unit)? = null
+    var onEnterPressed: ((value: String) -> Unit)? = null
 
     init {
         storageKey?.also { key ->
@@ -24,6 +26,12 @@ class TwoWayInputBinding(val element: HTMLInputElement, storageKey: String? = nu
         element.addEventListener("input", {
             value = element.value
             onInput?.invoke(value)
+        })
+
+        element.addEventListener("keydown", { event ->
+            if ((event as KeyboardEvent).key == "Enter") {
+                onEnterPressed?.invoke(value)
+            }
         })
     }
 }
