@@ -40,13 +40,14 @@ class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String
 
     var value: String by Delegates.observable(element.value) { _, _, newValue ->
         element.value = newValue
+        onChange?.invoke(newValue)
         // TODO: Should this be debounced?
         storageKey?.also {
             sessionStorage.setItem(it, newValue)
         }
     }
 
-    var onInput: ((value: String) -> Unit)? = null
+    var onChange: ((value: String) -> Unit)? = null
 
     init {
         storageKey?.also { key ->
@@ -58,7 +59,6 @@ class TwoWayTextAreaBinding(val element: HTMLTextAreaElement, storageKey: String
         // use addEventListener to avoid overwriting (or being overwritten by) other listeners
         element.addEventListener("input", {
             value = element.value
-            onInput?.invoke(value)
         })
     }
 }

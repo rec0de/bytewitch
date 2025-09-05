@@ -49,7 +49,7 @@ object KaitaiUI {
             updateLiveDecoder(getInputValue())
         }
 
-        kaitaiInput.onInput = {
+        kaitaiInput.onChange = {
             if (includeLiveStruct.checked) {
                 updateLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
