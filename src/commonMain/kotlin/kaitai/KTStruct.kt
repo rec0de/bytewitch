@@ -1,7 +1,6 @@
 package kaitai
 
 import bitmage.ByteOrder
-import decoders.KaitaiEnum
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,12 +21,18 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+
+/**
+ * Kotlin class representation of arbitrary KaitaiStruct which in turn is JSON (YAML -> JSON gets handled by [KaitaiParser]).
+ * Includes most keys, in particular the ones used and parsed in [decoders.Kaitai]. The [KaitaiParser] is configured to ignore other fields.
+ * Uses standard Kotlin serialization, for all Kotlin standard types.
+ * Contains custom types for which there are custom serializers at the bottom, for example a class representing a String or Int ([StringOrInt]) with the serializer [StringOrIntSerializer].
+ */
 @Serializable
 data class KTStruct(
     val meta: KTMeta? = null,
@@ -266,7 +271,6 @@ object StringOrArraySerializer : KSerializer<List<String>> {
     }
 }
 
-// Custom serializers
 object ArrayOfStringOrIntSerializer : KSerializer<List<StringOrInt>> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("ArrayOfStringOrInt", PrimitiveKind.STRING)

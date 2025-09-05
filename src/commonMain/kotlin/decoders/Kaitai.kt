@@ -1,14 +1,11 @@
 package decoders
 
 import bitmage.ByteOrder
-import bitmage.booleanArrayOfInts
 import bitmage.fromBytes
 import bitmage.hex
 import bitmage.padLeft
 import bitmage.toBooleanArray
 import bitmage.toByteArray
-import bitmage.toMinimalAmountOfBytes
-import bitmage.toUInt
 import bitmage.toUTF8String
 import kaitai.KTEndian
 import kaitai.KTEnum
@@ -36,7 +33,7 @@ enum class KaitaiElementKind(val cssClass: String) {
 
 class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by innerList {
     // intentionally left empty
-    // only to tell apart two extremely similar datatypes in the expressionparser....
+    // only to tell apart two extremely similar datatypes in the expression parser....
 }
 
 // acts just like a MutableList except it also has the added features specifically for Kaitai stuff
@@ -49,7 +46,7 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
     var canonicalPath : String? = null
     var imports : List<String>? = null
 
-    // getter and setters for integer ids already implemented, now we do them for strings aswell, as ids are unique
+    // getter and setters for integer ids already implemented, now we do them for strings as well, as ids are unique
     operator fun get(id : String): KaitaiElement {
         val element = this.find { it.id == id }
         if (element == null) {
@@ -170,9 +167,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val currentElement: KaitaiElement?,
     ) {
         //******************************************************************************************************************
-        //*                                                 methods                                                        *
+        //*                                                 methods (kaitai user guide 6.4)                                *
         //******************************************************************************************************************
-        fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {
+        fun expressionToString(input: Pair<TokenType, dynamic>, encoding: String? = null): Pair<TokenType, String> {  // .to_s
             when (input.first) {
                 TokenType.INTEGER -> {
                     return Pair(TokenType.STRING, (input.second as Long).toString())
@@ -227,7 +224,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             } catch (e: Exception) {
                 throw RuntimeException("Invalid enum value:$value")
             }
-
         }
 
         fun expressionLength(input: Pair<TokenType, dynamic>): Pair<TokenType, Long> {
@@ -343,13 +339,17 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     }
                 )
             } else {
-                throw RuntimeException("Unexpected token type: " + input.first + "for method: eof.")
+                throw RuntimeException("Unexpected token type: " + input.first + "for method: pos.")
             }
         }
 
+        // allows to cast any object to any other object
+        // currently not properly implemented, as it just returns without casting, which however is often fine
         fun expressionCast(input: Pair<TokenType, dynamic>, castType: Pair<TokenType, String>): Pair<TokenType, dynamic> {
+            return input
+
             val castAsInt: List<String> = listOf("u1", "u2", "u4", "u8", "s1", "s2", "s4", "s8")
-            val castAsFloat: List<String> = listOf("f1", "f2", "f4", "f8")  // TODO f1 and f2 do not exist, while f8 currently doesn't work
+            val castAsFloat: List<String> = listOf("f4", "f8")
             val castAsString: List<String> = listOf("str", "strz")
             when (input.first) {
                 TokenType.INTEGER -> {
@@ -516,9 +516,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             return Pair(TokenType.ENUM, Pair(enum, token.second.substringAfterLast("::")))
         }
 
-    fun tokenizeArray(fullArray: String): List<String> {
-        var array: String = fullArray
-        val result: MutableList<String> = mutableListOf()
+        fun tokenizeArray(fullArray: String): List<String> {
+            var array: String = fullArray
+            val result: MutableList<String> = mutableListOf()
 
             while (array.isNotEmpty()) {
                 var slice: Int = array.length
@@ -529,7 +529,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 var parentheses: Boolean = false
                 var depth: Int = 0
 
-                // add logic here to support more complex arrays: nested arrays, entries with complex expression containing more commas
                 for ((index, char) in array.withIndex()) {
                     if (char == ',' && !sqString && !dqString && depth == 0) {
                         slice = index
@@ -539,11 +538,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     } else if (char == '"' && !sqString) {
                         dqString = !dqString
                     } else if ((char == '[' && !sqString && !dqString && !parentheses) || brackets) {
-                        when(char) {
+                        when (char) {
                             '[' -> {
                                 brackets = true
                                 depth++
                             }
+
                             ']' -> {
                                 depth--
                                 if (depth == 0) {
@@ -552,11 +552,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                             }
                         }
                     } else if ((char == '(' && !sqString && !dqString && !brackets) || parentheses) {
-                        when(char) {
+                        when (char) {
                             '(' -> {
                                 parentheses = true
                                 depth++
                             }
+
                             ')' -> {
                                 depth--
                                 if (depth == 0) {
@@ -582,9 +583,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         fun parseArray(token: Pair<TokenType, String>): Pair<TokenType, List<Pair<TokenType, dynamic>>> {
-
-            var expressions: List<String> = tokenizeArray(token.second)
-            var array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
+            val expressions: List<String> = tokenizeArray(token.second)
+            val array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
             for (expression: String in expressions) {
                 array.add(
                     parseExpressionInner(
@@ -596,6 +596,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             return Pair(TokenType.ARRAY, array.toList())
         }
 
+        // when a reference is used (such as referencing another element in the sequence), this resolves this reference to the proper token and it's value
         fun parseReferenceHelper(targetElement: KaitaiElement): Pair<TokenType, dynamic> {
             return if (targetElement.value is BooleanArray) {
                 when (targetElement) {
@@ -644,7 +645,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         throw RuntimeException("Unexpected KaitaiElement type ${targetElement::class}")
                     }
                 }
-            } else {
+            } else {  // when value property in the element is directly of the appropriate type and not a BooleanArray (such as KaitaiSignedInteger has a Long)
                 when (targetElement) {
                     is KaitaiBoolean -> Pair(TokenType.BOOLEAN, targetElement.value)
                     is KaitaiSignedInteger -> Pair(TokenType.INTEGER, targetElement.value)
@@ -716,6 +717,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, dynamic> = parseTokens(leftTokens)
             val op2: Pair<TokenType, dynamic> = rightToken
 
+            // if-elsing based on TokenType of left operand
             if (op1.first == TokenType.STREAM) {
                 when (op2.second) {
                     "eof" -> {
@@ -863,15 +865,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             TokenType.PLUS to ::parseUnaryPlus,
             TokenType.MINUS to ::parseUnaryMinus,
             TokenType.BOOLEANNOT to ::parseBooleanNot,
-            TokenType.BITWISENOT to ::parseBitwiseNot, // TODO Bitwise Not aka invert aka ~ (not in the User Guide)
+            TokenType.BITWISENOT to ::parseBitwiseNot, // TODO Bitwise Not aka invert aka ~ (not in the User Guide, but in the Kaitai Compiler?!)
         )
 
-        fun parseUnaryPlus(
-            tokens: MutableList<Pair<TokenType, dynamic>>
-        ): Pair<TokenType, Number> {
-            return parseTokens(
-                tokens
-            )
+        fun parseUnaryPlus(tokens: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, Number> {
+            return parseTokens(tokens)
         }
 
         fun parseUnaryMinus(tokens: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, Number> {
@@ -909,7 +907,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     op.second.inv()
                 )
             else
-                throw Exception("Cannot apply bitwise not to non integer")
+                throw Exception("Cannot apply bitwise not to non-integer")
         }
 
         //******************************************************************************************************************
@@ -940,20 +938,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
-            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
-            Pair(
-                TokenType.FLOAT,
-                left * right
-            )
-        }
-        else
-            Pair(
-                TokenType.INTEGER,
-                op1.second as Long * op2.second as Long
-            )
-
+            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+                val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+                val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
+                Pair(
+                    TokenType.FLOAT,
+                    left * right
+                )
+            } else {
+                Pair(
+                    TokenType.INTEGER,
+                    op1.second as Long * op2.second as Long
+                )
+            }
             return result
         }
 
@@ -961,20 +958,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
-            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
-            Pair(
-                TokenType.FLOAT,
-                left / right
-            )
-        }
-        else
-            Pair(
-                TokenType.INTEGER,
-                op1.second as Long / op2.second as Long
-            )
-
+            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+                val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+                val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
+                Pair(
+                    TokenType.FLOAT,
+                    left / right
+                )
+            } else {
+                Pair(
+                    TokenType.INTEGER,
+                    op1.second as Long / op2.second as Long
+                )
+            }
             return result
         }
 
@@ -982,21 +978,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val result: Double = (op1.second).toDouble() % (op2.second).toDouble()
-            Pair(
-                TokenType.FLOAT,
-                if (result < 0) result + (op2.second).toDouble() else result
-            )
-        }
-        else {
-            val result: Long = (op1.second).toLong() % (op2.second).toLong()
-            Pair(
-                TokenType.INTEGER,
-                if (result < 0) result + (op2.second).toLong() else result
-            )
-        }
-
+            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+                val result: Double = (op1.second).toDouble() % (op2.second).toDouble()
+                Pair(
+                    TokenType.FLOAT,
+                    if (result < 0) result + (op2.second).toDouble() else result
+                )
+            } else {
+                val result: Long = (op1.second).toLong() % (op2.second).toLong()
+                Pair(
+                    TokenType.INTEGER,
+                    if (result < 0) result + (op2.second).toLong() else result
+                )
+            }
             return result
         }
 
@@ -1004,25 +998,24 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, dynamic> = parseTokens(tokens1)
             val op2: Pair<TokenType, dynamic> = parseTokens(tokens2)
 
-        val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING)
-            Pair(
-                TokenType.STRING,
-                (op1.second as String) + (op2.second as String)
-            )
-        else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
-            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
-            Pair(
-                TokenType.FLOAT,
-                left + right
-            )
-        }
-        else
-            Pair(
-                TokenType.INTEGER,
-                op1.second as Long + op2.second as Long
-            )
-
+            val result: Pair<TokenType, dynamic> = if (op1.first == TokenType.STRING && op2.first == TokenType.STRING) {
+                Pair(
+                    TokenType.STRING,
+                    (op1.second as String) + (op2.second as String)
+                )
+            } else if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+                val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+                val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
+                Pair(
+                    TokenType.FLOAT,
+                    left + right
+                )
+            } else {
+                Pair(
+                    TokenType.INTEGER,
+                    op1.second as Long + op2.second as Long
+                )
+            }
             return result
         }
 
@@ -1030,20 +1023,19 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val op1: Pair<TokenType, Number> = parseTokens(tokens1)
             val op2: Pair<TokenType, Number> = parseTokens(tokens2)
 
-        val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
-            val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
-            val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
-            Pair(
-                TokenType.FLOAT,
-                left - right
-            )
-        }
-        else
-            Pair(
-                TokenType.INTEGER,
-                op1.second as Long - op2.second as Long
-            )
-
+            val result: Pair<TokenType, Number> = if (op1.first == TokenType.FLOAT || op2.first == TokenType.FLOAT) {
+                val left: Double = if (op1.first == TokenType.INTEGER) (op1.second as Long).toDouble() else op1.second as Double
+                val right: Double = if (op2.first == TokenType.INTEGER) (op2.second as Long).toDouble() else op2.second as Double
+                Pair(
+                    TokenType.FLOAT,
+                    left - right
+                )
+            } else {
+                Pair(
+                    TokenType.INTEGER,
+                    op1.second as Long - op2.second as Long
+                )
+            }
             return result
         }
 
@@ -1174,29 +1166,13 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 )
 
                 return result
-            }else {
-                // this approach does not work as kotlin does not support comparing different values
-                /*val left = when (op1.first) {
-                    TokenType.INTEGER -> op1.second as Long
-                    TokenType.FLOAT -> op1.second as Double
-                    TokenType.STRING -> op1.second as String
-                    TokenType.BOOLEAN -> op1.second as Boolean
-                    else -> throw RuntimeException("Cannot compare ${op1.first}")
-                }
-                val right = when (op2.first) {
-                    TokenType.INTEGER -> op2.second as Long
-                    TokenType.FLOAT -> op2.second as Double
-                    TokenType.STRING -> op2.second as String
-                    TokenType.BOOLEAN -> op2.second as Boolean
-                    else -> throw RuntimeException("Cannot compare ${op2.first}")
-                }
-
-                return Pair(TokenType.BOOLEAN, left == right)*/
+            } else {
+                // kotlin does not support comparing different values of different types
+                // it is also not mentioned in the user guide, thus considered undefined behaviour (e.g. can we compare a float to an int?)
 
                 throw RuntimeException("Cannot compare ${op1.first} wih ${op2.first}")
-                // return Pair(TokenType.BOOLEAN, false)  would also be possible
+                // return Pair(TokenType.BOOLEAN, false) // would also be possible
             }
-
         }
 
         fun parseNotEqual(tokens1: MutableList<Pair<TokenType, dynamic>>, tokens2: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, Boolean> {
@@ -1291,17 +1267,23 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-    val validTokensForBinaryPlusAndMinus: List<TokenType> = listOf(TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING, TokenType.IDENTIFIER, TokenType.BOOLEAN, TokenType.PARENTHESES, TokenType.ARRAY, TokenType.INDEX, TokenType.FUNCTION, TokenType.CAST, TokenType.ENUMCALL)
+        val validTokensForBinaryPlusAndMinus: List<TokenType> =
+            listOf(
+                TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING, TokenType.IDENTIFIER, TokenType.BOOLEAN,
+                TokenType.PARENTHESES, TokenType.ARRAY, TokenType.INDEX, TokenType.FUNCTION, TokenType.CAST, TokenType.ENUMCALL
+            )
         // TokenType.BYTEARRAY, TokenType.ENUM, TokenType.STREAM, TokenType.KAITAITREE, TokenType.KAITAIELEMENT
         // These tokens are not in the list as they are only returned by parse functions and never created while tokenizing an expression. If they are for some reason added to expressions naturally later on, they also have to be added to the list for parseTokens to work properly.
 
         fun parseTokens(tokens: MutableList<Pair<TokenType, dynamic>>): Pair<TokenType, dynamic> {
-            if (tokens.size == 1 && tokens[0].first in operandTokens) { // while they have the highest precedence of any token they are the only option in case there is only one token left and can therefore be the first check
+            // while they have the highest precedence of any token they are the only option in case there is only one token left and can therefore be the first check
+            if (tokens.size == 1 && tokens[0].first in operandTokens) {
                 val function = operandTokens.getValue(tokens[0].first)
                 return function(tokens[0])
             }
 
-            if (tokens.contains(Pair(TokenType.QUESTIONMARK, "?"))) { // ternary if else has the lowest precedence
+            // ternary has the lowest precedence, if else is the only ternary
+            if (tokens.contains(Pair(TokenType.QUESTIONMARK, "?"))) {
                 var depth: Int = 0
                 var posQuestionmark: Int = 0
                 var posColon: Int
@@ -1322,6 +1304,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 }
             }
 
+            // apply binary operators
             for (operatorMap in binaryPrecedence.reversed()) { // the lower precedence operators are checked first
                 for ((index, token) in tokens.reversed().withIndex()) {
                     if (index != tokens.size - 1 && tokens.reversed()[index + 1].first in validTokensForBinaryPlusAndMinus && token.first in operatorMap) {
@@ -1333,6 +1316,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 }
             }
 
+            // apply unary operators
             for ((index, token) in tokens.withIndex()) { // unary operands all have the same precedence
                 if (token.first in unaryPrecedence) {
                     val op: MutableList<Pair<TokenType, dynamic>> = tokens.subList(index + 1, tokens.size)
@@ -1355,7 +1339,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     tokens.last()
                 )
             }
-            return Pair(TokenType.EMPTY, null)
+
+            throw IllegalArgumentException("The given expression is invalid.}")
         }
 
         val operators = setOf("+", "-", "*", "/", "%", "<", ">", "&", "|", "^", "?", ":", ".", "~")
@@ -1551,9 +1536,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                             trimmedExpression.substring(2..breakIndex - 1).replace("_", "").toLong(2)
                         ), trimmed + breakIndex
                     )
-                } else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(
-                        1
-                    ) == 'O')
+                } else if (trimmedExpression[0] == '0' && (trimmedExpression.getOrNull(1) == 'o' || trimmedExpression.getOrNull(1) == 'O')
                 ) { // token INTEGER in octal notation
                     val octalRegex: Regex = Regex("^[0-7_]$")
                     for ((index, char) in trimmedExpression.withIndex()) {
@@ -1624,6 +1607,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             var tokensWithEnums: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var enum: Boolean = false
 
+            // combine all relevant tokens for enum references into single token
             for ((index: Int, token: Pair<TokenType, dynamic>) in tokens.withIndex()) {
                 if (!enum) {
                     if (token.first == TokenType.IDENTIFIER && tokens.getOrNull(index + 1) != null && tokens[index + 1].first == TokenType.DOUBLECOLON) {
@@ -1645,7 +1629,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
 
             var tokensWithIndex: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
-
+            // tell apart arrays from index operator
             for ((index, token: Pair<TokenType, dynamic>) in tokensWithEnums.withIndex()) {
                 if (token.first == TokenType.ARRAY) {
                     if (index > 0 &&
@@ -1663,7 +1647,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             var tokensWithFunctions: MutableList<Pair<TokenType, dynamic>> = mutableListOf<Pair<TokenType, dynamic>>()
             var function: Boolean = false
 
-            for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) { // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
+            // combining TokenType IDENTIFIER with value: to_s, substring or to_s followed by TokenType PARENTHESES to TokenType FUNCTION
+            for ((index, token: Pair<TokenType, dynamic>) in tokensWithIndex.withIndex()) {
                 if (token.first == TokenType.IDENTIFIER &&
                     (token.second == "to_s" ||
                             token.second == "substring" ||
@@ -1706,6 +1691,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             return result
         }
 
+        // strips tokenType from expression and returns pure result
         fun parseExpression(expression: String): dynamic {
             val result: Pair<TokenType, dynamic> = parseExpressionInner(expression)
             return if (result.first == TokenType.ARRAY) {
@@ -1721,6 +1707,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun <V> processSwitchOn(switchOn: String, cases: Map<String, V>, expressionParser: ExpressionParser): V? {
         cases.forEach { (key, value) ->
             if (key != "_") {
+                // let the expressionParser handle the equality check
                 val matches = expressionParser.parseExpression("$switchOn == $key") as Boolean
                 if (matches) {
                     return value
@@ -1733,10 +1720,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun parseContents(contents: List<StringOrInt>) : BooleanArray {
         var byteArray : ByteArray = byteArrayOf()
         for (element in contents) {
-            if (element is StringOrInt.IntValue) {
+            if (element is StringOrInt.IntValue) {  // each individual int may at most be one byte large
                 byteArray += element.value.toByte()
             } else {
-                byteArray += element.toString().encodeToByteArray()
+                byteArray += element.toString().encodeToByteArray()  // strings can be multiple chars long
             }
         }
         return byteArray.toBooleanArray()
@@ -1862,7 +1849,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun parseBuiltinType(type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
-        } else if (type.type == "b1") {// le be bool
+        } else if (type.type == "b1") {
             type.usedDisplayStyle = DisplayStyle.BOOLEAN
             type.sizeInBits = 1
             type.sizeIsKnown = true
@@ -2059,7 +2046,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             ioSubStream = ioSubStream.padLeft(nextBlockSize - ioSubStream.size)
         }
 
-        // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian
+        // flip bytes in case byteOrder is little and therefore different order than kotlins BigEndian. Doesn't need to be done later on when presenting anymore.
         if (type.customType == null // no subtypes
             && (type.usedDisplayStyle == DisplayStyle.FLOAT || type.usedDisplayStyle == DisplayStyle.SIGNED_INTEGER || type.usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) // makes sense to flip
             && type.byteOrder == ByteOrder.LITTLE
@@ -2134,7 +2121,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        if (type.customType != null) {
+        if (type.customType != null) {  // custom type with subtypes
             kaitaiElement = processSeq(
                 elementId,
                 seqElement,
@@ -2279,6 +2266,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         )
     }
 
+    // see if we have repeat, which means we get a KaitaiList of KaitaiElements, or not which means we get a single KaitaiElement directly
     fun processOneOrManySeqElements(
         elementId: String,
         seqElement: KTSeq,
@@ -2348,6 +2336,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return processOffSequenceData(expressionResult, id, ioStream, currentScopeStruct, parentBytesListTree, doc, KaitaiElementKind.INSTANCE)
     }
 
+    // data that's not part of the sequence at all
     private fun processOffSequenceData(
         expressionResult: dynamic,
         id: String,
@@ -2419,7 +2408,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     ): Triple<KaitaiElement?, Int, Int> {
 
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
-        if (instance.value != null) {  //valueInstances have entirely eperate handling from normal instances
+        // valueInstances have entirely eperate handling from normal instances
+        if (instance.value != null) {
             if (!expressionParser.parseExpression(instance.ifCondition.toString())) {
                 return Triple(null, 0, 0)
             }
@@ -2437,7 +2427,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             )
         }
 
-        //normal instance here, which behave like seqElements, except they can do a little bit more
+        // normal instance here, which behave like seqElements, except they can do a little bit more
         val actualIoStream : BooleanArray = if (instance.io != null) {
             expressionParser.parseExpression(instance.io)
         } else {
@@ -2466,14 +2456,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         isRoot: Boolean, customTypeName: String?, canonicalPath: String?, imports: List<String>?
     ) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
-        /*
-        Entweder data als ByteArray und Bitshiften
-        var test = 13 -> 1101
-        test[6..8] = 1
-        test and 0b00000111 >> 0 = -> 101
-        test and 0b00111000 >> 3 = -> 001
-        oder data als BooleanArray so wie aktuell. Vermutlich inperformant, aber wohl gut genug
-        */
+
         val bytesListTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTree.parent = parentBytesListTree
         bytesListTree.byteOrder = bytesListTree.parent?.byteOrder ?: ByteOrder.BIG
@@ -2499,6 +2482,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             bytesListTree.imports = imports
         }
 
+        // handle passed parameters and add to bytesListTree, first because they are used in the sequence
         if (customTypeParams != null) {
             for (param in customTypeParams) {
                 bytesListTree.add(
@@ -2514,6 +2498,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
+        // handle actual sequence
         var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
@@ -2555,6 +2540,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
         }
 
+        // handle instances last because they usually have auxiliary information. if they get used by the immediately preceding sequence ("quasi forward referencing") they get parsed by the expression parser, not here
         if (currentScopeStruct.instances.isNotEmpty()) {
             for ((id, instance) in currentScopeStruct.instances) {
                 val triple = processInstance(id, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, sourceOffsetInBits, 0)
@@ -2717,7 +2703,7 @@ class KaitaiBytes(
 }
 
 // TODO: Currently the endianness is not used, because the value is already flipped in the Kaitai parser.
-//  Therefor, do we even need it here? The conversion here can support both endianness, if the value is not flipped
+//  Do we even need it here then? The conversion here can support both endianness types, if the value is not flipped
 abstract class KaitaiNumber(
     override val id: String, override var endianness: ByteOrder,
     override val ioStream: BooleanArray, override val value: dynamic,

@@ -84,39 +84,6 @@ fun ByteArray.toInt(endianness: ByteOrder = ByteOrder.BIG): Int {
     return result
 }
 
-fun ByteArray.toUInt(endianness: ByteOrder): UInt {
-    require(this.size <= 4) { "Byte array too long to convert to UInt" }
-
-    val actualArray = if (endianness == ByteOrder.LITTLE) {
-        this.reversedArray()
-    } else {
-        this
-    }
-
-    var result = 0u
-    for (byte in actualArray) {
-        result = (result shl 8) or (byte.toInt() and 0xFF).toUInt()
-    }
-    return result
-}
-
-fun ByteArray.toBinaryString(): String {
-    return this.joinToString("") { byte ->
-        byte.toUByte().toString(2).padStart(8, '0')
-    }
-}
-
-fun ByteArray.indexOfFirstSubsequence(subArray: ByteArray?): Int {
-    if (subArray == null || subArray.isEmpty() || subArray.size > this.size) return -1
-
-    for (i in 0 .. this.size - subArray.size) {
-        if (this.sliceArray(i .. i + subArray.size - 1).contentEquals(subArray)) {
-            return i
-        }
-    }
-    return -1
-}
-
 @JsName("TextDecoder")
 external class TextDecoder(encoding: String = definedExternally) {
     fun decode(input: dynamic): String
@@ -207,12 +174,6 @@ fun Long.toBytes(byteOrder: ByteOrder): ByteArray {
     return if(byteOrder == ByteOrder.BIG) bytesBE else bytesBE.reversed().toByteArray()
 }
 fun ULong.toBytes(byteOrder: ByteOrder) = this.toLong().toBytes(byteOrder)
-
-fun Int.toMinimalAmountOfBytes(byteOrder: ByteOrder): ByteArray {
-    var bytes: ByteArray = this.toBytes(byteOrder)
-    var indexOfFirstZeroByte = bytes.indexOfFirst { it != 0.toByte() }
-    return if (indexOfFirstZeroByte == -1) byteArrayOf(0) else bytes.copyOfRange(indexOfFirstZeroByte, bytes.size)
-}
 
 fun Int.toBytes(byteOrder: ByteOrder): ByteArray {
     val bytesBE = byteArrayOf((this shr 24).toByte(), (this shr 16).toByte(), (this shr 8).toByte(), (this shr 0).toByte())

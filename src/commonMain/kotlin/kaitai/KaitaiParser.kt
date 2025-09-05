@@ -1,6 +1,8 @@
 package kaitai
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToDynamic
 
 object KaitaiParser {
     private val jsonParser = Json {
@@ -18,6 +20,11 @@ object KaitaiParser {
             console.error("Error parsing Kaitai Struct: $e")
         }
         return null
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun toYaml(struct: KTStruct): String {
+        return JsYaml.dump(jsonParser.encodeToDynamic(struct))
     }
 }
 
