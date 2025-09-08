@@ -2060,7 +2060,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         // we verify contents as soon as we have ioSubstream known to stop further processing asap
         if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(ioSubStream)) {
-            throw Exception("Value of bytes does not align with expected contents value.")
+            throw Exception("Value of bytes does not align with expected contents value in element $elementId.")
         }
 
         // get the enum value
@@ -2151,7 +2151,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         throw RuntimeException(
                             "The enum $enum has no key-value pair with the given key ${
                                 Int.fromBytes(
-                                    value.toByteArray(),
+                                    (value as BooleanArray).toByteArray(),
                                     ByteOrder.BIG
                                 ).toUInt()
                             }"
@@ -2239,6 +2239,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         var repeatIndex = 0
         while (true) {
+            // If it's the first element and the ioStream is empty we need to do it at the beginning
+            if (seqElement.repeat == KTRepeat.EOS && ioStream.size == dataSizeOfSequenceInBits) {
+                break
+            }
+
             val triple = processSingleSeqElement(
                 repeatIndex.toString(),
                 seqElement,
@@ -2259,11 +2264,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             dataSizeOfSequenceInBits = triple.third
 
             repeatIndex += 1
-            if (seqElement.repeat == KTRepeat.EOS) {
-                if (ioStream.size == dataSizeOfSequenceInBits) {
-                    break
-                }
-            } else if (seqElement.repeat == KTRepeat.EXPR) {
+            if (seqElement.repeat == KTRepeat.EXPR) {
                 checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
                 val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
                 val repeatAmount : Long = if (seqElement.repeatExpr is StringOrInt.IntValue) {
@@ -2288,10 +2289,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        val resultSourceByteRange =
-            Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
-        val resultSourceRangeBitOffset =
-            Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+        var resultSourceByteRange : Pair<Int, Int>
+        var resultSourceRangeBitOffset : Pair<Int, Int>
+        try {
+            resultSourceByteRange = Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
+            resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
+        } catch (e : NoSuchElementException) {
+            resultSourceByteRange = Pair(0,0)
+            resultSourceRangeBitOffset = Pair(0,0)
+        }
+
 
         val kaitaiList = KaitaiList(
             elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
