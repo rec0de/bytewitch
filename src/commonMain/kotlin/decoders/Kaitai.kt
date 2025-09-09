@@ -100,7 +100,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 kaitaiStruct,
                 null,
                 data.toBooleanArray(),
-                sourceOffset,
+                sourceOffset * 8,
                 _offsetInDatastreamInBits = 0,
                 isRoot = true,
                 customTypeName = id,
@@ -2075,7 +2075,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         if (type.isByteWitch) {
-            val decode = ByteWitch.quickDecode(ioSubStream.toByteArray(), sourceOffsetInBits + dataSizeOfSequenceInBits)
+            val decode = ByteWitch.quickDecode(ioSubStream.toByteArray(), (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8)
             if (decode != null) { // only use result in case it exists, otherwise we try to continue aka probably display hex
                 offsetInDatastreamInBits += ((decode.sourceByteRange!!.second - decode.sourceByteRange!!.first) * 8)
                 dataSizeOfSequenceInBits += ((decode.sourceByteRange!!.second - decode.sourceByteRange!!.first) * 8)
