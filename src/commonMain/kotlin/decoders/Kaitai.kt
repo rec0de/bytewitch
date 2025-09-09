@@ -1684,7 +1684,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             val result: MutableList<dynamic> = mutableListOf()
             for (token: Pair<TokenType, dynamic> in array) {
                 if (token.first == TokenType.ARRAY) {
-                    result.add(decapsulateArrayTokens(token.second))
+                    result.add(decapsulateArrayTokens(token.second))}
+                else if (token.first == TokenType.BYTEARRAY) {
+                    result.add(BytesList<Long>((token.second as List<Pair<TokenType, Long>>).map { it.second }))
                 } else {
                     result.add(token.second)
                 }
