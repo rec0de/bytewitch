@@ -37,7 +37,7 @@ class BytesList<E>(private val innerList: List<E> = listOf()) : List<E> by inner
 }
 
 // acts just like a MutableList except it also has the added features specifically for Kaitai stuff
-class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mutableListOf(), val ioStream: BooleanArray, val currentScopeStruct: KTStruct) : MutableList<KaitaiElement> by innerList {
+class MutableKaitaiTree (private val innerList: MutableList<ByteWitchResult> = mutableListOf(), val ioStream: BooleanArray, val currentScopeStruct: KTStruct) : MutableList<ByteWitchResult> by innerList {
     var byteOrder = ByteOrder.BIG
     var kaitaiElement : KaitaiElement? = null
     var isRoot : Boolean = false
@@ -48,7 +48,7 @@ class MutableKaitaiTree (private val innerList: MutableList<KaitaiElement> = mut
 
     // getter and setters for integer ids already implemented, now we do them for strings as well, as ids are unique
     operator fun get(id : String): KaitaiElement {
-        val element = this.find { it.id == id }
+        val element = this.filter {it is KaitaiElement?}.find { (it as KaitaiElement).id == id } as KaitaiElement?
         if (element == null) {
             throw Exception("Could not find element with id $id")
         }
@@ -83,6 +83,7 @@ class Type(val type: String?) {
     var imports: List<String>? = null
     var isBinary: Boolean = false
     var params: Map<String, Pair<Any, String?>>? = null  // map of param name to paramvalue, enum
+    var isByteWitch: Boolean = false
 }
 
 class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: String = "") : ByteWitchDecoder {
@@ -165,7 +166,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int,
         val repeatIndex: Int?,
-        val currentElement: KaitaiElement?,
+        val currentElement: ByteWitchResult?,
     ) {
         //******************************************************************************************************************
         //*                                                 methods (kaitai user guide 6.4)                                *
@@ -638,7 +639,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         val kaitaiTree: MutableKaitaiTree = targetElement.bytesListTree
                         val array: MutableList<Pair<TokenType, dynamic>> = mutableListOf()
                         for (element in kaitaiTree) {
-                            array.add(parseReferenceHelper(element))
+                            if (element is KaitaiElement) {
+                                array.add(parseReferenceHelper(element))
+                            }
                         }
                         Pair(TokenType.ARRAY, array.toList())
                     }
@@ -663,10 +666,14 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         fun parseIdentifier(token: Pair<TokenType, String>): Pair<TokenType, dynamic> {
             return when (token.second) {
                 "_" -> {
-                    if (currentElement != null) {
-                        parseReferenceHelper(currentElement)
+                    if (currentElement is KaitaiElement?) {
+                        if (currentElement != null) {
+                            parseReferenceHelper(currentElement)
+                        } else {
+                            throw RuntimeException("The element (referenced by _) has not been parsed yet.")
+                        }
                     } else {
-                        throw RuntimeException("The element (referenced by _) has not been parsed yet.")
+                        throw RuntimeException("Can not use non Kaitai Elements as an identifier")
                     }
                 }
 
@@ -697,8 +704,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         val instance : KTSeq = currentScopeStruct.instances[token.second]!!
                         processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first?: throw RuntimeException("The referenced instance ${token.second} wasn't created because the if key was evaluated as false.")
                     }
-
-                    parseReferenceHelper(targetElement)
+                    if (targetElement is KaitaiElement) {
+                        parseReferenceHelper(targetElement)
+                    } else {
+                        throw RuntimeException("Can not use non Kaitai Elements as an identifier")
+                    }
                 }
             }
         }
@@ -850,7 +860,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                                 relevantBytesListTree.ioStream,
                                 0, 0).first?: throw RuntimeException("The referenced instance ${op2.second} wasn't created because the if key was evaluated as false.")
                         }
-                        parseReferenceHelper(targetElement)
+                        if (targetElement is KaitaiElement) {
+                            parseReferenceHelper(targetElement)
+                        } else {
+                            throw RuntimeException("Can not use non Kaitai Elements as a reference")
+                        }
                     }
                 }
             }
@@ -1850,6 +1864,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun parseBuiltinType(type: Type) : Type {
         if (type.type == null) {
             throw RuntimeException("Attempted to parse as builtin type null which is always invalid")
+        } else if (type.type == "bytewitch"){ // custom "bytewitch" type, not part of kaitai. means we let the bytewitch take care of the payload
+            type.isByteWitch = true
         } else if (type.type == "b1") {
             type.usedDisplayStyle = DisplayStyle.BOOLEAN
             type.sizeInBits = 1
@@ -1997,7 +2013,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         _dataSizeOfSequenceInBits: Int,
         repeatIndex: Int?,
         parentScopeStruct: KTStruct?,
-    ): Triple<KaitaiElement, Int, Int> {
+    ): Triple<ByteWitchResult, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
@@ -2056,6 +2072,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             && (!type.isBinary)
         ) { // little needs flipping, big doesn't need it anyways
             ioSubStream = ioSubStream.toByteArray().reversedArray().toBooleanArray()
+        }
+
+        if (type.isByteWitch) {
+            val decode = ByteWitch.quickDecode(ioSubStream.toByteArray(), sourceOffsetInBits + dataSizeOfSequenceInBits)
+            if (decode != null) { // only use result in case it exists, otherwise we try to continue aka probably display hex
+                offsetInDatastreamInBits += ((decode.sourceByteRange!!.second - decode.sourceByteRange!!.first) * 8)
+                dataSizeOfSequenceInBits += ((decode.sourceByteRange!!.second - decode.sourceByteRange!!.first) * 8)
+                return Triple(decode, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
+            }
         }
 
         // we verify contents as soon as we have ioSubstream known to stop further processing asap
@@ -2324,7 +2349,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
         parentScopeStruct: KTStruct?
-    ): Triple<KaitaiElement?, Int, Int> {
+    ): Triple<ByteWitchResult?, Int, Int> {
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
         if (!expressionParser.parseExpression(seqElement.ifCondition.toString())) {
             return Triple(null, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
@@ -2426,7 +2451,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
             is MutableKaitaiTree -> {
                 val temp = expressionResult.kaitaiElement!!
-                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind)
+                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, null, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind)
                 result.bytesListTree.kaitaiElement = result
                 result
             }
@@ -2468,7 +2493,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         ioStream: BooleanArray,
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
-    ): Triple<KaitaiElement?, Int, Int> {
+    ): Triple<ByteWitchResult?, Int, Int> {
 
         val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
         // valueInstances have entirely eperate handling from normal instances
@@ -2720,7 +2745,9 @@ class KaitaiResult(
         get() {
             var result = 0
             for (element in bytesListTree) {
-                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
+                if (element is KaitaiElement) {
+                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
+                }  //TODO size of non KaitaiElements?
             }
             return result
         }
@@ -2730,7 +2757,9 @@ class KaitaiResult(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
+                if (element is KaitaiElement) {
+                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
+                }  //TODO value of non KaitaiElements??!
             }
             return result
         }
@@ -2754,7 +2783,9 @@ class KaitaiList(
         get() {
             var result = 0
             for (element in bytesListTree) {
-                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
+                if (element is KaitaiElement) {
+                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
+                } //TODO size of non KaitaiElements?
             }
             return result
         }
@@ -2764,7 +2795,9 @@ class KaitaiList(
         get() {
             var result = booleanArrayOf()
             for (element in bytesListTree) {
-                if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
+                if (element is KaitaiElement) {
+                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
+                } //TODO size of non KaitaiElements??!
             }
             return result
         }

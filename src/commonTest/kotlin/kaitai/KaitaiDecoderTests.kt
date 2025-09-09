@@ -497,11 +497,17 @@ class KaitaiDecoderTests {
         checkElement(simple_eos, "simple_eos", KaitaiList::class, Pair(7,9), Pair(0, 0), booleanArrayOfInts(0x12, 0x34))
         val simple_eos_0 = simple_eos.bytesListTree!![0]
         checkElement(simple_eos_0, "0", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
-        val simple_eos_0_a = simple_eos_0.bytesListTree!!["a"]
+        check(simple_eos_0 is KaitaiResult) {
+            "Expected simple_eos_0 to be a KaitaiResult, got ${simple_eos_0::class.simpleName}"
+        }
+        val simple_eos_0_a = simple_eos_0.bytesListTree["a"]
         checkElement(simple_eos_0_a, "a", KaitaiBytes::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_1 = simple_eos.bytesListTree!![1]
         checkElement(simple_eos_1, "1", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
-        val simple_eos_1_a = simple_eos_1.bytesListTree!!["a"]
+        check(simple_eos_1 is KaitaiResult) {
+            "Expected simple_eos_1 to be a KaitaiResult, got ${simple_eos_1::class.simpleName}"
+        }
+        val simple_eos_1_a = simple_eos_1.bytesListTree["a"]
         checkElement(simple_eos_1_a, "a", KaitaiBytes::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
 
     }

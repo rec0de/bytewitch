@@ -132,18 +132,29 @@ class KaitaiInstancesTests {
 
         instance = result.bytesListTree["instanceBytes2"]
         check(instance is KaitaiList) { "Expected KaitaiList, got ${instance::class.simpleName}" }
-        check((instance.bytesListTree[0].value as Long) == 0x00L) { "Expected 0, got ${(instance.bytesListTree[0].value as Long)}"}
-        check((instance.bytesListTree[1].value as Long) == 0x11L)
-        check((instance.bytesListTree[2].value as Long) == 0x22L)
-        check((instance.bytesListTree[3].value as Long) == 0x33L)
+        var instanceElement = instance.bytesListTree[0]
+        check(instanceElement is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceElement::class.simpleName}"}
+        check((instanceElement.value as Long) == 0x00L) { "Expected 0, got ${(instanceElement.value as Long)}"}
+        instanceElement = instance.bytesListTree[1]
+        check(instanceElement is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceElement::class.simpleName}"}
+        check((instanceElement.value as Long) == 0x11L)
+        instanceElement = instance.bytesListTree[2]
+        check(instanceElement is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceElement::class.simpleName}"}
+        check((instanceElement.value as Long) == 0x22L)
+        instanceElement = instance.bytesListTree[3]
+        check(instanceElement is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceElement::class.simpleName}"}
+        check((instanceElement.value as Long) == 0x33L)
 
         instance = result.bytesListTree["instanceList"]
         check(instance is KaitaiList) { "Expected KaitaiList, got ${instance::class.simpleName}" }
-        var instanceSub: KaitaiElement = instance.bytesListTree[0]
+        var instanceSub = instance.bytesListTree[0]
+        check(instanceSub is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceSub::class.simpleName}"}
         check((instanceSub.value as Long) == 170L) {"Expected 170 got ${(instanceSub.value as Long)}"}
         instanceSub = instance.bytesListTree[1]
+        check(instanceSub is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceSub::class.simpleName}"}
         check((instanceSub.value as Long) == 187L) {"Expected 187 got ${(instanceSub.value as Long)}"}
         instanceSub = instance.bytesListTree[2]
+        check(instanceSub is KaitaiSignedInteger) {"Expected instanceElement to be KaitaiSignedInteger, got ${instanceSub::class.simpleName}"}
         check((instanceSub.value as Long) == 204L) {"Expected 204 got ${(instanceSub.value as Long)}"}
 
         instance = result.bytesListTree["instanceResult"]
