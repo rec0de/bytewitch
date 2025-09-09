@@ -113,7 +113,7 @@ data class KTSeq(
     @SerialName("size-eos")
     val sizeEos: Boolean = false,
 
-    //TODO val process
+    val process: String? = null,
 
     val enum: String? = null,
 

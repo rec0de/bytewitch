@@ -1973,6 +1973,58 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return type
     }
 
+    fun parseProcessXor(stream: BooleanArray, param: String, parser: ExpressionParser) : BooleanArray {
+        val processedStream: BooleanArray = stream.copyOf()
+        val bytes: BooleanArray = (parser.parseExpression("[" + param.substringAfter('[').substringBefore(']') + "]") as List<Long>).map { it -> it.toByte() }.toByteArray().toBooleanArray()
+        var i = 0
+        val bits = bytes.size
+        while (i < processedStream.size) {
+            for(j in i..i+bits) {
+                processedStream[j] = processedStream[j] xor bytes[j % bytes.size]
+                if (j == processedStream.size-1) return processedStream
+                i++
+            }
+        }
+        return processedStream
+    }
+
+    fun parseProcessRol(stream: BooleanArray, param: String, parser: ExpressionParser) : BooleanArray {
+        var processedStream: BooleanArray = BooleanArray(0)
+        val shiftAmount: Int = ((parser.parseExpression(param) as Long).toInt() + 8) % 8
+        for (byteIndex in 0 until stream.size / 8) {
+            val start: Int = byteIndex * 8
+            val end: Int = start + 8
+            processedStream += stream.slice(start + shiftAmount..<end)
+            processedStream += stream.slice(start..<start + shiftAmount)
+        }
+        return processedStream
+    }
+
+    fun parseProcessRor(stream: BooleanArray, param: String, parser: ExpressionParser) : BooleanArray {
+        var processedStream: BooleanArray = BooleanArray(0)
+        val shiftAmount: Int = ((parser.parseExpression(param) as Long).toInt() + 8) % 8
+        for (byteIndex in 0 until stream.size / 8) {
+            val start: Int = byteIndex * 8
+            val end: Int = start + 8
+            processedStream += stream.slice(end - shiftAmount..<end)
+            processedStream += stream.slice(start..<end - shiftAmount)
+        }
+        return processedStream
+    }
+
+    // custom process functions should be implemented here
+
+    val processFunctions = mapOf(
+        Pair("xor", ::parseProcessXor),
+        Pair("rol", ::parseProcessRol),
+        Pair("ror", ::parseProcessRor),
+    )
+
+    // custom process functions should be included here
+    fun parseProcess(stream: BooleanArray, function: String, parser: ExpressionParser) : BooleanArray {
+        return processFunctions[function.substringBefore("(")]?.invoke(stream, function.substringAfter("(").dropLast(1).trim(), parser) ?: throw IllegalArgumentException("Process function '$function' was not found")
+    }
+
     fun getEnum(currentScopeStruct: KTStruct?, path: String) : KTEnum? {
         if (currentScopeStruct == null) {
             return null
@@ -2063,6 +2115,10 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         // we verify contents as soon as we have ioSubstream known to stop further processing asap
         if (seqElement.contents != null && !parseContents(seqElement.contents).contentEquals(ioSubStream)) {
             throw Exception("Value of bytes does not align with expected contents value in element $elementId.")
+        }
+
+        if (seqElement.process != null && type.sizeIsKnown) {
+            ioSubStream = parseProcess(ioSubStream, seqElement.process.trim(), expressionParser)
         }
 
         // get the enum value
