@@ -111,7 +111,7 @@ class KaitaiDecoderTests {
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
         // Validate the main result element
-        checkElement(result, "booleans", KaitaiResult::class, Pair(0, 0), Pair(0, 2))  // whether this is correct or not idk, but it's how it is implemented right now at the end of processSeq
+        checkElement(result, "booleans", KaitaiResult::class, Pair(0, 1), Pair(0, 0))
         check(result.endianness == ByteOrder.BIG) { "Expected endianness to be 'big', got '${result.endianness}'" }
         check(result.bytesListTree.size == struct.seq.size) {
             "Expected bytesListTree to have ${struct.seq.size} elements, got ${result.bytesListTree.size}"
@@ -337,7 +337,7 @@ class KaitaiDecoderTests {
         }
 
         val field1 = result.bytesListTree["subElementsTooShort"]
-        checkElement(field1, "subElementsTooShort", KaitaiResult::class, Pair(0, 7), Pair(0, 0))
+        checkElement(field1, "subElementsTooShort", KaitaiResult::class, Pair(0, 10), Pair(0, 0))
         check(field1.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field1.bytesListTree!!.size}" }
         check((field1.bytesListTree!!["code"].value as BooleanArray).contentEquals(booleanArrayOfInts(0xc0, 0xde))) {
             "Expected subtype.code to be exactly 0xc0 0xde and not ${field1.bytesListTree!!["code"].value}"
@@ -464,8 +464,8 @@ class KaitaiDecoderTests {
             0x11, 0x22, 0x33, 0x44,
             0x12, 0x34
         )
-
-        val decoder = Kaitai("bitwise_offsets", struct)
+        console.log(KaitaiParser.toYaml(struct))
+        val decoder = Kaitai("repeat_key", struct)
         val result = decoder.decode(data, 0)
 
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }

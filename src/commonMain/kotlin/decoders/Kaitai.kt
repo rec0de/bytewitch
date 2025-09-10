@@ -68,6 +68,14 @@ class MutableKaitaiTree (private val innerList: MutableList<ByteWitchResult> = m
         }
         return rootCandidate
     }
+
+    fun getRealRoot() : MutableKaitaiTree {
+        var rootCandidate: MutableKaitaiTree = this
+        while (rootCandidate.parent != null) {
+            rootCandidate = rootCandidate.parent!!
+        }
+        return rootCandidate
+    }
 }
 
 class Type(val type: String?) {
@@ -105,10 +113,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 isRoot = true,
                 customTypeName = id,
                 canonicalPath,
-                kaitaiStruct.meta?.imports
+                kaitaiStruct.meta?.imports,
+                null
             )
         } catch (e: dynamic) {  // with dynamic, we catch all exceptions, however. But that's fine too
-            console.error("[$name] Unexpected Exception has been thrown:\n$e")
+            console.log("[$name] Unexpected Exception has been thrown:\n$e")
             throw Exception("[$name] Unexpected Exception has been thrown:\n$e")
         }
         return result
@@ -157,6 +166,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         STREAM(""),
         KAITAITREE(""),
         KAITAIELEMENT(""),
+        BYTEWITCHRESULT(""),
     }
 
     inner class ExpressionParser(
@@ -641,6 +651,9 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         for (element in kaitaiTree) {
                             if (element is KaitaiElement) {
                                 array.add(parseReferenceHelper(element))
+                            } else {
+                                // TODO If you have Non-KaitaiElements, is there any processing that needs to be done, before adding them to the list?
+                                array.add(Pair(TokenType.BYTEWITCHRESULT, element))
                             }
                         }
                         Pair(TokenType.ARRAY, array.toList())
@@ -2108,7 +2121,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 isRoot = type.canonicalPath != null,
                 type.customTypeName,
                 type.canonicalPath,
-                type.imports
+                type.imports,
+                type
             )
 
             if (seqElement.doc == null && seqElement.docRef == null) {
@@ -2252,11 +2266,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         ioStream: BooleanArray,
         _offsetInDatastreamInBits: Int,
         sourceOffsetInBits: Int,
-        _dataSizeOfSequenceInBits: Int,
+        originalDataSizeOfSequenceInBits: Int,
         parentScopeStruct: KTStruct?
     ) : Triple<KaitaiElement, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
-        var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
+        var dataSizeOfSequenceInBits = originalDataSizeOfSequenceInBits
 
         val bytesListTreeForInnerList = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTreeForInnerList.parent = bytesListTree.parent
@@ -2314,20 +2328,18 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        var resultSourceByteRange : Pair<Int, Int>
-        var resultSourceRangeBitOffset : Pair<Int, Int>
-        try {
-            resultSourceByteRange = Pair(bytesListTreeForInnerList.first().sourceByteRange!!.first, bytesListTreeForInnerList.last().sourceByteRange!!.second)
-            resultSourceRangeBitOffset = Pair(bytesListTreeForInnerList.first().sourceRangeBitOffset.first, bytesListTreeForInnerList.last().sourceRangeBitOffset.second)
-        } catch (e : NoSuchElementException) {
-            resultSourceByteRange = Pair(0,0)
-            resultSourceRangeBitOffset = Pair(0,0)
-        }
-
+        val resultSourceByteRange: Pair<Int, Int> = Pair((sourceOffsetInBits + originalDataSizeOfSequenceInBits) / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8)
+        val resultSourceRangeBitOffset: Pair<Int, Int> = Pair(0,0) // always zero as custom types have to be byte aligned
 
         val kaitaiList = KaitaiList(
-            elementId, bytesListTree.byteOrder, bytesListTreeForInnerList, resultSourceByteRange, resultSourceRangeBitOffset,
-            KaitaiDoc(undefined, undefined), kaitaiElementKind
+            elementId,
+            bytesListTree.byteOrder,
+            bytesListTreeForInnerList,
+            resultSourceByteRange,
+            resultSourceRangeBitOffset,
+            KaitaiDoc(undefined, undefined),
+            kaitaiElementKind,
+            bytesListTree.getRealRoot().ioStream.slice(resultSourceByteRange.first*8..<resultSourceByteRange.second*8).toBooleanArray()
         )
         kaitaiList.bytesListTree.kaitaiElement = kaitaiList
         return Triple(
@@ -2451,7 +2463,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
             is MutableKaitaiTree -> {
                 val temp = expressionResult.kaitaiElement!!
-                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind)
+                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind, booleanArrayOf())
                 result.bytesListTree.kaitaiElement = result
                 result
             }
@@ -2472,7 +2484,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                             doc,
                         )
                     })
-                    KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
+                    KaitaiList(id, ByteOrder.BIG, bytesListTree, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind, booleanArrayOf())
                 }
             }
             else -> {
@@ -2542,7 +2554,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     fun processSeq(
         parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
         customTypeParams: Map<String, Pair<Any, String?>>?, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int,
-        isRoot: Boolean, customTypeName: String?, canonicalPath: String?, imports: List<String>?
+        isRoot: Boolean, customTypeName: String?, canonicalPath: String?, imports: List<String>?, ownType: Type?
     ) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
 
@@ -2589,7 +2601,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         // handle actual sequence
-        var dataSizeOfSequenceInBits = 0
+        var dataSizeOfSequenceInBits : Int = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
                 val elementId = seqElement.id?: ""
@@ -2619,15 +2631,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         val bufferAfterBinaryElement = (8 - ((dataSizeOfSequenceInBits + sourceOffsetInBits) % 8)) % 8
         dataSizeOfSequenceInBits += bufferAfterBinaryElement
 
-        // TODO we should have way to see if we have a substream or not and highlight accordingly. currently only until end of data gets highlighted, not all of the actual substream
-        val resultSourceByteRange: Pair<Int, Int>
-        val resultSourceRangeBitOffset: Pair<Int, Int>
-        if (currentScopeStruct.seq.isEmpty()) {
-            resultSourceByteRange = Pair(0, 0) // is it possible to do the actual start and end value (which are the same) here instead of 0?
-            resultSourceRangeBitOffset = Pair(0, 0)
+
+        val resultSourceRangeBitOffset: Pair<Int, Int> = Pair(0, 0)  // always 0, 0, since with custom types elements are always byte aligned
+        val resultSourceByteRange: Pair<Int, Int> = if (ownType != null && ownType.sizeIsKnown) {
+            Pair(sourceOffsetInBits / 8, (sourceOffsetInBits + ownType.sizeInBits) / 8)
         } else {
-            resultSourceByteRange = Pair(bytesListTree.first().sourceByteRange!!.first, bytesListTree.last().sourceByteRange!!.second)
-            resultSourceRangeBitOffset = Pair(bytesListTree.first().sourceRangeBitOffset.first, bytesListTree.last().sourceRangeBitOffset.second)
+            Pair(sourceOffsetInBits / 8, (sourceOffsetInBits + dataSizeOfSequenceInBits) / 8)
         }
 
         // handle instances last because they usually have auxiliary information. if they get used by the immediately preceding sequence ("quasi forward referencing") they get parsed by the expression parser, not here
@@ -2641,7 +2650,16 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        val kaitaiResult = KaitaiResult(parentId, bytesListTree.byteOrder, bytesListTree, resultSourceByteRange, resultSourceRangeBitOffset, resultDoc, KaitaiElementKind.SEQELEMENT)
+        val kaitaiResult = KaitaiResult(
+            parentId,
+            bytesListTree.byteOrder,
+            bytesListTree,
+            resultSourceByteRange,
+            resultSourceRangeBitOffset,
+            resultDoc,
+            KaitaiElementKind.SEQELEMENT,
+            bytesListTree.getRealRoot().ioStream.slice(resultSourceByteRange.first*8..<resultSourceByteRange.second*8).toBooleanArray()
+        )
         kaitaiResult.bytesListTree.kaitaiElement = kaitaiResult
         return kaitaiResult
     }
@@ -2732,7 +2750,7 @@ class KaitaiResult(
     override val id: String, override var endianness: ByteOrder,
     override val bytesListTree: MutableKaitaiTree,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind, override val value: BooleanArray
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
@@ -2741,28 +2759,7 @@ class KaitaiResult(
                 "</div>"
     }
 
-    override val sizeInBits: Int
-        get() {
-            var result = 0
-            for (element in bytesListTree) {
-                if (element is KaitaiElement) {
-                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
-                }  //TODO size of non KaitaiElements?
-            }
-            return result
-        }
-
-    // KaitaiResult does not really have a value itself, but if it's called we want to deliver a reasonable result
-    override val value: BooleanArray
-        get() {
-            var result = booleanArrayOf()
-            for (element in bytesListTree) {
-                if (element is KaitaiElement) {
-                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
-                }  //TODO value of non KaitaiElements??!
-            }
-            return result
-        }
+    override val sizeInBits: Int = (sourceByteRange.second - sourceByteRange.first) * 8
 
     override val ioStream: BooleanArray = bytesListTree.ioStream
 }
@@ -2771,7 +2768,7 @@ class KaitaiList(
     override val id: String, override var endianness: ByteOrder,
     override val bytesListTree: MutableKaitaiTree,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
-    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
+    override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind, override val value: BooleanArray
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
@@ -2779,28 +2776,7 @@ class KaitaiList(
                 "</div>"
     }
 
-    override val sizeInBits: Int
-        get() {
-            var result = 0
-            for (element in bytesListTree) {
-                if (element is KaitaiElement) {
-                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.sizeInBits
-                } //TODO size of non KaitaiElements?
-            }
-            return result
-        }
-
-    // KaitaiList does not really have a value itself, but if it's called we want to deliver a reasonable result
-    override val value: BooleanArray
-        get() {
-            var result = booleanArrayOf()
-            for (element in bytesListTree) {
-                if (element is KaitaiElement) {
-                    if (element.kaitaiElementKind == KaitaiElementKind.SEQELEMENT) result += element.value as BooleanArray
-                } //TODO size of non KaitaiElements??!
-            }
-            return result
-        }
+    override val sizeInBits: Int = (sourceByteRange.second - sourceByteRange.first) * 8
 
     override val ioStream: BooleanArray = bytesListTree.ioStream
 }
