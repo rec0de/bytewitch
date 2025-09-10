@@ -1,12 +1,13 @@
 package kaitai
 
+import decoders.ByteWitchResult
 import decoders.KaitaiElement
 import kotlin.reflect.KClass
 
 object KaitaiTestUtils {
 
     fun checkElement(
-        element: KaitaiElement,
+        element: ByteWitchResult,
         id: String,
         elementClass: KClass<*>? = null,
         sourceByteRange: Pair<Int, Int>? = null,
@@ -14,6 +15,9 @@ object KaitaiTestUtils {
         value: dynamic = null,
         htmlInnerContent: String? = null
     ) {
+        check(element is KaitaiElement) {
+            "Expected element to be a KaitaiElement, got ${element::class.simpleName}"
+        }
         check(element.id == id) {
             "Expected id to be '$id', got '${element.id}'"
         }
