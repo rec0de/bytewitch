@@ -2,6 +2,8 @@ package kaitai
 
 import decoders.ByteWitchResult
 import decoders.KaitaiElement
+import kotlinx.browser.document
+import org.w3c.dom.HTMLDivElement
 import kotlin.reflect.KClass
 
 object KaitaiTestUtils {
@@ -46,8 +48,12 @@ object KaitaiTestUtils {
         }
         if (htmlInnerContent != null) {
             val rendered = element.renderHTML()
-            check(rendered.contains(htmlInnerContent)) {
-                "Expected HTML content of field '$id' to contain '$htmlInnerContent', got '$rendered'"
+            val div = document.createElement("div") as HTMLDivElement
+            div.innerHTML = rendered
+            val renderedValue = div.querySelector(".kaitai-value")?.innerHTML ?: ""
+            console.log(renderedValue)
+            check(renderedValue.contains(htmlInnerContent)) {
+                "Expected HTML content of field '$id' to contain '$htmlInnerContent', got '$renderedValue'"
             }
         }
     }

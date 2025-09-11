@@ -19,6 +19,10 @@
     --neutral-highlight: #838383;
     --kaitai: #c9a0742f;
     --kaitai-highlight: #b98346;
+    --kaitai-instance-border: yellow;
+    --kaitai-parameter-border: darkgreen;
+    --kaitai-element-id: #23292e;
+    --kaitai-type-suffix: #272729;
     --rowgap: 0.3rem;
     --sans: Lato, Roboto, Helvetica, sans-serif;
     --mono: monospace;
@@ -367,7 +371,7 @@ button:hover {
 }
 
 .kaitai-instance {
-    outline: 2px solid yellow;
+    outline: 2px solid var(--kaitai-instance-border);
 }
 
 .kaitai-instances-hidden .kaitai-instance {
@@ -375,7 +379,15 @@ button:hover {
 }
 
 .kaitai-parameter {
-    outline: 2px solid darkgreen;
+    outline: 2px solid var(--kaitai-parameter-border);
+}
+
+.kaitai-element-id {
+    color: var(--kaitai-element-id);
+}
+
+.kaitai-type-suffix {
+    color: var(--kaitai-type-suffix);
 }
 
 .asn1 {

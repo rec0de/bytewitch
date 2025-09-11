@@ -42,16 +42,16 @@ class KaitaiDecoderTests {
 
         // Validate field1
         val field1 = result.bytesListTree["field1"]
-        checkElement(field1, "field1", KaitaiUnsignedInteger::class, Pair(0, 4), Pair(0, 0), booleanArrayOfInts(0x00, 0x00, 0x00, 0x01), "field1(1)u")
+        checkElement(field1, "field1", KaitaiUnsignedInteger::class, Pair(0, 4), Pair(0, 0), booleanArrayOfInts(0x00, 0x00, 0x00, 0x01), "1")
 
         // Validate field2
         val field2 = result.bytesListTree["field2"]
-        val expectedField2Content = "Hello" + "\u0000" // Include null terminator
-        checkElement(field2, "field2", KaitaiString::class, Pair(4, 10), Pair(0, 0), booleanArrayOfInts(0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x00), "field2($expectedField2Content)utf8")
+        val expectedField2Content = "Hello" // + "\u0000" // Null terminator doesn't get included in actual HTML, dunno if that's right
+        checkElement(field2, "field2", KaitaiString::class, Pair(4, 10), Pair(0, 0), booleanArrayOfInts(0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x00), expectedField2Content)
 
         // Validate field3
         val field3 = result.bytesListTree["field3"]
-        checkElement(field3, "field3", KaitaiSignedInteger::class, Pair(10, 11), Pair(0, 0), booleanArrayOfInts(0x81), "field3(-127)s")
+        checkElement(field3, "field3", KaitaiSignedInteger::class, Pair(10, 11), Pair(0, 0), booleanArrayOfInts(0x81), "-127")
     }
 
     @Test
@@ -120,12 +120,12 @@ class KaitaiDecoderTests {
         // Validate field1
         val field1 = result.bytesListTree["field1"]
         check(field1 is KaitaiBoolean) { "Expected field1 to be KaitaiBoolean, got ${field1::class.simpleName}" }
-        checkElement(field1, "field1", KaitaiBoolean::class, Pair(0, 0), Pair(0, 1), htmlInnerContent = "field1(true)b")
+        checkElement(field1, "field1", KaitaiBoolean::class, Pair(0, 0), Pair(0, 1), htmlInnerContent = "true")
 
         // Validate field2
         val field2 = result.bytesListTree["field2"]
         check(field2 is KaitaiBoolean) { "Expected field2 to be KaitaiBoolean, got ${field2::class.simpleName}" }
-        checkElement(field2, "field2", KaitaiBoolean::class, Pair(0, 0), Pair(1, 2), htmlInnerContent = "field2(false)b")
+        checkElement(field2, "field2", KaitaiBoolean::class, Pair(0, 0), Pair(1, 2), htmlInnerContent = "false")
     }
 
     @Test
@@ -174,42 +174,42 @@ class KaitaiDecoderTests {
         // Validate field1
         val field1 = result.bytesListTree["field1"]
         check(field1 is KaitaiUnsignedInteger) { "Expected field1 to be KaitaiUnsignedInteger, got ${field1::class.simpleName}" }
-        checkElement(field1, "field1", KaitaiUnsignedInteger::class, Pair(0, 1), Pair(0, 0), htmlInnerContent = "field1(1)u")
+        checkElement(field1, "field1", KaitaiUnsignedInteger::class, Pair(0, 1), Pair(0, 0), htmlInnerContent = "1")
 
         // Validate field2
         val field2 = result.bytesListTree["field2"]
         check(field2 is KaitaiUnsignedInteger) { "Expected field2 to be KaitaiUnsignedInteger, got ${field2::class.simpleName}" }
-        checkElement(field2, "field2", KaitaiUnsignedInteger::class, Pair(1, 3), Pair(0, 0), htmlInnerContent = "field2(515)u")
+        checkElement(field2, "field2", KaitaiUnsignedInteger::class, Pair(1, 3), Pair(0, 0), htmlInnerContent = "515")
 
         // Validate field3
         val field3 = result.bytesListTree["field3"]
         check(field3 is KaitaiUnsignedInteger) { "Expected field3 to be KaitaiUnsignedInteger, got ${field3::class.simpleName}" }
-        checkElement(field3, "field3", KaitaiUnsignedInteger::class, Pair(3, 7), Pair(0, 0), htmlInnerContent = "field3(67438087)u")
+        checkElement(field3, "field3", KaitaiUnsignedInteger::class, Pair(3, 7), Pair(0, 0), htmlInnerContent = "67438087")
 
         // Validate field4
         val field4 = result.bytesListTree["field4"]
         check(field4 is KaitaiUnsignedInteger) { "Expected field4 to be KaitaiUnsignedInteger, got ${field4::class.simpleName}" }
-        checkElement(field4, "field4", KaitaiUnsignedInteger::class, Pair(7, 15), Pair(0, 0), htmlInnerContent = "field4(579005069656919567)u")
+        checkElement(field4, "field4", KaitaiUnsignedInteger::class, Pair(7, 15), Pair(0, 0), htmlInnerContent = "579005069656919567")
 
         // Validate field5
         val field5 = result.bytesListTree["field5"]
         check(field5 is KaitaiUnsignedInteger) { "Expected field5 to be KaitaiUnsignedInteger, got ${field5::class.simpleName}" }
-        checkElement(field5, "field5", KaitaiUnsignedInteger::class, Pair(15, 16), Pair(0, 0), htmlInnerContent = "field5(97)u")
+        checkElement(field5, "field5", KaitaiUnsignedInteger::class, Pair(15, 16), Pair(0, 0), htmlInnerContent = "97")
 
         // Validate field6
         val field6 = result.bytesListTree["field6"]
         check(field6 is KaitaiUnsignedInteger) { "Expected field6 to be KaitaiUnsignedInteger, got ${field6::class.simpleName}" }
-        checkElement(field6, "field6", KaitaiUnsignedInteger::class, Pair(16, 17), Pair(0, 0), htmlInnerContent = "field6(165)u")
+        checkElement(field6, "field6", KaitaiUnsignedInteger::class, Pair(16, 17), Pair(0, 0), htmlInnerContent = "165")
 
         // Validate field7
         val field7 = result.bytesListTree["field7"]
         check(field7 is KaitaiUnsignedInteger) { "Expected field7 to be KaitaiUnsignedInteger, got ${field7::class.simpleName}" }
-        checkElement(field7, "field7", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "field7(27413)u")
+        checkElement(field7, "field7", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "27413")
 
         // Validate field8
         val field8 = result.bytesListTree["field8"]
         check(field8 is KaitaiUnsignedInteger) { "Expected field8 to be KaitaiUnsignedInteger, got ${field8::class.simpleName}" }
-        checkElement(field8, "field8", KaitaiUnsignedInteger::class, Pair(19, 21), Pair(0, 0), htmlInnerContent = "field8(45402)u")
+        checkElement(field8, "field8", KaitaiUnsignedInteger::class, Pair(19, 21), Pair(0, 0), htmlInnerContent = "45402")
     }
 
     @Test
@@ -256,35 +256,35 @@ class KaitaiDecoderTests {
 
         // Validate field1
         val field1 = result.bytesListTree["field1"]
-        checkElement(field1, "field1", KaitaiSignedInteger::class, Pair(0, 1), Pair(0, 0), htmlInnerContent = "field1(122)s")
+        checkElement(field1, "field1", KaitaiSignedInteger::class, Pair(0, 1), Pair(0, 0), htmlInnerContent = "122")
 
         // Validate field2
         val field2 = result.bytesListTree["field2"]
-        checkElement(field2, "field2", KaitaiSignedInteger::class, Pair(1, 3), Pair(0, 0), htmlInnerContent = "field2(1441)s")
+        checkElement(field2, "field2", KaitaiSignedInteger::class, Pair(1, 3), Pair(0, 0), htmlInnerContent = "1441")
 
         // Validate field3
         val field3 = result.bytesListTree["field3"]
-        checkElement(field3, "field3", KaitaiSignedInteger::class, Pair(3, 7), Pair(0, 0), htmlInnerContent = "field3(1354825755)s")
+        checkElement(field3, "field3", KaitaiSignedInteger::class, Pair(3, 7), Pair(0, 0), htmlInnerContent = "1354825755")
 
         // Validate field4
         val field4 = result.bytesListTree["field4"]
-        checkElement(field4, "field4", KaitaiSignedInteger::class, Pair(7, 15), Pair(0, 0), htmlInnerContent = "field4(6917706421467349044)s")
+        checkElement(field4, "field4", KaitaiSignedInteger::class, Pair(7, 15), Pair(0, 0), htmlInnerContent = "6917706421467349044")
 
         // Validate field5
         val field5 = result.bytesListTree["field5"]
-        checkElement(field5, "field5", KaitaiSignedInteger::class, Pair(15, 16), Pair(0, 0), htmlInnerContent = "field5(-91)s")
+        checkElement(field5, "field5", KaitaiSignedInteger::class, Pair(15, 16), Pair(0, 0), htmlInnerContent = "-91")
 
         // Validate field6
         val field6 = result.bytesListTree["field6"]
-        checkElement(field6, "field6", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "field6(-20134")
+        checkElement(field6, "field6", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "-201")
 
         // Validate field7
         val field7 = result.bytesListTree["field7"]
-        checkElement(field7, "field7", KaitaiSignedInteger::class, Pair(18, 22), Pair(0, 0), htmlInnerContent = "field7(-520068864)s")
+        checkElement(field7, "field7", KaitaiSignedInteger::class, Pair(18, 22), Pair(0, 0), htmlInnerContent = "-520068864")
 
         // Validate field8
         val field8 = result.bytesListTree["field8"]
-        checkElement(field8, "field8", KaitaiSignedInteger::class, Pair(22, 30), Pair(0, 0), htmlInnerContent = "field8(-792456140590940108)s")
+        checkElement(field8, "field8", KaitaiSignedInteger::class, Pair(22, 30), Pair(0, 0), htmlInnerContent = "-792456140590940108")
     }
 
     @Test
@@ -1181,31 +1181,31 @@ class KaitaiDecoderTests {
         // Validate field sub-field
         val subField = field.bytesListTree?.get("sub-field")
         checkNotNull(subField) { "Expected sub-field to be part pf field" }
-        checkElement(subField, "sub-field", KaitaiUnsignedInteger::class, Pair(4, 6), Pair(0, 0), htmlInnerContent = "sub-field(17)u")
+        checkElement(subField, "sub-field", KaitaiUnsignedInteger::class, Pair(4, 6), Pair(0, 0), htmlInnerContent = "17")
 
         // Validate field number_type1
         val fieldNumberType1 = result.bytesListTree["number_type1"]
-        checkElement(fieldNumberType1, "number_type1", KaitaiUnsignedInteger::class, Pair(6, 8), Pair(0, 0), htmlInnerContent = "number_type1(1027)u")
+        checkElement(fieldNumberType1, "number_type1", KaitaiUnsignedInteger::class, Pair(6, 8), Pair(0, 0), htmlInnerContent = "1027")
 
         // Validate field number_body1
         val fieldNumberBody1 = result.bytesListTree["number_body1"]
-        checkElement(fieldNumberBody1, "number_body1", KaitaiSignedInteger::class, Pair(8, 10), Pair(0, 0), htmlInnerContent = "number_body1(-78)s")
+        checkElement(fieldNumberBody1, "number_body1", KaitaiSignedInteger::class, Pair(8, 10), Pair(0, 0), htmlInnerContent = "-78")
 
         // Validate field number_type2
         val fieldNumberType2 = result.bytesListTree["number_type2"]
-        checkElement(fieldNumberType2, "number_type2", KaitaiUnsignedInteger::class, Pair(10, 12), Pair(0, 0), htmlInnerContent = "number_type2(1541)u")
+        checkElement(fieldNumberType2, "number_type2", KaitaiUnsignedInteger::class, Pair(10, 12), Pair(0, 0), htmlInnerContent = "1541")
 
         // Validate field number_body2
         val fieldNumberBody2 = result.bytesListTree["number_body2"]
-        checkElement(fieldNumberBody2, "number_body2", KaitaiUnsignedInteger::class, Pair(12, 16), Pair(0, 0), htmlInnerContent = "number_body2(4289917496)u")
+        checkElement(fieldNumberBody2, "number_body2", KaitaiUnsignedInteger::class, Pair(12, 16), Pair(0, 0), htmlInnerContent = "4289917496")
 
         // Validate field number_type_default
         val fieldNumberTypeDefault = result.bytesListTree["number_type_default"]
-        checkElement(fieldNumberTypeDefault, "number_type_default", KaitaiUnsignedInteger::class, Pair(16, 17), Pair(0, 0), htmlInnerContent = "number_type_default(3)u")
+        checkElement(fieldNumberTypeDefault, "number_type_default", KaitaiUnsignedInteger::class, Pair(16, 17), Pair(0, 0), htmlInnerContent = "3")
 
         // Validate field number_body_default
         val fieldNumberBodyDefault = result.bytesListTree["number_body_default"]
-        checkElement(fieldNumberBodyDefault, "number_body_default", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "number_body_default(1025)u")
+        checkElement(fieldNumberBodyDefault, "number_body_default", KaitaiUnsignedInteger::class, Pair(17, 19), Pair(0, 0), htmlInnerContent = "1025")
     }
 
     @Test

@@ -1948,6 +1948,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             if (elements.size >= 2) {
                 parsedParamsData = expressionParser.parseExpression("[${elements[1].trimEnd().dropLast(1)}]")  //drop closing bracket
             }
+            type.customTypeName = typeName.split("::").last()
         } else {
             type = Type(null)
         }
@@ -2336,9 +2337,30 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         var repeatIndex = 0
         while (true) {
-            // If it's the first element and the ioStream is empty we need to do it at the beginning
-            if (seqElement.repeat == KTRepeat.EOS && ioStream.size == dataSizeOfSequenceInBits) {
-                break
+            // We could repeat 0 times if the ioStream is empty or the expr resolves to 0
+            if (seqElement.repeat == KTRepeat.EOS) {
+                if (ioStream.size == dataSizeOfSequenceInBits) {
+                    break
+                }
+            } else if (seqElement.repeat == KTRepeat.EXPR) {
+                checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
+                val expressionParser = ExpressionParser(
+                    bytesListTree,
+                    currentScopeStruct,
+                    parentScopeStruct,
+                    ioStream,
+                    offsetInDatastreamInBits,
+                    null,
+                    null
+                )
+                val repeatAmount: Long = if (seqElement.repeatExpr is StringOrInt.IntValue) {
+                    seqElement.repeatExpr.value.toLong()
+                } else {
+                    expressionParser.parseExpression(seqElement.repeatExpr.toString())
+                }
+                if (repeatIndex >= repeatAmount) {
+                    break
+                }
             }
 
             val triple = processSingleSeqElement(
@@ -2361,18 +2383,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             dataSizeOfSequenceInBits = triple.third
 
             repeatIndex += 1
-            if (seqElement.repeat == KTRepeat.EXPR) {
-                checkNotNull(seqElement.repeatExpr) { "With repeat type expr, a repeat-expr key is needed" }
-                val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
-                val repeatAmount : Long = if (seqElement.repeatExpr is StringOrInt.IntValue) {
-                    seqElement.repeatExpr.value.toLong()
-                } else {
-                    expressionParser.parseExpression(seqElement.repeatExpr.toString())
-                }
-                if (repeatIndex >= repeatAmount) {
-                    break
-                }
-            } else if (seqElement.repeat == KTRepeat.UNTIL) {
+
+            if (seqElement.repeat == KTRepeat.UNTIL) {
                 checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
                 val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
                 val repeatGuard : Boolean = if (seqElement.repeatUntil is StringOrBoolean.BooleanValue) {
@@ -2521,7 +2533,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
             is MutableKaitaiTree -> {
                 val temp = expressionResult.kaitaiElement!!
-                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind, booleanArrayOf())
+                val result: KaitaiResult = KaitaiResult(id, ByteOrder.BIG, expressionResult, temp.suffix, Pair(0, 0), Pair(0, 0), temp.doc, kaitaiElementKind, booleanArrayOf())
                 result.bytesListTree.kaitaiElement = result
                 result
             }
@@ -2712,6 +2724,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             parentId,
             bytesListTree.byteOrder,
             bytesListTree,
+            ownType?.customTypeName ?: "",
             resultSourceByteRange,
             resultSourceRangeBitOffset,
             resultDoc,
@@ -2725,6 +2738,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
 interface KaitaiElement : ByteWitchResult {
     val id: String
+    val suffix: String
     val bytesListTree: MutableKaitaiTree? get() = null
     val value: dynamic
     val sizeInBits: Int
@@ -2806,13 +2820,15 @@ class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
 
 class KaitaiResult(
     override val id: String, override var endianness: ByteOrder,
-    override val bytesListTree: MutableKaitaiTree,
+    override val bytesListTree: MutableKaitaiTree, override val suffix: String,
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind, override val value: BooleanArray
 ) : KaitaiElement {
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                    "${id}(${bytesListTree.joinToString("") { it.renderHTML() }})" +
+                    "<span class=\"kaitai-element-id\">$id</span>" +
+                    "(<span class=\"kaitai-value\">${bytesListTree.joinToString("") { it.renderHTML() }}</span>)" +
+                    "<span class=\"kaitai-type-suffix\">$suffix</span>" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2828,9 +2844,10 @@ class KaitaiList(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind, override val value: BooleanArray
 ) : KaitaiElement {
+    override val suffix = ""  // Lists have no type and therefor no suffix. they are recognizable by the brackets
     override fun renderHTML(): String {
         return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                    "${bytesListTree.joinToString(", ", "${id}[", "]") { it.renderHTML() }}" +
+                    "${bytesListTree.joinToString(", ", "<span class=\"kaitai-element-id\">$id</span>[", "]") { it.renderHTML() }}" +
                 "</div>"
     }
 
@@ -2845,9 +2862,12 @@ class KaitaiBytes(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
+    override val suffix = "h"
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                    "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()})h" +
+                    "<span class=\"kaitai-element-id\">$id</span>" +
+                    "(<span class=\"kaitai-value\">${if (value is BooleanArray) (value as BooleanArray).toByteArray().hex() else (value as List<Long>).map{it.toByte()}.toByteArray().hex()}</span>)" +
+                    "<span class=\"kaitai-type-suffix\">$suffix</span>" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2861,11 +2881,13 @@ abstract class KaitaiNumber(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
-    abstract val suffix: String
+    override val suffix = ""
 
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                    "${id}(${parseValueAsString()})${suffix}" +
+                    "<span class=\"kaitai-element-id\">$id</span>" +
+                    "(<span class=\"kaitai-value\">${parseValueAsString()}</span>)" +
+                    "<span class=\"kaitai-type-suffix\">$suffix</span>" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2945,9 +2967,12 @@ class KaitaiBoolean(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
+    override val suffix = "b"
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                "${id}(${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean})b" +
+                "<span class=\"kaitai-element-id\">$id</span>" +
+                "(<span class=\"kaitai-value\">${if (value is BooleanArray) (value as BooleanArray)[0] else value as Boolean}</span>)" +
+                "<span class=\"kaitai-type-suffix\">$suffix</span>" +
                 doc.renderHTML() +
                 "</div>"
     }
@@ -2959,9 +2984,12 @@ class KaitaiString(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
 ) : KaitaiElement {
+    override val suffix = "utf8"
     override fun renderHTML(): String {
         return  "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                    "${id}(${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String})utf8" +
+                    "<span class=\"kaitai-element-id\">$id</span>" +
+                    "(<span class=\"kaitai-value\">${if (value is BooleanArray) (value as BooleanArray).toByteArray().toUTF8String() else value as String}</span>)" +
+                    "<span class=\"kaitai-type-suffix\">$suffix</span>" +
                     doc.renderHTML() +
                 "</div>"
     }
@@ -2974,9 +3002,12 @@ class KaitaiEnum(
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind,
     val enum: Pair<KTEnum?, String>,
 ) : KaitaiElement {
+    override val suffix = "enum"
     override fun renderHTML(): String {
         return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
-                   "${id}(${enum.second})enum" +
+                   "<span class=\"kaitai-element-id\">$id</span>" +
+                   "(<span class=\"kaitai-value\">${enum.second}</span>)" +
+                    "<span class=\"kaitai-type-suffix\">${suffix}</span>" +
                    doc.renderHTML() +
                "</div>"
     }

@@ -109,38 +109,38 @@ class KaitaiIntegrationTests {
         checkElement(entryTimestamp, "timestamp", KaitaiResult::class, Pair(10, 16), Pair(0, 0))
 
         val dateYear = entryTimestamp.bytesListTree["year"]
-        checkElement(dateYear, "year", KaitaiUnsignedInteger::class, Pair(10, 12), Pair(0, 0), htmlInnerContent = "year(2010)u")
+        checkElement(dateYear, "year", KaitaiUnsignedInteger::class, Pair(10, 12), Pair(0, 0), htmlInnerContent = "2010")
         val dateMonth = entryTimestamp.bytesListTree["month"]
-        checkElement(dateMonth, "month", KaitaiUnsignedInteger::class, Pair(12, 14), Pair(0, 0), htmlInnerContent = "month(5)u")
+        checkElement(dateMonth, "month", KaitaiUnsignedInteger::class, Pair(12, 14), Pair(0, 0), htmlInnerContent = "5")
         val dateDay = entryTimestamp.bytesListTree["day"]
-        checkElement(dateDay, "day", KaitaiUnsignedInteger::class, Pair(14, 16), Pair(0, 0), htmlInnerContent = "day(24)u")
+        checkElement(dateDay, "day", KaitaiUnsignedInteger::class, Pair(14, 16), Pair(0, 0), htmlInnerContent = "24")
 
         val listSub = result.bytesListTree["list_sub"]
         check(listSub is KaitaiResult) { "Expected KaitaiResult, got ${listSub::class.simpleName}" }
         checkElement(listSub, "list_sub", KaitaiResult::class, Pair(16, 20), Pair(0, 0))
 
         val field1 = listSub.bytesListTree["field1"]
-        checkElement(field1, "field1", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "field1(258)s")
+        checkElement(field1, "field1", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "258")
 
         val own = listSub.bytesListTree["own"]
         check(own is KaitaiResult) { "Expected KaitaiResult, got $own" }
         checkElement(own, "own", KaitaiResult::class, Pair(18, 20))
 
         val ownA  = own.bytesListTree["a"]
-        checkElement(ownA, "a", KaitaiSignedInteger::class, Pair(18, 19), Pair(0, 0), htmlInnerContent = "a(17)s")
+        checkElement(ownA, "a", KaitaiSignedInteger::class, Pair(18, 19), Pair(0, 0), htmlInnerContent = "17")
 
         val ownB  = own.bytesListTree["b"]
-        checkElement(ownB, "b", KaitaiSignedInteger::class, Pair(19, 20), Pair(0, 0), htmlInnerContent = "b(18)s")
+        checkElement(ownB, "b", KaitaiSignedInteger::class, Pair(19, 20), Pair(0, 0), htmlInnerContent = "18")
 
         val listSubSub = result.bytesListTree["list_sub_sub"]
         check(listSubSub is KaitaiResult) { "Expected KaitaiResult, got $own" }
         checkElement(listSubSub, "list_sub_sub", KaitaiResult::class, Pair(20, 22))
 
         val subA  = listSubSub.bytesListTree["a"]
-        checkElement(subA, "a", KaitaiSignedInteger::class, Pair(20, 21), Pair(0, 0), htmlInnerContent = "a(3)s")
+        checkElement(subA, "a", KaitaiSignedInteger::class, Pair(20, 21), Pair(0, 0), htmlInnerContent = "3")
 
         val subB  = listSubSub.bytesListTree["b"]
-        checkElement(subB, "b", KaitaiSignedInteger::class, Pair(21, 22), Pair(0, 0), htmlInnerContent = "b(4)s")
+        checkElement(subB, "b", KaitaiSignedInteger::class, Pair(21, 22), Pair(0, 0), htmlInnerContent = "4")
     }
 
     @Test
@@ -209,32 +209,32 @@ class KaitaiIntegrationTests {
 
         // CHeck fields
         val mainA = result.bytesListTree["a"]
-        checkElement(mainA, "a", KaitaiUnsignedInteger::class, Pair(0, 2), Pair(0, 0), htmlInnerContent = "a(1)u")
+        checkElement(mainA, "a", KaitaiUnsignedInteger::class, Pair(0, 2), Pair(0, 0), htmlInnerContent = "1")
 
         val mainB = result.bytesListTree["b"]
         check(mainB is KaitaiResult) { "Expected KaitaiResult, got ${mainB::class.simpleName}" }
         checkElement(mainB, "b", KaitaiResult::class, Pair(2, 6), Pair(0, 0))
 
         val mainL = result.bytesListTree["l"]
-        checkElement(mainL, "l", KaitaiSignedInteger::class, htmlInnerContent = "l(3)s")
+        checkElement(mainL, "l", KaitaiSignedInteger::class, htmlInnerContent = "3")
 
         val topA = mainB.bytesListTree["a"]
-        checkElement(topA, "a", KaitaiUnsignedInteger::class, Pair(2, 4), Pair(0, 0), htmlInnerContent = "a(2)u")
+        checkElement(topA, "a", KaitaiUnsignedInteger::class, Pair(2, 4), Pair(0, 0), htmlInnerContent = "2")
 
         val topB = mainB.bytesListTree["b"]
         check(topB is KaitaiResult) { "Expected KaitaiResult, got ${mainB::class.simpleName}" }
         checkElement(topB, "b", KaitaiResult::class, Pair(4, 6), Pair(0, 0))
 
         val topJ = mainB.bytesListTree["j"]
-        checkElement(topJ, "j", KaitaiSignedInteger::class, htmlInnerContent = "j(2)s")
+        checkElement(topJ, "j", KaitaiSignedInteger::class, htmlInnerContent = "2")
 
         val topK = mainB.bytesListTree["k"]
-        checkElement(topK, "k", KaitaiSignedInteger::class, htmlInnerContent = "k(3)s")
+        checkElement(topK, "k", KaitaiSignedInteger::class, htmlInnerContent = "3")
 
         val bottomA = topB.bytesListTree["a"]
-        checkElement(bottomA, "a", KaitaiUnsignedInteger::class, Pair(4, 6), Pair(0, 0), htmlInnerContent = "a(3)u")
+        checkElement(bottomA, "a", KaitaiUnsignedInteger::class, Pair(4, 6), Pair(0, 0), htmlInnerContent = "3")
 
         val bottomI = topB.bytesListTree["i"]
-        checkElement(bottomI, "i", KaitaiSignedInteger::class, htmlInnerContent = "i(3)s")
+        checkElement(bottomI, "i", KaitaiSignedInteger::class, htmlInnerContent = "3")
     }
 }
