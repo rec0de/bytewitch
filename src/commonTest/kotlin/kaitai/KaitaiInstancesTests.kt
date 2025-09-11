@@ -248,13 +248,13 @@ class KaitaiInstancesTests {
 
         val b = result.bytesListTree["b"]
         check(b is KaitaiResult) { "Expected KaitaiResult, got ${b::class.simpleName}" }
-        checkElement(b, "b", KaitaiResult::class, Pair(1, 3), Pair(0, 0), booleanArrayOfInts(0x03, 0x04))
+        checkElement(b, "b", KaitaiResult::class, Pair(1, 3), Pair(0, 0))
         val bx = b.bytesListTree["x"]
         checkElement(bx, "x", KaitaiBytes::class, Pair(1, 3), Pair(0, 0), booleanArrayOfInts(0x03, 0x04))
 
         val c = result.bytesListTree["c"]
         check(c is KaitaiResult) { "Expected KaitaiResult, got ${c::class.simpleName}" }
-        checkElement(c, "c", KaitaiResult::class, Pair(3, 5), Pair(0, 0), booleanArrayOfInts(0x05, 0x06))
+        checkElement(c, "c", KaitaiResult::class, Pair(3, 5), Pair(0, 0))
         val cx = c.bytesListTree["x"]
         checkElement(cx, "x", KaitaiBytes::class, Pair(3, 5), Pair(0, 0), booleanArrayOfInts(0x05, 0x06))
 

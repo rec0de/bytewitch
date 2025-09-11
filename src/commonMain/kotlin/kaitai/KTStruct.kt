@@ -5,6 +5,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -51,7 +52,15 @@ data class KTStruct(
     val instances: Map<String, KTSeq> = emptyMap(),
 
     val enums: Map<String, KTEnum> = emptyMap(),
-)
+) {
+    @Transient
+    var parent : KTStruct? = null
+    init {
+        types.values.forEach {
+            it.parent = this
+        }
+    }
+}
 
 @Serializable
 data class KTMeta(

@@ -396,14 +396,14 @@ class KaitaiExpressionTests {
         checkElement(c, "c", KaitaiBytes::class, Pair(2, 3), Pair(0,0), booleanArrayOfInts(0x03))
 
         val d = result.bytesListTree["d"]
-        checkElement(d, "d", KaitaiList::class, Pair(3, 7), Pair(0,0), booleanArrayOfInts(0x04, 0x05, 0x06, 0x07))
+        checkElement(d, "d", KaitaiList::class, Pair(3, 7), Pair(0,0))
         val d0 = d.bytesListTree!![0]
         checkElement(d0, "0", KaitaiBytes::class, Pair(3, 5), Pair(0,0), booleanArrayOfInts(0x04, 0x05))
         val d1 = d.bytesListTree!![1]
         checkElement(d1, "1", KaitaiBytes::class, Pair(5, 7), Pair(0,0), booleanArrayOfInts(0x06, 0x07))
 
         val e = result.bytesListTree["e"]
-        checkElement(e, "e", KaitaiList::class, Pair(7, 10), Pair(0,0), booleanArrayOfInts(0x08, 0x09, 0x10))
+        checkElement(e, "e", KaitaiList::class, Pair(7, 10), Pair(0,0))
         val e0 = e.bytesListTree!![0]
         checkElement(e0, "0", KaitaiBytes::class, Pair(7, 7), Pair(0,0), booleanArrayOfInts())
         val e1 = e.bytesListTree!![1]
@@ -423,7 +423,7 @@ class KaitaiExpressionTests {
         checkElement(f2, "f2", KaitaiBytes::class, Pair(11, 12), Pair(0,0), booleanArrayOfInts(0x12))
 
         val g = result.bytesListTree["g"]
-        checkElement(g, "g", KaitaiList::class, Pair(12, 15), Pair(0,0), booleanArrayOfInts(0x13, 0x14, 0xff))
+        checkElement(g, "g", KaitaiList::class, Pair(12, 15), Pair(0,0))
         val g0 = g.bytesListTree!![0]
         checkElement(g0, "0", KaitaiSignedInteger::class, Pair(12, 13), Pair(0,0), booleanArrayOfInts(0x13))
         val g1 = g.bytesListTree!![1]

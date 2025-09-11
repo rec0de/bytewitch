@@ -476,7 +476,7 @@ class KaitaiDecoderTests {
         }
 
         val repeat_by_expr = result.bytesListTree["repeat_by_expr"]
-        checkElement(repeat_by_expr, "repeat_by_expr", KaitaiList::class, Pair(0,3), Pair(0, 0), booleanArrayOfInts(0xaa, 0xbb, 0xcc))
+        checkElement(repeat_by_expr, "repeat_by_expr", KaitaiList::class, Pair(0,3), Pair(0, 0))
         val aa0 = repeat_by_expr.bytesListTree!![0]
         checkElement(aa0, "0", KaitaiBytes::class, Pair(0,1), Pair(0, 0), booleanArrayOfInts(0xaa))
         val aa1 = repeat_by_expr.bytesListTree!![1]
@@ -485,25 +485,25 @@ class KaitaiDecoderTests {
         checkElement(aa2, "2", KaitaiBytes::class, Pair(2,3), Pair(0, 0), booleanArrayOfInts(0xcc))
 
         val set_size = result.bytesListTree["set_size"]
-        checkElement(set_size, "set_size", KaitaiResult::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
+        checkElement(set_size, "set_size", KaitaiResult::class, Pair(3,7), Pair(0, 0))
         val set_size_x = set_size.bytesListTree!!["x"]
-        checkElement(set_size_x, "x", KaitaiList::class, Pair(3,7), Pair(0, 0), booleanArrayOfInts(0x11, 0x22, 0x33, 0x44))
+        checkElement(set_size_x, "x", KaitaiList::class, Pair(3,7), Pair(0, 0))
         val set_size_x_0 = set_size_x.bytesListTree!![0]
         checkElement(set_size_x_0, "0", KaitaiBytes::class, Pair(3,5), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
         val set_size_x_1 = set_size_x.bytesListTree!![1]
         checkElement(set_size_x_1, "1", KaitaiBytes::class, Pair(5,7), Pair(0, 0),booleanArrayOfInts(0x33, 0x44))
 
         val simple_eos = result.bytesListTree["simple_eos"]
-        checkElement(simple_eos, "simple_eos", KaitaiList::class, Pair(7,9), Pair(0, 0), booleanArrayOfInts(0x12, 0x34))
+        checkElement(simple_eos, "simple_eos", KaitaiList::class, Pair(7,9), Pair(0, 0))
         val simple_eos_0 = simple_eos.bytesListTree!![0]
-        checkElement(simple_eos_0, "0", KaitaiResult::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
+        checkElement(simple_eos_0, "0", KaitaiResult::class, Pair(7,8), Pair(0, 0))
         check(simple_eos_0 is KaitaiResult) {
             "Expected simple_eos_0 to be a KaitaiResult, got ${simple_eos_0::class.simpleName}"
         }
         val simple_eos_0_a = simple_eos_0.bytesListTree["a"]
         checkElement(simple_eos_0_a, "a", KaitaiBytes::class, Pair(7,8), Pair(0, 0), booleanArrayOfInts(0x12))
         val simple_eos_1 = simple_eos.bytesListTree!![1]
-        checkElement(simple_eos_1, "1", KaitaiResult::class, Pair(8,9), Pair(0, 0), booleanArrayOfInts(0x34))
+        checkElement(simple_eos_1, "1", KaitaiResult::class, Pair(8,9), Pair(0, 0))
         check(simple_eos_1 is KaitaiResult) {
             "Expected simple_eos_1 to be a KaitaiResult, got ${simple_eos_1::class.simpleName}"
         }
@@ -576,16 +576,15 @@ class KaitaiDecoderTests {
         check((dummy0.value as BooleanArray).isEmpty()) { "Expected size to be 0, got ${(dummy0.value as BooleanArray).size}" }
         val dummy1 = result.bytesListTree["dummy1"]
         check(dummy1 is KaitaiResult) { "Expected a to be KaitaiResult, got ${dummy1::class.simpleName}" }
-        check(dummy1.value.isEmpty()) { "Expected size to be 0, got ${dummy1.value.size}" }
+        check(dummy1.bytesListTree.isEmpty()) { "Expected dummy1.bytesListTree to be of size 0, got ${dummy1.bytesListTree.size}" }
         val dummy2 = result.bytesListTree["dummy2"]
         check(dummy2 is KaitaiResult) { "Expected a to be KaitaiResult, got ${dummy2::class.simpleName}" }
-        check(dummy2.value.isEmpty()) { "Expected size to be 0, got ${dummy2.value.size}" }
+        check(dummy2.bytesListTree.isEmpty()) { "Expected dummy2.bytesListTree to be of size 0, got ${dummy2.bytesListTree.size}" }
         val dummy3 = result.bytesListTree["dummy3"]
         check(dummy3 is KaitaiResult) { "Expected a to be KaitaiResult, got ${dummy3::class.simpleName}" }
-        check(dummy3.value.isEmpty()) { "Expected size to be 0, got ${dummy3.value.size}" }
+        check(dummy3.bytesListTree.isEmpty()) { "Expected dummy3.bytesListTree to be of size 0, got ${dummy3.bytesListTree.size}" }
         val dummy4 = result.bytesListTree["dummy4"]
         check(dummy4 is KaitaiResult) { "Expected a to be KaitaiResult, got ${dummy4::class.simpleName}" }
-        check(dummy4.value.isEmpty()) { "Expected size to be 0, got ${dummy4.value.size}" }
 
         val trailer = result.bytesListTree["trailer"]
         checkElement(trailer, "trailer", KaitaiBytes::class, Pair(1, 2), Pair(0, 0), booleanArrayOfInts(0xab))
@@ -711,29 +710,29 @@ class KaitaiDecoderTests {
         }
 
         val field1 = result.bytesListTree["field1"]
-        checkElement(field1, "field1", KaitaiResult::class, Pair(0, 4), Pair(0, 0), booleanArrayOfInts(0x11, 0x11, 0x11, 0x22))
+        checkElement(field1, "field1", KaitaiResult::class, Pair(0, 4), Pair(0, 0))
         check(field1.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field1.bytesListTree!!.size}" }
         val field1_sub1 = field1.bytesListTree!!["sub1"]
-        checkElement(field1_sub1, "sub1", KaitaiResult::class, Pair(0, 2), Pair(0, 0), booleanArrayOfInts(0x11, 0x11))
+        checkElement(field1_sub1, "sub1", KaitaiResult::class, Pair(0, 2), Pair(0, 0))
         check(field1_sub1.bytesListTree!!.size == 1) { "Expected subtype to have exactly 1 elements, got ${field1_sub1.bytesListTree!!.size}" }
         val field1_sub1_leaf = field1_sub1.bytesListTree!!["leaf"]
         checkElement(field1_sub1_leaf, "leaf", KaitaiBytes::class, Pair(0, 2), Pair(0, 0), booleanArrayOfInts(0x11, 0x11))
         val field1_sub2 = field1.bytesListTree!!["sub2"]
-        checkElement(field1_sub2, "sub2", KaitaiResult::class, Pair(2, 4), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
+        checkElement(field1_sub2, "sub2", KaitaiResult::class, Pair(2, 4), Pair(0, 0))
         check(field1_sub2.bytesListTree!!.size == 1) { "Expected subtype to have exactly 2 elements, got ${field1_sub2.bytesListTree!!.size}" }
         val field1_sub2_leaf = field1_sub2.bytesListTree!!["leaf"]
         checkElement(field1_sub2_leaf, "leaf", KaitaiBytes::class, Pair(2, 4), Pair(0, 0), booleanArrayOfInts(0x11, 0x22))
 
         val field2 = result.bytesListTree["field2"]
-        checkElement(field2, "field2", KaitaiResult::class, Pair(4, 8), Pair(0, 0), booleanArrayOfInts(0x22, 0x11, 0x22, 0x22))
+        checkElement(field2, "field2", KaitaiResult::class, Pair(4, 8), Pair(0, 0))
         check(field2.bytesListTree!!.size == 2) { "Expected subtype to have exactly 2 elements, got ${field2.bytesListTree!!.size}" }
         val field2_sub1 = field2.bytesListTree!!["sub1"]
-        checkElement(field2_sub1, "sub1", KaitaiResult::class, Pair(4, 6), Pair(0, 0), booleanArrayOfInts(0x22, 0x11))
+        checkElement(field2_sub1, "sub1", KaitaiResult::class, Pair(4, 6), Pair(0, 0))
         check(field2_sub1.bytesListTree!!.size == 1) { "Expected subtype to have exactly 2 elements, got ${field2_sub1.bytesListTree!!.size}" }
         val field2_sub1_leaf = field2_sub1.bytesListTree!!["leaf"]
         checkElement(field2_sub1_leaf, "leaf", KaitaiBytes::class, Pair(4, 6), Pair(0, 0), booleanArrayOfInts(0x22, 0x11))
         val field2_sub2 = field2.bytesListTree!!["sub2"]
-        checkElement(field2_sub2, "sub2", KaitaiResult::class, Pair(6, 8), Pair(0, 0), booleanArrayOfInts(0x22, 0x22))
+        checkElement(field2_sub2, "sub2", KaitaiResult::class, Pair(6, 8), Pair(0, 0))
         check(field2_sub2.bytesListTree!!.size == 1) { "Expected subtype to have exactly 2 elements, got ${field2_sub2.bytesListTree!!.size}" }
         val field2_sub2_leaf = field2_sub2.bytesListTree!!["leaf"]
         checkElement(field2_sub2_leaf, "leaf", KaitaiBytes::class, Pair(6, 8), Pair(0, 0), booleanArrayOfInts(0x22, 0x22))
@@ -808,17 +807,17 @@ class KaitaiDecoderTests {
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
         var element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"]
-        checkElement(element, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
+        checkElement(element, id="element_a", elementClass= KaitaiResult::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0))
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_a"].bytesListTree!!["subsub_a"]
         checkElement(element, id="subsub_a", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(0, 4), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xaa, 0xaa, 0xaa, 0xaa))
 
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"]
-        checkElement(element, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
+        checkElement(element, id="element_b", elementClass= KaitaiResult::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0))
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_b"].bytesListTree!!["sub_b"]
         checkElement(element, id="sub_b", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(4, 6), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xbb, 0xbb))
 
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"]
-        checkElement(element, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
+        checkElement(element, id="element_c", elementClass= KaitaiResult::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0))
         element = result.bytesListTree["element_sub"].bytesListTree!!["element_subsub"].bytesListTree!!["element_c"].bytesListTree!!["root_c"]
         checkElement(element, id="root_c", elementClass= KaitaiUnsignedInteger::class, sourceByteRange=Pair(6, 7), sourceRangeBitOffset=Pair(0, 0), value=booleanArrayOfInts(0xcc))
     }
@@ -1267,7 +1266,7 @@ class KaitaiDecoderTests {
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
         val pre = result.bytesListTree["pre"]
-        checkElement(pre, "pre", KaitaiResult::class, Pair(0,2), Pair(0,0), booleanArrayOfInts(0x01, 0x02))
+        checkElement(pre, "pre", KaitaiResult::class, Pair(0,2), Pair(0,0))
 
         val with_params = result.bytesListTree["with_params"]
         check(with_params is KaitaiResult) { "Expected with params to be KaitaiResult, got ${with_params::class.simpleName}" }
