@@ -205,7 +205,12 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 }
 
                 TokenType.ENUM -> {
-                    return Pair(TokenType.INTEGER, getEnumKeyFromValue((input.second as Pair<KTEnum, String>).first, (input.second as Pair<KTEnum, String>).second))
+                    return if ((input.second as Pair<KTEnum, String>).second[0].isLetter()){
+                        Pair(TokenType.INTEGER, getEnumKeyFromValue((input.second as Pair<KTEnum, String>).first, (input.second as Pair<KTEnum, String>).second))
+                    } else {
+                        Pair(TokenType.INTEGER, (input.second as Pair<KTEnum, String>).second.toLong())
+                    }
+
                 }
 
                 TokenType.BOOLEAN -> {
@@ -2224,7 +2229,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         bytesListTree: MutableKaitaiTree,
         value: dynamic,
     ): Pair<KTEnum?, String>? {
-        var result: Pair<KTEnum?, String> = Pair(null, "")
+        val result: Pair<KTEnum?, String>
         if (enum != null &&
             (usedDisplayStyle == DisplayStyle.SIGNED_INTEGER ||
                     usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER ||
@@ -2235,66 +2240,70 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 ?: getImportedEnum(enum, bytesListTree)
 
             if (path != null) {
-                if (usedDisplayStyle == DisplayStyle.UNSIGNED_INTEGER) {
-                    if (path[Int.fromBytes((value as BooleanArray).toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
-                        throw RuntimeException(
-                            "The enum $enum has no key-value pair with the given key ${
-                                Int.fromBytes(
-                                    (value as BooleanArray).toByteArray(),
-                                    ByteOrder.BIG
-                                ).toUInt()
-                            }"
-                        )
-                    } else {
-                        result = Pair(
-                            path,
-                            path[Int.fromBytes((value as BooleanArray).toByteArray(), ByteOrder.BIG).toUInt().toLong()]!!.id.toString()
-                        )
+                when (usedDisplayStyle) {
+                    DisplayStyle.UNSIGNED_INTEGER -> {
+                        result =
+                            if (path[Int.fromBytes((value as BooleanArray).toByteArray(), ByteOrder.BIG).toUInt().toLong()] == null) {
+                                Pair(
+                                    path,
+                                    Int.fromBytes((value as BooleanArray).toByteArray(), ByteOrder.BIG).toUInt().toLong().toString()
+                                )
+                            } else {
+                                Pair(
+                                    path,
+                                    path[Int.fromBytes((value as BooleanArray).toByteArray(), ByteOrder.BIG).toUInt()
+                                        .toLong()]!!.id.toString()
+                                )
+                            }
                     }
-                } else if (usedDisplayStyle == DisplayStyle.SIGNED_INTEGER) {
-                    val key : Long = when (value) {
-                        is BooleanArray -> {
-                            val byteArray = (value as BooleanArray).toByteArray()
-                            when (byteArray.size) {
-                                1 -> byteArray[0].toLong()
-                                2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toLong()
-                                4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toLong()
-                                8 -> Long.fromBytes(byteArray, ByteOrder.BIG)
-                                else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+                    DisplayStyle.SIGNED_INTEGER -> {
+                        val key: Long = when (value) {
+                            is BooleanArray -> {
+                                val byteArray = (value as BooleanArray).toByteArray()
+                                when (byteArray.size) {
+                                    1 -> byteArray[0].toLong()
+                                    2 -> Short.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                                    4 -> Int.fromBytes(byteArray, ByteOrder.BIG).toLong()
+                                    8 -> Long.fromBytes(byteArray, ByteOrder.BIG)
+                                    else -> throw IllegalArgumentException("Invalid byte array size for signed integer: ${byteArray.size}")
+                                }
+                            }
+
+                            else -> {
+                                value as Long
                             }
                         }
-                        else -> {
-                            value as Long
+                        result = if (path[key] == null) {
+                            Pair(path, key.toString())
+                        } else {
+                            Pair(
+                                path,
+                                path[key]!!.id.toString()
+                            )
                         }
                     }
-                    if (path[key] == null) {
-                        throw RuntimeException(
-                            "The enum ${enum} has no key-value pair with the given key $key"
-                        )
-                    } else {
-                        result = Pair(
-                            path,
-                            path[key]!!.id.toString()
-                        )
-                    }
-                } else if (usedDisplayStyle == DisplayStyle.BOOLEAN) {
-                    val key : Long = when (value) {
-                        is BooleanArray ->  {
-                            if ((value as BooleanArray)[0]) 1 else 0
-                        } else -> {
-                            if (value as Boolean) 1 else 0
-                        }
-                    }
+                    DisplayStyle.BOOLEAN -> {
+                        val key: Long = when (value) {
+                            is BooleanArray -> {
+                                if ((value as BooleanArray)[0]) 1 else 0
+                            }
 
-                    if (path[key] == null) {
-                        throw RuntimeException(
-                            "The enum $enum has no key-value pair with the given key $key"
-                        )
-                    } else {
-                        result = Pair(
-                            path,
-                            path[key]!!.id.toString()
-                        )
+                            else -> {
+                                if (value as Boolean) 1 else 0
+                            }
+                        }
+
+                        result = if (path[key] == null) {
+                            Pair(path, key.toString())
+                        } else {
+                            Pair(
+                                path,
+                                path[key]!!.id.toString()
+                            )
+                        }
+                    }
+                    else -> {
+                        throw IllegalStateException("Unexpected display style for enum")
                     }
                 }
             } else {

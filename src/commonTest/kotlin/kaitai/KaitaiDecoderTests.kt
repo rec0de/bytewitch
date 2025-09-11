@@ -464,7 +464,7 @@ class KaitaiDecoderTests {
             0x11, 0x22, 0x33, 0x44,
             0x12, 0x34
         )
-        console.log(KaitaiParser.toYaml(struct))
+
         val decoder = Kaitai("repeat_key", struct)
         val result = decoder.decode(data, 0)
 
