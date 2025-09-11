@@ -276,7 +276,7 @@ class KaitaiDecoderTests {
 
         // Validate field6
         val field6 = result.bytesListTree["field6"]
-        checkElement(field6, "field6", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "-201")
+        checkElement(field6, "field6", KaitaiSignedInteger::class, Pair(16, 18), Pair(0, 0), htmlInnerContent = "-20134")
 
         // Validate field7
         val field7 = result.bytesListTree["field7"]

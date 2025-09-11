@@ -50,9 +50,8 @@ object KaitaiTestUtils {
             val rendered = element.renderHTML()
             val div = document.createElement("div") as HTMLDivElement
             div.innerHTML = rendered
-            val renderedValue = div.querySelector(".kaitai-value")?.innerHTML ?: ""
-            console.log(renderedValue)
-            check(renderedValue.contains(htmlInnerContent)) {
+            val renderedValue = div.querySelector(".kaitai-value")?.innerHTML
+            check(renderedValue == htmlInnerContent) {
                 "Expected HTML content of field '$id' to contain '$htmlInnerContent', got '$renderedValue'"
             }
         }
