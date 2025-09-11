@@ -35,6 +35,7 @@ object SSFRenderer {
                     </div>
                 """.trimIndent()
 
+
                 SSFField.PAYLOAD_LENGTH_BIG_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN,
                 SSFField.MESSAGE_LENGTH_BIG_ENDIAN, SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN -> {
                     val payloadLength = SSFUtil.tryParseLength(
@@ -124,6 +125,7 @@ object SSFRenderer {
 
         val content = "<div class=\"ssffield roundbox\"><div>${renderedFieldContents.joinToString("")}</div></div>"
         val editButton = "<div class=\"icon icon-edit edit-button\"></div>"
+
         val alignmentButton = "<div class=\"icon icon-alignment alignment-button\" style=\"display:none;\"></div>"
         val toggleButton = "<div class=\"icon icon-toggle-right toggle-seqalign-button\" style=\"display:none;\"></div>"
         val iconBar = "<div class=\"icon-bar\">$editButton$alignmentButton$toggleButton</div>"
