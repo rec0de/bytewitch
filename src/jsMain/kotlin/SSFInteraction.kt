@@ -122,7 +122,6 @@ fun attachFinishButtonHandler(container: Element, originalBytes: ByteArray, msgI
             } else if(eligibleMsgs.size >= 2) {
                 showStartSequenceAlignmentButton() // show start button for sequence alignment
             }
-
         })
     }
 }

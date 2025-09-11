@@ -259,23 +259,4 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
         }
         return pooledSegment
     }
-
-
-    // position penalty for absolute and relative difference
-    private fun computePositionPenalty(startA: Int, startB: Int, lenA: Int, lenB: Int): Double {
-        val alpha = 0.02 // hyper parameter for absolute difference
-        val beta = 0.03  // hyper parameter for relative difference
-
-        // calc penalty for absolute difference
-        val maxLen = maxOf(lenA, lenB).toDouble()
-        val positionDiffAbs = kotlin.math.abs(startA - startB).toDouble()
-        val penaltyAbs = positionDiffAbs / maxLen
-
-        // calc penalty for relative difference
-        val relativePosA = startA.toDouble() / lenA
-        val relativePosB = startB.toDouble() / lenB
-        val penaltyRel = kotlin.math.abs(relativePosA - relativePosB)
-
-        return alpha * penaltyAbs + beta * penaltyRel
-    }
 }

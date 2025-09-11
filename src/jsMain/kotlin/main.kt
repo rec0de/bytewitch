@@ -1,5 +1,6 @@
 import SequenceAlignment.SegmentWiseSequenceAlignment
 import SequenceAlignment.ByteWiseSequenceAlignment
+import bitmage.hex
 import decoders.ByteWitchResult
 import decoders.SwiftSegFinder.*
 import kotlinx.browser.document
@@ -259,9 +260,30 @@ fun mainDecode(isLiveDecoding: Boolean) {
         // only decode text area if input changed
         val oldBytes = parsedMessages[i]?.bytes
         if (oldBytes == null || !oldBytes.contentEquals(bytes)) {
-            parsedMessages[i] = SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
+            if (bytes.isNotEmpty()) {
+                parsedMessages[i] =
+                    SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
 
-            decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
+                decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
+            } else if (inputText.isEmpty()) { // if no bytes are set in textview and not even a half byte is set so delete output
+                // delete from output view
+                val output = document.getElementById("output") as HTMLDivElement
+                val target = document.getElementById("message-output-$i") as? HTMLDivElement
+                if (target != null) {
+                    output.removeChild(target)
+                }
+
+                // delete from parsedMessages
+                parsedMessages.remove(i)
+                ssfEligible.remove(i)
+
+                // reset hexview to the bytes of the first textarea
+                val hexview = document.getElementById("hexview") as HTMLDivElement
+                val textview = document.getElementById("textview") as HTMLDivElement
+                hexview.innerText = ""
+                textview.innerHTML = ""
+            }
+
         }
     }
 
