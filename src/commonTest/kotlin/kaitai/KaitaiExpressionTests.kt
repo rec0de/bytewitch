@@ -18,7 +18,7 @@ class KaitaiExpressionTests {
     @Test
     fun tokenizerTest() {
         val kaitai = Kaitai("tokenizer", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "13_37  "
         var result:  MutableList<Pair<Kaitai.TokenType, dynamic>> = expressionParser.tokenizeExpression(expression)
@@ -196,7 +196,7 @@ class KaitaiExpressionTests {
     @Test
     fun operationsTest() {
         val kaitai = Kaitai("operations", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "-5 + 6 + 3.3 + -2.0"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -342,7 +342,7 @@ class KaitaiExpressionTests {
     @Test
     fun arrayTest() {
         val kaitai = Kaitai("array", KTStruct())
-        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), KTStruct(), booleanArrayOf(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(MutableKaitaiTree(ioStream = booleanArrayOf(), currentScopeStruct = KTStruct()), KTStruct(), booleanArrayOf(), 0, null, null)
 
         var expression: String = "[3, 3+1, 3 << 2, 7 / 2, ]"
         var result: dynamic = expressionParser.parseExpression(expression)
@@ -482,7 +482,7 @@ class KaitaiExpressionTests {
         val result = kaitai.decode(data, 0)
         check(result is KaitaiResult) { "Expected KaitaiResult, got ${result::class.simpleName}" }
 
-        val expressionParser = kaitai.ExpressionParser(result.bytesListTree, struct, null, data.toBooleanArray(), 0, null, null)
+        val expressionParser = kaitai.ExpressionParser(result.bytesListTree, struct, data.toBooleanArray(), 0, null, null)
 
         var expressionResult = expressionParser.parseExpression("u1")
         check(expressionResult is Long) {"Expected type of u1 to be Long, got ${expressionResult::class.simpleName}" }

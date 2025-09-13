@@ -368,6 +368,7 @@ button:hover {
     flex-wrap: wrap;
     overflow-wrap: anywhere;
     max-width: 100%;
+    color: initial;
 }
 
 .kaitai-instance {
@@ -384,6 +385,10 @@ button:hover {
 
 .kaitai-element-id {
     color: var(--kaitai-element-id);
+}
+
+.kaitai-value {
+    /*  */
 }
 
 .kaitai-type-suffix {

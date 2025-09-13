@@ -92,9 +92,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 id,
                 null,
                 parentBytesListTree = null,
-                null,
                 kaitaiStruct,
-                null,
                 data.toBooleanArray(),
                 sourceOffset * 8,
                 _offsetInDatastreamInBits = 0,
@@ -160,7 +158,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     inner class ExpressionParser(
         val bytesListTree: MutableKaitaiTree,
         val currentScopeStruct: KTStruct,
-        val parentScopeStruct: KTStruct?,
         val ioStream: BooleanArray,
         val offsetInCurrentIoStream: Int,
         val repeatIndex: Int?,
@@ -515,7 +512,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
         fun parseEnum(token: Pair<TokenType, String>): Pair<TokenType, Pair<KTEnum, String>> {
             val path: String = token.second.substringBeforeLast("::")
-            val enum: KTEnum = getEnum(currentScopeStruct, path) ?: getEnum(parentScopeStruct, path) ?: getEnum(kaitaiStruct, path)
+            val enum: KTEnum = getEnum(currentScopeStruct, path) ?: getEnum(currentScopeStruct.parent, path) ?: getEnum(kaitaiStruct, path)
             ?: throw RuntimeException("The enum $path does not exist.")
 
             return Pair(TokenType.ENUM, Pair(enum, token.second.substringAfterLast("::")))
@@ -708,7 +705,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                         bytesListTree[token.second]
                     } catch (e: Exception) {
                         val instance : KTSeq = currentScopeStruct.instances[token.second]!!
-                        processInstance(token.second, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, 0, 0).first?: throw RuntimeException("The referenced instance ${token.second} wasn't created because the if key was evaluated as false.")
+                        processInstance(token.second, instance, currentScopeStruct, bytesListTree, ioStream, 0, 0).first?: throw RuntimeException("The referenced instance ${token.second} wasn't created because the if key was evaluated as false.")
                     }
                     if (targetElement is KaitaiElement) {
                         parseReferenceHelper(targetElement)
@@ -860,7 +857,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                             processInstance(
                                 op2.second as String,
                                 instance,
-                                relevantBytesListTree.parent?.currentScopeStruct,
                                 relevantBytesListTree.currentScopeStruct,
                                 relevantBytesListTree,
                                 relevantBytesListTree.ioStream,
@@ -1921,7 +1917,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         return type
     }
 
-    fun parseType(parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree, expressionParser: ExpressionParser) : Type {
+    fun parseType(currentScopeStruct: KTStruct, seqElement: KTSeq, bytesListTree: MutableKaitaiTree, expressionParser: ExpressionParser) : Type {
          val typeNameWithParams : String? = when (seqElement.type) {
             is KTType.Primitive -> {
                 seqElement.type.type
@@ -1959,7 +1955,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             // Check if we have a custom type defined in the current scope or in the global scope
             val customTypeCandidate =
                 getCustomType(currentScopeStruct, type.type) ?:
-                getCustomType(parentScopeStruct, type.type) ?:
+                getCustomType(currentScopeStruct.parent, type.type) ?:
                 getCustomType(bytesListTree.getRoot().rootStruct, type.type) ?:
                 //getCustomType(kaitaiStruct, type.type) ?:
                 getImportedType(type, bytesListTree)
@@ -1972,7 +1968,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 val paramNames = type.customType!!.params.map { param -> param.id }
                 require(paramNames.all{it != null}) {"At least one of the parameter names is null, which seems incorrect."}
 
-                val pairsOfDataAndParams = parsedParamsData.zip(type.customType!!.params.map{it -> it.enum})
+                val pairsOfDataAndParams = parsedParamsData.zip(type.customType!!.params.map{it.enum})
 
                 type.params = paramNames.filterNotNull().zip(pairsOfDataAndParams).toMap()
             } else {  // parse builtin type
@@ -1999,7 +1995,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
     fun parseProcessXor(stream: BooleanArray, param: String, parser: ExpressionParser) : BooleanArray {
         val processedStream: BooleanArray = stream.copyOf()
-        val bytes: BooleanArray = (parser.parseExpression("[" + param.substringAfter('[').substringBefore(']') + "]") as List<Long>).map { it -> it.toByte() }.toByteArray().toBooleanArray()
+        val bytes: BooleanArray = (parser.parseExpression("[" + param.substringAfter('[').substringBefore(']') + "]") as List<Long>).map { it.toByte() }.toByteArray().toBooleanArray()
         var i = 0
         val bits = bytes.size
         while (i < processedStream.size) {
@@ -2074,12 +2070,11 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         sourceOffsetInBits: Int,
         _dataSizeOfSequenceInBits: Int,
         repeatIndex: Int?,
-        parentScopeStruct: KTStruct?,
     ): Triple<ByteWitchResult, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = _dataSizeOfSequenceInBits
 
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, null)
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, null)
 
         if (seqElement.pos != null) {
             offsetInDatastreamInBits = if (seqElement.pos is StringOrInt.IntValue) {
@@ -2089,7 +2084,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        val type = parseType(parentScopeStruct, currentScopeStruct, seqElement, bytesListTree, expressionParser)
+        val type = parseType(currentScopeStruct, seqElement, bytesListTree, expressionParser)
         if (type.sizeIsUntilEOS) {
             type.sizeInBits = (ioStream.size - offsetInDatastreamInBits)
             type.sizeIsKnown = true
@@ -2157,7 +2152,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         // get the enum value
-        val enum: Pair<KTEnum?, String>? = fetchEnum(seqElement.enum, type.usedDisplayStyle, currentScopeStruct, parentScopeStruct, bytesListTree, ioSubStream)
+        val enum: Pair<KTEnum?, String>? = fetchEnum(seqElement.enum, type.usedDisplayStyle, currentScopeStruct, bytesListTree, ioSubStream)
         if (enum != null) {
             type.usedDisplayStyle = DisplayStyle.ENUM
         }
@@ -2167,9 +2162,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 elementId,
                 seqElement,
                 bytesListTree,
-                type.customType!!.parent,
                 type.customType!!,
-                type.params,
                 ioSubStream,
                 sourceOffsetInBits + dataSizeOfSequenceInBits,
                 if (type.sizeInBits != 0) 0 else offsetInDatastreamInBits,  // reset offset in case of substream
@@ -2207,7 +2200,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             }
         }
 
-        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, kaitaiElement))) {
+        if (seqElement.valid != null && !checkValidKey(seqElement.valid, ExpressionParser(bytesListTree, currentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, kaitaiElement))) {
             throw Exception("Value of bytes does not align with expected valid value.")
         }
 
@@ -2225,7 +2218,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         enum: String?,
         usedDisplayStyle: DisplayStyle,
         currentScopeStruct: KTStruct,
-        parentScopeStruct: KTStruct?,
         bytesListTree: MutableKaitaiTree,
         value: dynamic,
     ): Pair<KTEnum?, String>? {
@@ -2236,7 +2228,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     usedDisplayStyle == DisplayStyle.BOOLEAN)
         ) {
             val path: KTEnum? =
-                getEnum(currentScopeStruct, enum) ?: getEnum(parentScopeStruct, enum) ?: getEnum(kaitaiStruct, enum)
+                getEnum(currentScopeStruct, enum) ?: getEnum(currentScopeStruct.parent, enum) ?: getEnum(kaitaiStruct, enum)
                 ?: getImportedEnum(enum, bytesListTree)
 
             if (path != null) {
@@ -2326,7 +2318,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         _offsetInDatastreamInBits: Int,
         sourceOffsetInBits: Int,
         originalDataSizeOfSequenceInBits: Int,
-        parentScopeStruct: KTStruct?
     ) : Triple<KaitaiElement, Int, Int> {
         var offsetInDatastreamInBits = _offsetInDatastreamInBits
         var dataSizeOfSequenceInBits = originalDataSizeOfSequenceInBits
@@ -2347,7 +2338,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 val expressionParser = ExpressionParser(
                     bytesListTree,
                     currentScopeStruct,
-                    parentScopeStruct,
                     ioStream,
                     offsetInDatastreamInBits,
                     null,
@@ -2374,7 +2364,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 sourceOffsetInBits,
                 dataSizeOfSequenceInBits,
                 repeatIndex,
-                parentScopeStruct,
             )
 
             bytesListTreeForInnerList.add(triple.first)
@@ -2386,7 +2375,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
 
             if (seqElement.repeat == KTRepeat.UNTIL) {
                 checkNotNull(seqElement.repeatUntil) { "With repeat type until, a repeat-until key is needed" }
-                val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
+                val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, ioStream, offsetInDatastreamInBits, repeatIndex, triple.first)
                 val repeatGuard : Boolean = if (seqElement.repeatUntil is StringOrBoolean.BooleanValue) {
                     seqElement.repeatUntil.value
                 } else {
@@ -2429,9 +2418,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         offsetInDatastreamInBits: Int,
         sourceOffsetInBits: Int,
         dataSizeOfSequenceInBits: Int,
-        parentScopeStruct: KTStruct?
     ): Triple<ByteWitchResult?, Int, Int> {
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
         if (!expressionParser.parseExpression(seqElement.ifCondition.toString())) {
             return Triple(null, offsetInDatastreamInBits, dataSizeOfSequenceInBits)
         }
@@ -2447,7 +2435,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 offsetInDatastreamInBits,
                 sourceOffsetInBits,
                 dataSizeOfSequenceInBits,
-                parentScopeStruct
             )
         } else {
             processSingleSeqElement(
@@ -2461,7 +2448,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 sourceOffsetInBits,
                 dataSizeOfSequenceInBits,
                 null,
-                parentScopeStruct,
             )
         }
     }
@@ -2503,7 +2489,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     ): KaitaiElement {
         val kaitaiElement = when(expressionResult) {
             is Long -> { // token integer
-                val result: Pair<KTEnum?, String>? = fetchEnum(enum, DisplayStyle.SIGNED_INTEGER, currentScopeStruct, parentBytesListTree.currentScopeStruct, parentBytesListTree, expressionResult)
+                val result: Pair<KTEnum?, String>? = fetchEnum(enum, DisplayStyle.SIGNED_INTEGER, currentScopeStruct, parentBytesListTree, expressionResult)
                 if (result != null) {
                     KaitaiEnum(id, ByteOrder.BIG, ioStream, booleanArrayOf(), 0, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind, result)
                 } else {
@@ -2517,7 +2503,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                 KaitaiString(id, ByteOrder.BIG, ioStream, expressionResult, 0, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind)
             }
             is Boolean -> { // token boolean
-                val result: Pair<KTEnum?, String>? = fetchEnum(enum, DisplayStyle.BOOLEAN, currentScopeStruct, parentBytesListTree.currentScopeStruct, parentBytesListTree, expressionResult)
+                val result: Pair<KTEnum?, String>? = fetchEnum(enum, DisplayStyle.BOOLEAN, currentScopeStruct, parentBytesListTree, expressionResult)
                 if (result != null) {
                     KaitaiEnum(id, ByteOrder.BIG, ioStream, booleanArrayOf(), 0, Pair(0, 0), Pair(0, 0), doc, kaitaiElementKind, result)
                 } else {
@@ -2568,7 +2554,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
     private fun processInstance(
         id: String,
         instance: KTSeq,
-        parentScopeStruct: KTStruct?,
         currentScopeStruct: KTStruct,
         bytesListTree: MutableKaitaiTree,
         ioStream: BooleanArray,
@@ -2576,8 +2561,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         dataSizeOfSequenceInBits: Int,
     ): Triple<ByteWitchResult?, Int, Int> {
 
-        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, 0, null, null)
-        // valueInstances have entirely eperate handling from normal instances
+        val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, ioStream, 0, null, null)
+        // valueInstances have entirely separate handling from normal instances
         if (instance.value != null) {
             if (!expressionParser.parseExpression(instance.ifCondition.toString())) {
                 return Triple(null, 0, 0)
@@ -2616,17 +2601,15 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
             offsetInDatastreamInBits,
             sourceOffsetInBits,
             dataSizeOfSequenceInBits,
-            parentScopeStruct,
         )
     }
 
     fun processSeq(
-        parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, parentScopeStruct: KTStruct?, currentScopeStruct: KTStruct,
-        customTypeParams: Map<String, Pair<Any, String?>>?, ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int,
+        parentId: String, parentSeq: KTSeq?, parentBytesListTree: MutableKaitaiTree?, currentScopeStruct: KTStruct,
+        ioStream: BooleanArray, sourceOffsetInBits: Int, _offsetInDatastreamInBits: Int,
         isRoot: Boolean, customTypeName: String?, canonicalPath: String?, imports: List<String>?, ownType: Type?
     ) : KaitaiElement {
         var offsetInDatastreamInBits: Int = _offsetInDatastreamInBits
-
         val bytesListTree = MutableKaitaiTree(ioStream = ioStream, currentScopeStruct = currentScopeStruct)
         bytesListTree.parent = parentBytesListTree
         bytesListTree.byteOrder = bytesListTree.parent?.byteOrder ?: ByteOrder.BIG
@@ -2636,7 +2619,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     endian.value.toByteOrder()
                 }
                 is KTEndian.Switch -> {
-                    val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, parentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
+                    val expressionParser = ExpressionParser(bytesListTree, currentScopeStruct, ioStream, offsetInDatastreamInBits, null, null)
                     val entry = processSwitchOn(endian.switchOn, endian.cases, expressionParser)
                     checkNotNull(entry) { "No matching case found" }
                     entry.toByteOrder()
@@ -2653,8 +2636,8 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         // handle passed parameters and add to bytesListTree, first because they are used in the sequence
-        if (customTypeParams != null) {
-            for (param in customTypeParams) {
+        if (ownType?.params != null) {
+            for (param in ownType.params) {
                 bytesListTree.add(
                     processParameter(
                         param.value.first,
@@ -2670,7 +2653,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         }
 
         // handle actual sequence
-        var dataSizeOfSequenceInBits : Int = 0
+        var dataSizeOfSequenceInBits = 0
         if (currentScopeStruct.seq.isNotEmpty()) {
             for (seqElement in currentScopeStruct.seq) {
                 val elementId = seqElement.id?: ""
@@ -2684,7 +2667,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
                     offsetInDatastreamInBits,
                     sourceOffsetInBits,
                     dataSizeOfSequenceInBits,
-                    parentScopeStruct
                 )
 
                 if (triple.first != null) {
@@ -2711,7 +2693,7 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         // handle instances last because they usually have auxiliary information. if they get used by the immediately preceding sequence ("quasi forward referencing") they get parsed by the expression parser, not here
         if (currentScopeStruct.instances.isNotEmpty()) {
             for ((id, instance) in currentScopeStruct.instances) {
-                val triple = processInstance(id, instance, parentScopeStruct, currentScopeStruct, bytesListTree, ioStream, sourceOffsetInBits, 0)
+                val triple = processInstance(id, instance, currentScopeStruct, bytesListTree, ioStream, sourceOffsetInBits, 0)
 
                 if (triple.first != null) {
                     bytesListTree.add(triple.first!!)
@@ -2732,18 +2714,6 @@ class Kaitai(kaitaiName: String, val kaitaiStruct: KTStruct, val canonicalPath: 
         kaitaiResult.bytesListTree.kaitaiElement = kaitaiResult
         return kaitaiResult
     }
-}
-
-interface KaitaiElement : ByteWitchResult {
-    val id: String
-    val suffix: String
-    val bytesListTree: MutableKaitaiTree? get() = null
-    val value: dynamic
-    val sizeInBits: Int
-    var endianness: ByteOrder
-    var doc: KaitaiDoc
-    val ioStream: BooleanArray
-    val kaitaiElementKind: KaitaiElementKind
 }
 
 class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
@@ -2816,6 +2786,18 @@ class KaitaiDoc(val docstring: String?, val docRef: List<String>?) {
     }
 }
 
+interface KaitaiElement : ByteWitchResult {
+    val id: String
+    val suffix: String
+    val bytesListTree: MutableKaitaiTree? get() = null
+    val value: dynamic
+    val sizeInBits: Int
+    var endianness: ByteOrder
+    var doc: KaitaiDoc
+    val ioStream: BooleanArray
+    val kaitaiElementKind: KaitaiElementKind
+}
+
 class KaitaiResult(
     override val id: String, override var endianness: ByteOrder,
     override val bytesListTree: MutableKaitaiTree, override val suffix: String,
@@ -2844,7 +2826,7 @@ class KaitaiList(
     override val sourceByteRange: Pair<Int, Int>, override val sourceRangeBitOffset: Pair<Int, Int>,
     override var doc: KaitaiDoc, override val kaitaiElementKind: KaitaiElementKind
 ) : KaitaiElement {
-    override val suffix = ""  // Lists have no type and therefor no suffix. they are recognizable by the brackets
+    override val suffix = ""  // Lists have no type and therefor no suffix. they are recognizable by the brackets and the elements in them have types
     override fun renderHTML(): String {
         return "<div class=\"kaitai roundbox tooltip ${kaitaiElementKind.cssClass}\" $byteRangeDataTags>" +
                     "${bytesListTree.joinToString(", ", "<span class=\"kaitai-element-id\">$id</span>[", "]") { it.renderHTML() }}" +
