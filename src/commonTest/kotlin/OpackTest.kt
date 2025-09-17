@@ -3,6 +3,7 @@ import bitmage.hex
 import decoders.ECCurves
 import decoders.OPDict
 import decoders.OPString
+import decoders.OpackObject
 import decoders.OpackParser
 import kotlin.test.Test
 
@@ -43,6 +44,25 @@ class OpackTest {
 
         check(r1.any { it.second is OPDict })
         check(r2.any { it.second is OPDict })
+    }
+
+    @Test
+    fun pyATVExamples() {
+        val samples = listOf(
+            "EF4163416403",
+            "0512345678123456781234567812345678",
+            "6F666F6F00",
+            "D443666F6F43626172A0A1",
+            "DF416103",
+            "E3416102416244746573744163A2"
+        )
+
+        val results = samples.map { ByteWitch.analyze(it.fromHex(), tryhard = true) }
+
+        samples.forEach {
+            val result = ByteWitch.analyze(it.fromHex(), tryhard = false)
+            check(result.any{ it.second is OpackObject }) { "Payload failed to detect as opack: $it" }
+        }
     }
 
 }

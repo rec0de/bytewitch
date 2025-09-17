@@ -155,7 +155,6 @@ fun decode(tryhard: Boolean) {
 
             parseResult.appendChild(parseName)
             parseResult.appendChild(parseContent)
-
             output.appendChild(parseResult)
         }
     }
