@@ -36,7 +36,7 @@ object KaitaiUI {
                     nameInput.value = ""
                     kaitaiInput.value = ""
                     // force decode when parser is saved
-                    decode(false, force = true)
+                    mainDecode(false, force = true)
                 }
             } else {
                 console.warn("Kaitai name and input cannot be empty")
@@ -53,7 +53,7 @@ object KaitaiUI {
             if (includeLiveStruct.checked) {
                 updateLiveDecoder(getInputValue())
                 if (liveDecodeEnabled)
-                    decode(true)
+                    mainDecode(true)
             }
         }
 
@@ -64,7 +64,7 @@ object KaitaiUI {
                 updateLiveDecoder(null)
             }
             if (liveDecodeEnabled) {
-                decode(true)
+                mainDecode(true)
             }
         }
 

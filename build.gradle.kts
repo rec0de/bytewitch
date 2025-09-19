@@ -18,6 +18,7 @@ kotlin {
                 devServer = devServer?.copy(
                     open = false // verhindert das automatische Öffnen des Browsers
                 )
+                sourceMaps = true
             }
             testTask {
                 useKarma {

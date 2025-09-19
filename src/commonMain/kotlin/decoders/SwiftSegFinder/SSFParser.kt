@@ -6,7 +6,11 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.random.Random
 
+data class GaussianKernel(val sigma: Double, val radius: Int, val weights: DoubleArray)
+
 class SSFParser {
+    private val GAUSS_06: GaussianKernel = precomputeGaussianKernel(0.6)
+
     // this finds all segment boundaries and returns a SSF object that can be called to get the html code
     fun parse(bytes: ByteArray, msgIndex: Int): SSFParsedMessage {
         val segments = findSegmentBoundaries(bytes)
@@ -142,10 +146,10 @@ class SSFParser {
             replacedSegments.add(
                 SSFSegment(
                     lengthFieldOffset,
-                    if (chosenEndian)
-                        SSFField.PAYLOAD_LENGTH_BIG_ENDIAN
+            if (chosenEndian)
+                        SSFField.MESSAGE_LENGTH_BIG_ENDIAN
                     else
-                        SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN
+                        SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN
                 )
             )
 
@@ -157,13 +161,6 @@ class SSFParser {
 
             val finalSegments = replacedSegments.sortedBy { it.offset }
             msg.copy(segments = finalSegments)
-
-            /*val newSegments = msg.segments.toMutableList()
-            newSegments.add(SSFSegment(lengthFieldOffset,
-                if (chosenEndian) SSFField.PAYLOAD_LENGTH_BIG_ENDIAN else SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
-            newSegments.add(SSFSegment(payloadStart, SSFField.UNKNOWN))
-
-            msg.copy(segments = newSegments.sortedBy { it.offset }.distinctBy { it.offset })*/
         }
     }
 
@@ -184,9 +181,11 @@ class SSFParser {
             // payloadEnd must be message size
             if (payloadEnd != bytes.size) continue
 
-            // length field must be of type UNKNOWN
+            // length field must be of type UNKNOWN or already by a message length field because only one is allowed to exists
             val currentSegment = findSegmentForOffset(segments, offset)
-            if (currentSegment?.fieldType != SSFField.UNKNOWN) continue
+            if (currentSegment?.fieldType != SSFField.UNKNOWN
+                && currentSegment?.fieldType != SSFField.MESSAGE_LENGTH_BIG_ENDIAN
+                && currentSegment?.fieldType != SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN) continue
 
             return offset to length
         }
@@ -224,6 +223,53 @@ class SSFParser {
         return -1
     }
 
+    // calc Gain Ratio GR. GR(Di) means IGR from Di to Di+1. This says how much neighboring bytes belong together
+    fun calcGainRatio(messages: List<SSFParsedMessage>, entropy: DoubleArray): DoubleArray {
+        val minLength = messages.minOf { it.bytes.size }
+        val gr = DoubleArray(minLength) { 0.0 }
+
+        for (i in 0 until minLength - 1) { // don't need to check the last byte
+            val pairCounts = mutableMapOf<Pair<Int, Int>, Int>() // how often byte combination [a,b] appear at pos i
+            val countsI = mutableMapOf<Int, Int>() // how often byte a appears at position i
+            val countsJ = mutableMapOf<Int, Int>() // how often byte b appears at position i
+
+            // go through all messages for counting byte a and byte b
+            for (msg in messages) {
+                val a = msg.bytes[i].toInt() and 0xFF
+                val b = msg.bytes[i + 1].toInt() and 0xFF
+                pairCounts[a to b] = pairCounts.getOrPut(a to b) { 0 } + 1
+                countsI[a] = countsI.getOrPut(a) { 0 } + 1
+                countsJ[b] = countsJ.getOrPut(b) { 0 } + 1
+            }
+
+            val total = messages.size.toDouble()
+
+            // Entropy of (i, i+1)
+            val hXY = pairCounts.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i
+            val hX = countsI.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // Entropy of i+1
+            val hY = countsJ.entries.sumOf { (_, count) ->
+                val p = count / total
+                -p * ln(p)
+            }
+
+            // calculate igr
+            val igr = hY - (hXY - hX)
+            gr[i] = if (entropy[i] > 0) igr / entropy[i] else 0.0
+        }
+
+        return gr
+    }
+
     // find segmentation boundaries
     private fun findSegmentBoundaries(bytes: ByteArray): List<SSFSegment> {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
@@ -254,7 +300,7 @@ class SSFParser {
             val deltaBC = computeDeltaBC(slice)
 
             // sigma should depend on the field length: Nemesys paper on page 5
-            val smoothed = applyGaussianFilter(deltaBC, 0.6)
+            val smoothed = applyGaussianFilter(deltaBC, GAUSS_06)
 
             // Safety check (it mostly enters if the bytes are too short)
             if (smoothed.isEmpty()) {
@@ -315,34 +361,39 @@ class SSFParser {
         return deltaBC
     }
 
-    // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
-    private fun applyGaussianFilter(deltaBC: DoubleArray, sigma: Double): DoubleArray {
+    // pre compute kernel value
+    private fun precomputeGaussianKernel(sigma: Double): GaussianKernel {
         val radius = ceil(3 * sigma).toInt()
         val size = 2 * radius + 1 // calc kernel size
-        val kernel = DoubleArray(size)  // kernel as DoubleArray
+        val weights = DoubleArray(size) // kernel as DoubleArray
         var sum = 0.0
-
-        // calc kernel and sum of values
         for (i in -radius..radius) {
-            kernel[i + radius] = exp(-0.5 * (i * i) / (sigma * sigma))  // gaussian weight
-            sum += kernel[i + radius]
+            weights[i + radius] = exp(-0.5 * (i * i) / (sigma * sigma)) // gaussian weight
+            sum += weights[i + radius]
         }
 
         // normalize kernel
-        for (i in kernel.indices) {
-            kernel[i] /= sum
-        }
+        for (i in weights.indices) weights[i] /= sum
+
+        return GaussianKernel(sigma, radius, weights)
+    }
+
+    // apply gaussian filter to smooth deltaBC. So we don't interpret every single change as a field boundary
+    private fun applyGaussianFilter(deltaBC: DoubleArray, kernel: GaussianKernel): DoubleArray {
+        val r = kernel.radius
+        val w = kernel.weights
 
         // calc smoothed array
         val smoothed = DoubleArray(deltaBC.size)
         for (i in deltaBC.indices) {
-            smoothed[i] = 0.0
-            for (j in -radius..radius) {
+            var acc = 0.0
+            for (j in -r..r) {
                 val idx = i + j
-                if (idx >= 0 && idx < deltaBC.size) {
-                    smoothed[i] += deltaBC[idx] * kernel[j + radius]  // weighted average
+                if (idx in deltaBC.indices) {
+                    acc += deltaBC[idx] * w[j + r] // weighted average
                 }
             }
+            smoothed[i] = acc
         }
 
         return smoothed
@@ -517,25 +568,6 @@ class SSFParser {
         return result
     }
 
-    // calc Shannon-Entropy for one segment
-    fun calculateShannonEntropy(segment: ByteArray): Double {
-        // count the amount of bytes in the segment
-        val frequency = mutableMapOf<Byte, Int>()
-        for (byte in segment) {
-            frequency[byte] = (frequency[byte] ?: 0) + 1
-        }
-
-        // calc entropy
-        val total = segment.size.toDouble()
-        var entropy = 0.0
-        for ((_, count) in frequency) {
-            val probability = count / total
-            entropy -= probability * ln(probability) / ln(2.0)
-        }
-
-        return entropy
-    }
-
     // split bytes at the beginning of the message
     fun splitFixed(
         segments: MutableList<SSFSegment>,
@@ -565,6 +597,34 @@ class SSFParser {
         return segments
     }
 
+    // H in [0,1] using byte-alphabet (|A|=256)
+    fun entropyBytesNormalized(segment: ByteArray): Double {
+        if (segment.isEmpty()) return 0.0
+
+        val counts = IntArray(256)
+        for (b in segment) counts[b.toInt() and 0xFF]++
+
+        val total = segment.size.toDouble()
+        var h = 0.0
+        for (c in counts) if (c > 0) {
+            val p = c / total
+            h -= p * ln(p)
+        }
+
+        return h / ln(256.0)
+    }
+
+    // compute the byte-wise xor of the first l bytes of two arrays
+    fun xorPrefix(a: ByteArray, b: ByteArray, l: Int): ByteArray {
+        val len = minOf(l, a.size, b.size)
+        val out = ByteArray(len)
+
+        for (i in 0 until len) {
+            out[i] = (a[i].toInt() xor b[i].toInt()).toByte()
+        }
+
+        return out
+    }
 
     // merge two segments based on their entropy
     fun entropyMerge(
@@ -578,27 +638,26 @@ class SSFParser {
             // get current segment
             val (start, fieldType) = segments[index]
             val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
-            val currentSegment = bytes.sliceArray(start until end)
-            val currentEntropy = calculateShannonEntropy(currentSegment)
+            val segA = bytes.sliceArray(start until end)
+            // val hA = entropyNibblesNormalized(segA) // nibble entropy of segment A
+            val hA = entropyBytesNormalized(segA) // byte entropy of segment A
 
             if (index + 1 < segments.size) { // check if a following segment exists
-                val (nextStart, nextFieldType) = segments[index + 1]
-                if (fieldType == nextFieldType) {  // check that both field have the same field type
+                val (nextStart, nextType) = segments[index + 1]
+                if (fieldType == nextType) { // check that both field have the same field type
                     val nextEnd = if (index + 2 < segments.size) segments[index + 2].offset else bytes.size
-                    val nextSegment = bytes.sliceArray(nextStart until nextEnd)
-                    val nextEntropy = calculateShannonEntropy(nextSegment)
+                    val segB = bytes.sliceArray(nextStart until nextEnd)
+                    // val hB = entropyNibblesNormalized(segB) // nibble entropy of segment B
+                    val hB = entropyBytesNormalized(segB) // byte entropy of segment B
 
-                    val entropyDiff = kotlin.math.abs(currentEntropy - nextEntropy)
-
-                    if (currentEntropy > 0.7 && nextEntropy > 0.7 && entropyDiff < 0.05) {
+                    val diff = kotlin.math.abs(hA - hB)
+                    if (hA > 0.7 && hB > 0.7 && diff < 0.05) {
                         // xor of the start bytes for both segments
-                        val xorLength = minOf(2, currentSegment.size, nextSegment.size)
-                        val xorStart1 = currentSegment.take(xorLength).toByteArray()
-                        val xorStart2 = nextSegment.take(xorLength).toByteArray()
-                        val xorResult = ByteArray(xorLength) { i -> (xorStart1[i].toInt() xor xorStart2[i].toInt()).toByte() }
-                        val xorEntropy = calculateShannonEntropy(xorResult)
+                        val xor = xorPrefix(segA, segB, 2)
+                        // val hX = entropyNibblesNormalized(xor)
+                        val hX = entropyBytesNormalized(xor)
 
-                        if (xorEntropy > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
+                        if (hX > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
                             // merge segments together
                             result.add(SSFSegment(start, fieldType))
                             index += 2 // skip the following field because we want to merge it to this one
@@ -850,5 +909,14 @@ object SSFUtil {
         val start = message.segments[index].offset
         val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
         return start until end
+    }
+
+    fun setSSFFieldfromDecoder(decoder: ByteWitchDecoder): SSFField {
+        return when (decoder.name.lowercase()) {
+            "utf8" -> SSFField.STRING
+            "utf16" -> SSFField.UNKNOWN // STRING_UTF16
+            "ieee754" -> SSFField.UNKNOWN // FLOAT
+            else -> SSFField.UNKNOWN
+        }
     }
 }

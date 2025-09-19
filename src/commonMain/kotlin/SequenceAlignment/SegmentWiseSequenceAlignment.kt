@@ -9,10 +9,10 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
     // main function for sequence alignment
     override fun align(messages: Map<Int, SSFParsedMessage>): List<AlignedSequence> {
         val alignments = mutableListOf<AlignedSequence>()
-        val tresholdAlignedSegment = 0.17
+        val thresholdAlignedSegment = 0.83
 
         // get dissimilarity matrix (by using canberra-ulm dissimilarity)
-        val sparseMatrixData = calcSparseSimilarityMatrix(messages, tresholdAlignedSegment)
+        val sparseMatrixData = calcSparseSimilarityMatrix(messages, thresholdAlignedSegment)
 
         for ((pair, matrixS) in sparseMatrixData) {
             if (matrixS.isEmpty()) continue
@@ -37,10 +37,7 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
 
                 val sim = matrixS[i - 1 to j - 1] ?: Double.NEGATIVE_INFINITY
                 if (score == diag + sim) {
-                    if (1.0 - sim < tresholdAlignedSegment) {
-                        alignments.add(AlignedSequence(protoA, protoB, i - 1, j - 1, 1.0 - sim))
-                    }
-
+                    alignments.add(AlignedSequence(protoA, protoB, i - 1, j - 1, 1.0 - sim))
                     i--
                     j--
                 } else if (score == up + gapPenalty) {
@@ -122,8 +119,8 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
                         val dissim = canberraUlmDissimilarity(segmentBytesA, segmentBytesB, typeA, typeB)
                         // val dissim = canberraDissimilarityByteWise(segmentBytesA, segmentBytesB, typeA, typeB)
                         // val dissim = canberraDissimilarityWithPooling(segmentBytesA, segmentBytesB)
-                        val sim = 1.0 - dissim
 
+                        val sim = 1.0 - dissim
                         if (sim >= similarityThreshold) {
                             // save matches for segmentA
                             simMap[segmentAIndex to segmentBIndex] = sim
@@ -159,9 +156,11 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
 
         var minD = Double.MAX_VALUE
 
-        // if both segments are a payload length field so set canberra distance to 0
+        // if both segments are a length field so set canberra distance to 0
         if ((typeA == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
-            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
+            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)
+            || (typeA == SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN && typeB == SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN)
+            || (typeA == SSFField.MESSAGE_LENGTH_BIG_ENDIAN && typeB == SSFField.MESSAGE_LENGTH_BIG_ENDIAN)) {
             minD = 0.0
         } else {
             // sliding window to search for the lowest dissimilarity
@@ -188,7 +187,9 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
     private fun canberraDissimilarityByteWise(segmentA: ByteArray, segmentB: ByteArray, typeA: SSFField, typeB: SSFField): Double {
         // if both segments are a payload length field so set canberra distance to 0
         if ((typeA == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
-            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)) {
+            || (typeA == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN && typeB == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN)
+            || (typeA == SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN && typeB == SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN)
+            || (typeA == SSFField.MESSAGE_LENGTH_BIG_ENDIAN && typeB == SSFField.MESSAGE_LENGTH_BIG_ENDIAN)) {
             return 0.0
         }
 
@@ -221,55 +222,41 @@ object SegmentWiseSequenceAlignment : AlignmentResult<SSFParsedMessage> {
 
     // Canberra Dissimilarity for segments of different sizes (using pooling)
     private fun canberraDissimilarityWithPooling(segmentA: ByteArray, segmentB: ByteArray): Double {
-        val shortSegment = if (segmentA.size <= segmentB.size) segmentA else segmentB
-        val longSegment = if (segmentA.size > segmentB.size) segmentA else segmentB
+        val shortSeg = if (segmentA.size <= segmentB.size) segmentA else segmentB
+        val longSeg  = if (segmentA.size >  segmentB.size) segmentA else segmentB
+
+        // no pooling necessary if it has the same length
+        if (shortSeg.size == longSeg.size) {
+            return canberraDistance(shortSeg, longSeg) / shortSeg.size
+        }
 
         // pool longer segment
-        val pooledSegment = averagePoolSegment(longSegment, shortSegment.size)
+        val pooled = averagePoolSegment(longSeg, shortSeg.size)
 
         // now just use the regular canberraDistance with pooledSegment
-        return canberraDistance(shortSegment, pooledSegment) / shortSegment.size
+        return canberraDistance(shortSeg, pooled) / shortSeg.size
     }
 
     // average pooling of a segment to transform it in a lower dimension
     fun averagePoolSegment(segment: ByteArray, targetSize: Int): ByteArray {
-        val pooled = ByteArray(targetSize)
-        val chunkSize = segment.size.toDouble() / targetSize
+        val m = targetSize.coerceAtLeast(0)
+        require(m > 0) { "targetSize must be > 0" }
 
-        for (i in 0 until targetSize) {
-            // chunk that we need to pool
-            val start = (i * chunkSize).toInt()
-            val end = ((i + 1) * chunkSize).toInt().coerceAtMost(segment.size)
-            val chunk = segment.sliceArray(start until end)
+        val prefix = IntArray(segment.size + 1)
+        for (i in segment.indices) prefix[i + 1] = prefix[i] + (segment[i].toInt() and 0xFF)
 
-            val avgValue = if (chunk.isNotEmpty()) {
-                chunk.map { it.toInt() and 0xFF }.average().toInt() // calc average value
-            } else {
-                0
-            }
+        val pooledSegment = ByteArray(m)
+        for (i in 0 until m) {
+            // get 'bucket' start and end index
+            val start = (i * segment.size) / m
+            val end = ((i + 1) * segment.size) / m
 
-            pooled[i] = avgValue.toByte()
+            val len = end - start // 'bucket' size
+            val sum = prefix[end] - prefix[start] // sum of 'bucket'
+            val avg = if (len > 0) sum / len else 0 // avg value of 'bucket'
+
+            pooledSegment[i] = avg.toByte()
         }
-
-        return pooled
-    }
-
-
-    // position penalty for absolute and relative difference
-    private fun computePositionPenalty(startA: Int, startB: Int, lenA: Int, lenB: Int): Double {
-        val alpha = 0.02 // hyper parameter for absolute difference
-        val beta = 0.03  // hyper parameter for relative difference
-
-        // calc penalty for absolute difference
-        val maxLen = maxOf(lenA, lenB).toDouble()
-        val positionDiffAbs = kotlin.math.abs(startA - startB).toDouble()
-        val penaltyAbs = positionDiffAbs / maxLen
-
-        // calc penalty for relative difference
-        val relativePosA = startA.toDouble() / lenA
-        val relativePosB = startB.toDouble() / lenB
-        val penaltyRel = kotlin.math.abs(relativePosA - relativePosB)
-
-        return alpha * penaltyAbs + beta * penaltyRel
+        return pooledSegment
     }
 }

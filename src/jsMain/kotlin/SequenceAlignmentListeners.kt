@@ -1,4 +1,5 @@
 import SequenceAlignment.AlignedSequence
+import SequenceAlignment.SegmentWiseSequenceAlignment
 import org.w3c.dom.*
 import org.w3c.dom.events.Event
 import kotlinx.browser.document
@@ -183,9 +184,39 @@ fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequen
 
 // show toggle button to switch to segment wise sequence alignment
 fun showSequenceAlignmentToggleButton() {
+    hideStartSequenceAlignmentButton()
+
     val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
     for (i in 0 until toggleButtons.length) {
         (toggleButtons[i] as HTMLElement).style.display = "block"
+    }
+}
+
+// hide toggle button to switch to segment wise sequence alignment
+fun hideSequenceAlignmentToggleButton() {
+    val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
+    for (i in 0 until toggleButtons.length) {
+        (toggleButtons[i] as HTMLElement).style.display = "none"
+    }
+}
+
+// hide button to start sequence alignment
+fun hideStartSequenceAlignmentButton() {
+    val alignmentButtons = document.querySelectorAll(".alignment-button")
+    for (i in 0 until alignmentButtons.length) {
+        (alignmentButtons[i] as HTMLElement).style.display = "none"
+    }
+}
+
+// show button to start sequence alignment
+fun showStartSequenceAlignmentButton() {
+    // remove previous sequence alignment
+    removeAllSequenceAlignmentListeners()
+    hideSequenceAlignmentToggleButton()
+
+    val alignmentButtons = document.querySelectorAll(".alignment-button")
+    for (i in 0 until alignmentButtons.length) {
+        (alignmentButtons[i] as HTMLElement).style.display = "block"
     }
 }
 
@@ -212,14 +243,6 @@ fun byteDistance(a: ByteArray, b: ByteArray): Double {
     if (a.size != b.size) return 1.0
     return a.indices.count { a[it] != b[it] }.toDouble() / a.size
 }
-
-// return colour based on the difference
-/*fun getRgbColorForDifference(diff: Double): Triple<Int, Int, Int> {
-    val clampedDiff = diff.coerceIn(0.0, 1.0)
-    val r = (clampedDiff * 255).toInt()
-    val g = ((1 - clampedDiff) * 255).toInt()
-    return Triple(r, g, 0)
-}*/
 
 // return colour based on the difference - we use HSL because it looks more natural
 fun getHslColorForDifference(diff: Double): Triple<Float, Float, Float> {

@@ -123,6 +123,11 @@ button:hover {
     flex-grow: 1;
 }
 
+.show-ssf-button {
+    align-self: flex-start;  /* verhindert das Strecken */
+    width: auto;             /* nur so breit wie Inhalt */
+}
+
 .card {
     box-sizing: border-box;
     border-radius: 0.5rem;
@@ -610,6 +615,14 @@ button:hover {
 
 .icon-toggle-right:hover {
     background-image: url("icons/switch_right_white_filled.png");
+}
+
+.icon-alignment {
+    background-image: url("icons/alignment_white.png");
+}
+
+.icon-alignment:hover {
+    background-image: url("icons/alignment_white_filled.png");
 }
 
 .icon-toggle-right-black {

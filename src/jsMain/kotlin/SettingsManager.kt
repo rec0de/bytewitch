@@ -18,7 +18,7 @@ object SettingsManager {
         ssfEnabled = ssfDecodingBinding.checked
         ssfDecodingBinding.onChange = { checked ->
             ssfEnabled = checked
-            decode(false, force = true)
+            mainDecode(false, force = true)
         }
 
         val outputDiv = document.getElementById("output") as HTMLDivElement

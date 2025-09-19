@@ -29,20 +29,47 @@ object TextareaUtils {
 
         parsedMessages.remove(textareaIndex)
         lastInputBytes.remove(textareaIndex)
+        ssfEligible.remove(textareaIndex)
 
-        // TODO need to remove alignment listeners
+        removeAllSequenceAlignmentListeners()
+        if (ssfEligible.size >= 2) {
+            showStartSequenceAlignmentButton()
+        } else {
+            hideStartSequenceAlignmentButton()
+            hideSequenceAlignmentToggleButton()
+
+            // switch to segmentwise view if only one ssf item is left
+            if (!showSegmentWiseAlignment && ssfEligible.isNotEmpty()) {
+                showSegmentWiseAlignment = true
+                ssfEligible.forEach { idx ->
+                    parsedMessages[idx]?.let { parsed ->
+                        rerenderSSF(idx, parsed)
+                    }
+                }
+            }
+        }
 
         // delete from output view
         val output = document.getElementById("output") as HTMLDivElement
-        val messageOutputs = output.querySelectorAll(".message-output")
-        if (messageOutputs.length > 0) {
-            // remove last child
-            output.removeChild(messageOutputs[messageOutputs.length - 1] as HTMLDivElement)
+        val target = document.getElementById("message-output-$textareaIndex") as? HTMLDivElement
+        if (target != null) {
+            output.removeChild(target)
         }
 
-        // reset hexview
-        val hexview = document.getElementById("hexview") as HTMLDivElement
-        hexview.innerHTML = ""
+        // reset hexview to the bytes of the first textarea
+        setByteFinderContent(0)
+    }
+
+    // input listener for live decode of all text areas
+    fun applyLiveDecodeListeners() {
+        val textareas = document.querySelectorAll(".input_area")
+        for (i in 0 until textareas.length) {
+            val ta = textareas[i] as HTMLTextAreaElement
+            ta.oninput = {
+                if (liveDecodeEnabled)
+                    mainDecode(true)
+            }
+        }
     }
 
     fun appendTextArea(content: String? = null) {
@@ -85,7 +112,7 @@ object TextareaUtils {
 
         textarea.oninput = {
             if (liveDecodeEnabled)
-                decode(true)
+                mainDecode(true)
 
             // update byte size label
             val bytes = ByteWitch.getBytesFromInputEncoding(textarea.value)
@@ -128,7 +155,6 @@ object TextareaUtils {
         })
     }
 
-
     // add content to textarea if no empty one exits yet
     fun appendTextareaForFileUpload(content: String) {
         // check if an empty text area already exists
@@ -136,7 +162,8 @@ object TextareaUtils {
             if (textarea.value.trim().isEmpty()) {
                 // found empty textarea, fill it with file content through binding
                 textarea.value = content
-                if (liveDecodeEnabled) decode(true)
+                if (liveDecodeEnabled)
+                    mainDecode(true)
                 return
             }
         }

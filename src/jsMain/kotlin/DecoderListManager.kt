@@ -66,7 +66,7 @@ object DecoderListManager {
         userKaitaiList.addEventListener("itemRemoved") { ids ->
             ByteWitch.userKaitaiDecoderListManager.removeDecoder(ids.first())
             KaitaiUI.removeUserKaitai(ids.first())
-            decode(false, force = true)
+            mainDecode(false, force = true)
         }
         userKaitaiList.addEventListener("itemEdited", { ids ->
             KaitaiUI.editUserKaitai(ids.first())
@@ -83,16 +83,16 @@ object DecoderListManager {
     ) {
         list.addEventListener("orderChanged", { orderedIds ->
             listManager.setDecoderOrder(orderedIds)
-            decode(false, force = true)
+            mainDecode(false, force = true)
         })
 
         list.addEventListener("itemEnabled") { ids ->
             listManager.setDecoderEnabled(ids.first(), true)
-            decode(false, force = true)
+            mainDecode(false, force = true)
         }
         list.addEventListener("itemDisabled") { ids ->
             listManager.setDecoderEnabled(ids.first(), false)
-            decode(false, force = true)
+            mainDecode(false, force = true)
         }
 
         val enableAllBtn = document.getElementById("$prefix-decoders-enable-all") as? HTMLButtonElement
@@ -100,7 +100,7 @@ object DecoderListManager {
             if (!list.disabledItems.isEmpty()) {
                 list.setItemStatusForAll(true)
                 listManager.setAllDecodersEnabled(true)
-                decode(false, force = true)
+                mainDecode(false, force = true)
             }
         }
 
@@ -109,7 +109,7 @@ object DecoderListManager {
             if (!list.enabledItems.isEmpty()) {
                 list.setItemStatusForAll(false)
                 listManager.setAllDecodersEnabled(false)
-                decode(false, force = true)
+                mainDecode(false, force = true)
             }
         }
 

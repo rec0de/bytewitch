@@ -239,7 +239,6 @@ object ByteWitch {
     }
 
     fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
-
         getAllDecoders().forEach { decoder ->
             val confidence = decoder.confidence(data, sourceOffset)
             if (confidence.first > 0.75) {

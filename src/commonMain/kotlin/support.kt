@@ -28,7 +28,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val lengthBias = if(enableLengthBias) max((10-string.length).toDouble()/10, 0.0) * 0.6 else 0.0
 
     // string is mostly printable ASCII, seems plausible
-    // avoid two-letter strings with one ascii char getting good ascii percentage by setting "min length" to 7
+    // avoid two-letter strings with one ascii char getting good ascii percentage by setting "min length" to 7val asciiPercentage = printableASCII.length.toDouble() / string.length
     val asciiPercentage = printableASCII.length.toDouble() / string.length
     val biasedAsciiPercentage = printableASCII.length.toDouble() / max(string.length, 7)
     if((biasedAsciiPercentage > 0.8 || asciiPercentage == 1.0) && weirdASCII.isEmpty()) {
