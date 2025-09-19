@@ -1,17 +1,15 @@
 package decoders
 
-import bitmage.ByteOrder
 import bitmage.decodeBase32
-import bitmage.fromBytes
 import bitmage.hex
 
 object Bech32: ByteWitchDecoder {
     override val name = "bech32"
+    private val validator = Regex("^.{1,83}1[02-9ac-hj-np-zAC-HJ-NP-Z]{6,}$")
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
-        val pattern = Regex("^.{1,83}1[02-9ac-hj-np-zAC-HJ-NP-Z]{6,}$")
         val string = data.decodeToString()
-        if(string matches pattern) {
+        if(string matches validator) {
             return Pair(1.0, null)
         }
         return Pair(0.0, null)

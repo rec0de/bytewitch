@@ -5,44 +5,54 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder,
+        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
         ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32,
         Randomness, HeuristicSignatureDetector
     )
 
-    private var plainHex = false
-    fun isPlainHex() = plainHex
-
-    fun stripCommentsAndFilterHex(data: String): String {
-        // allow use of # as line comment
-        val stripped = data.split("\n").map { line ->
-            val commentMarker = line.indexOfFirst{ it == '#' }
-            val lineEnd = if(commentMarker == -1) line.length else commentMarker
-            line.substring(0, lineEnd)
-        }.joinToString("")
-
-        return stripped.filter { it in "0123456789abcdefABCDEF" }
+    enum class Encoding(val label: String) {
+        NONE("none"), PLAIN("plain"), HEX("hex"), HEXDUMP("hexdump"), BASE64("base64")
     }
 
-    fun getBytesFromInputEncoding(data: String): ByteArray {
+    fun stripComments(data: String): String {
+        // allow use of # as line comment
+        val stripped = data.split("\n").joinToString("") { line ->
+            val commentMarker = line.indexOfFirst { it == '#' }
+            val lineEnd = if (commentMarker == -1) line.length else commentMarker
+            line.take(lineEnd)
+        }
+
+        return stripped
+    }
+
+    fun getBytesFromInputEncoding(data: String): Pair<ByteArray, Encoding> {
         val cleanedData = data.trim()
+
+        if(cleanedData.isEmpty())
+            return Pair(byteArrayOf(), Encoding.NONE)
+
+        // allow some overrides
+        if(cleanedData.startsWith("#plain"))
+            return Pair(cleanedData.removePrefix("#plain").trim().encodeToByteArray(), Encoding.PLAIN)
+
         // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
-        val isBase64 = cleanedData.replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=]+[G-Z+/=\\-_][A-Z0-9+/=\\-_]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
-        val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s+\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
-        plainHex = false
+        val isBase64 = cleanedData.removePrefix("0x").replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=]+[G-Z+/=\\-_][A-Z0-9+/=\\-_]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s*\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
+        val commentsStripped = stripComments(cleanedData).removePrefix("0x")
+        val isHex = Regex("[0-9a-fA-F\\s]+").matches(commentsStripped)
 
         return when {
-            isBase64 -> decodeBase64(cleanedData.replace("\n", ""))
-            isHexdump -> decodeHexdump(cleanedData)
-            else -> {
-                plainHex = true
-                val filtered = stripCommentsAndFilterHex(cleanedData)
+            isBase64 -> Pair(decodeBase64(cleanedData.replace("\n", "")), Encoding.BASE64)
+            isHexdump -> Pair(decodeHexdump(cleanedData), Encoding.HEXDUMP)
+            isHex -> {
+                val filtered = commentsStripped.filter { it in "0123456789abcdefABCDEF" }
                 if (filtered.length % 2 != 0)
-                    byteArrayOf()
+                    Pair(byteArrayOf(), Encoding.NONE)
                 else
-                    filtered.fromHex()
+                    Pair(filtered.fromHex(), Encoding.HEX)
             }
+            else -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
         }
     }
 
@@ -119,7 +129,7 @@ object ByteWitch {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    private fun decodeBase64(base64Data: String): ByteArray {
+    fun decodeBase64(base64Data: String): ByteArray {
         // transform URL-safe base64 into regular base64
         val canonicalB64 = base64Data.replace('-', '+').replace('_', '/')
 

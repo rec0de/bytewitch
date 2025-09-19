@@ -177,16 +177,23 @@
             margin-top:  0.5rem;
         }
 
-        .textareaContainer > .sizeLabel {
+        .textareaContainer > .sizeLabel, .textareaContainer > .encoding {
             position: absolute;
             bottom: 0.5rem;
-            left: .25rem;
             background: var(--content-back);
             padding: 0.25rem 0.5rem;
             border-radius: 1rem;
             font-size: 0.85em;
             font-family: var(--mono);
             font-weight: bold;
+        }
+
+        .textareaContainer > .encoding {
+            right: .25rem;
+        }
+
+        .textareaContainer > .sizeLabel {
+            left: .25rem;
         }
 
         .invisible {
@@ -535,16 +542,8 @@
             background-image: url("icon_switch_left_white.png");
         }
 
-        .icon-toggle-left:hover {
-            background-image: url("icon_switch_left_white_filled.png");
-        }
-
         .icon-toggle-right {
             background-image: url("icon_switch_right_white.png");
-        }
-
-        .icon-toggle-right:hover {
-            background-image: url("icon_switch_right_white_filled.png");
         }
 
         .icon-alignment {
