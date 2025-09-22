@@ -9,9 +9,11 @@ fun setByteFinderContent(msgIndex: Int) {
     val hexview = document.getElementById("hexview") as HTMLDivElement
     val textview = document.getElementById("textview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
+    val inputId = document.getElementById("bytefinder-input-id") as HTMLSpanElement
 
     hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
     textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+    inputId.innerText = (msgIndex + 1).toString()
     bytefinder.style.display = "flex"
 }
 

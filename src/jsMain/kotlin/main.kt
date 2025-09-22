@@ -171,26 +171,10 @@ fun clearSelections() {
 
 // decode one specific byte sequence
 fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean) : Boolean {
-    val output = document.getElementById("output") as HTMLDivElement
-
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
-    // check if message-output container already exists
-    val messageId = "message-output-$taIndex"
-    var messageBox = document.getElementById(messageId) as? HTMLDivElement
-
-    if (messageBox == null) {
-        messageBox = document.createElement("DIV") as HTMLDivElement
-        messageBox.id = messageId
-        messageBox.classList.add("message-output") // apply layout CSS
-        output.appendChild(messageBox)
-    } else {
-        messageBox.innerHTML = "" // clear old content
-    }
-    val messageBoxTitle = document.createElement("H2") as HTMLHeadingElement
-    messageBoxTitle.innerHTML = "Input ${taIndex + 1}"
-    messageBox.appendChild(messageBoxTitle)
+    val messageBox = getOrCreateMessageOutput(taIndex)
 
     if (result.isNotEmpty()) {
         result.forEach {
@@ -198,7 +182,7 @@ fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean)
         }
 
         // check if result needs a SwiftSegFinder decoding
-        val allowSSF = showSSFContent && !hasHighEndHit(result)
+        val allowSSF = ssfEnabled && showSSFContent && !hasHighEndHit(result)
 
         if (allowSSF) {
             // show SwiftSegFinder view
@@ -219,11 +203,7 @@ fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean)
         }
         return true
     } else {
-        if (bytes.isNotEmpty()) {
-            messageBox.appendChild(document.createTextNode("No decoder could parse the input"))
-        } else {
-            messageBox.appendChild(document.createTextNode("No valid input to parse"))
-        }
+        messageBox.appendChild(document.createTextNode("No decoder could parse the input"))
         return false
     }
 }
@@ -294,6 +274,8 @@ fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
         val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
+        var anyDecoderMatched = false
+
         // only decode text area if input changed or the Kaitai struct changed
         val inputChanged = lastInputBytes[i]?.contentEquals(bytes)?.not() ?: true
         if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged) {
@@ -302,14 +284,12 @@ fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
                 parsedMessages[i] =
                     SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
 
+                anyDecoderMatched = anyDecoderMatched.or(
                 decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
-            } else if (inputText.isEmpty()) { // if no bytes are set in textview and not even a half byte is set so delete output
-                // delete from output view
-                val output = document.getElementById("output") as HTMLDivElement
-                val target = document.getElementById("message-output-$i") as? HTMLDivElement
-                if (target != null) {
-                    output.removeChild(target)
-                }
+                )
+            } else {
+                val messageBox = getOrCreateMessageOutput(i)
+                messageBox.appendChild(document.createTextNode("No valid input to parse"))
 
                 // delete from parsedMessages
                 parsedMessages.remove(i)
@@ -324,16 +304,13 @@ fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
         }
 
         // set bytefinder visible if any results have been generated
-        val messageBox = document.getElementById("message-output-$i") as? HTMLDivElement
-        if (messageBox != null && messageBox.children.length > 1) {
-            bytefinder.style.display = "flex"
+        if (anyDecoderMatched) {
+            // show the bytes of the first text area in the byte finder view
+            setByteFinderContent(0)
         }
     }
 
     KaitaiUI.setChangedSinceLastDecode(false)
-
-    // show the bytes of the first text area in the byte finder view
-    setByteFinderContent(0)
 
     val eligibleMsgs = getEligibleMsgsForSSF()
     if (eligibleMsgs.isNotEmpty()) {
@@ -358,6 +335,28 @@ fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
     } else if(eligibleMsgs.size >= 2) {
         showStartSequenceAlignmentButton()
     }
+}
+
+fun getOrCreateMessageOutput(index: Int): HTMLDivElement {
+    val messageId = "message-output-$index"
+    var messageBox = document.getElementById(messageId) as? HTMLDivElement
+
+    if (messageBox == null) {
+        messageBox = document.createElement("DIV") as HTMLDivElement
+        messageBox.id = messageId
+        messageBox.classList.add("message-output") // apply layout CSS
+
+        val output = document.getElementById("output") as HTMLDivElement
+        output.appendChild(messageBox)
+    } else {
+        messageBox.innerHTML = "" // clear old content
+    }
+
+    val messageBoxTitle = document.createElement("H2") as HTMLHeadingElement
+    messageBoxTitle.innerHTML = "Input ${index + 1}"
+    messageBox.appendChild(messageBoxTitle)
+
+    return messageBox
 }
 
 // check if decoder is confident to not show SwiftSegFinder
