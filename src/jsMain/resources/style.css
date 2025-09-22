@@ -182,10 +182,9 @@ button:hover {
     margin-top:  0.5rem;
 }
 
-.textareaContainer > .sizeLabel, .annotationLabel {
+.textareaContainer > .sizeLabel, .textareaContainer > .annotationLabel, .textareaContainer > .encoding {
     position: absolute;
     bottom: 0.5rem;
-    left: .25rem;
     background: var(--content-back);
     padding: 0.25rem 0.5rem;
     border-radius: 1rem;
@@ -194,9 +193,12 @@ button:hover {
     font-weight: bold;
 }
 
-.textareaContainer > .annotationLabel {
-    left: unset;
+.textareaContainer > .annotationLabel, .textareaContainer > .encoding {
     right: .25rem;
+}
+
+.textareaContainer > .sizeLabel {
+    left: .25rem;
 }
 
 .invisible {
@@ -597,10 +599,6 @@ button:hover {
     background-image: url("icons/switch_left_white.png");
 }
 
-.icon-toggle-left:hover {
-    background-image: url("icons/switch_left_white_filled.png");
-}
-
 .icon-toggle-left-black {
     background-image: url("icons/switch_left_black.png");
 }
@@ -611,10 +609,6 @@ button:hover {
 
 .icon-toggle-right {
     background-image: url("icons/switch_right_white.png");
-}
-
-.icon-toggle-right:hover {
-    background-image: url("icons/switch_right_white_filled.png");
 }
 
 .icon-alignment {

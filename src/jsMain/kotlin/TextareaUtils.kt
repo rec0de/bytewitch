@@ -67,7 +67,7 @@ object TextareaUtils {
             val ta = textareas[i] as HTMLTextAreaElement
             ta.oninput = {
                 if (liveDecodeEnabled)
-                    mainDecode(true)
+                    mainDecode(isLiveDecoding = true, tryhard = false)
             }
         }
     }
@@ -85,7 +85,7 @@ object TextareaUtils {
         // textarea.value = content // set later via binding
         textarea.setAttribute("data-textarea-id", textareaIndex.toString())
 
-        val bytes = ByteWitch.getBytesFromInputEncoding(content?:"")
+        val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(content?:"")
         val byteSizeText = "${bytes.size}B (0x${bytes.size.toString(16)})"
 
         val sizeText = document.createElement("span") as HTMLSpanElement
@@ -96,8 +96,13 @@ object TextareaUtils {
         sizeLabel.appendChild(sizeText)
         sizeLabel.appendChild(document.createElement("span")) // selection info
 
+        val encodingLabel = document.createElement("div") as HTMLDivElement
+        encodingLabel.className = "encoding"
+        encodingLabel.innerText = encoding.label
+
         textareaContainer.appendChild(textarea)
         textareaContainer.appendChild(sizeLabel)
+        textareaContainer.appendChild(encodingLabel)
         dataContainer.appendChild(textareaContainer)
         textareaContainers.add(textareaIndex, textareaContainer)
 
@@ -112,14 +117,15 @@ object TextareaUtils {
 
         textarea.oninput = {
             if (liveDecodeEnabled)
-                mainDecode(true)
+                mainDecode(isLiveDecoding = true, tryhard = false)
 
             // update byte size label
-            val bytes = ByteWitch.getBytesFromInputEncoding(textarea.value)
+            val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(textarea.value)
             (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
 
-            // update "plain hex" attribute on textarea
-            textarea.setAttribute("data-plainhex", ByteWitch.isPlainHex().toString())
+            // update encoding label
+            textarea.setAttribute("data-plainhex", (encoding == ByteWitch.Encoding.HEX).toString())
+            encodingLabel.innerText = encoding.label
         }
 
         textarea.addEventListener("selectionchange", {
@@ -144,8 +150,8 @@ object TextareaUtils {
                     sizeLabel.innerText = "" // selection starts in a comment
                 else {
                     val selection = textarea.value.substring(selectionStart, selectionEnd)
-                    val range = ByteWitch.stripCommentsAndFilterHex(selection).length.toDouble() / 2
-                    val offset = ByteWitch.stripCommentsAndFilterHex(prefix).length.toDouble() / 2
+                    val range = ByteWitch.stripComments(selection).length.toDouble() / 2
+                    val offset = ByteWitch.stripComments(prefix).length.toDouble() / 2
                     val offsetHex = "0x" + floor(offset).roundToInt().toString(16)
 
                     (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText =
@@ -163,7 +169,7 @@ object TextareaUtils {
                 // found empty textarea, fill it with file content through binding
                 textarea.value = content
                 if (liveDecodeEnabled)
-                    mainDecode(true)
+                    mainDecode(isLiveDecoding = true, tryhard = false)
                 return
             }
         }

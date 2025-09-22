@@ -14,14 +14,13 @@ const val byteLimitSSFContent = 1000 // only show SwiftSegFinder for messages wi
 const val maxLimitSequenceAlignment = 5000 // max total bytes across all eligible messages for auto sequence alignment
 val ssfEligible = mutableSetOf<Int>() // msgIndex for protocol messages that show SwiftSegFinder output
 private val HIGH_END_DECODERS = setOf( // set of confident decoders when SSF is not allowed to show up
-    "bplist17", "bplist15", "bplist", // TODO maybe use enum to not write the name of it twice.
+    "bplist17", "bplist15", "bplist", "utf8" // TODO maybe use enum to not write the name of it twice.
 )
 
 
 var liveDecodeEnabled = true
 var currentHighlight: Element? = null
 var lastSelectionEvent: Double? = null
-var tryhard = false
 
 // track input changes to avoid unnecessary re-decodes
 var lastInputBytes = mutableMapOf<Int, ByteArray>()
@@ -65,13 +64,11 @@ fun main() {
         TextareaUtils.applyLiveDecodeListeners()
 
         decodeBtn.onclick = {
-            tryhard = false
-            mainDecode(true, force = !liveDecodeEnabled)
+            mainDecode(isLiveDecoding = true, force = !liveDecodeEnabled, tryhard = false)
         }
 
         tryhardBtn.onclick = {
-            tryhard = true
-            mainDecode(false)
+            mainDecode(isLiveDecoding = false, tryhard = true)
         }
 
         uploadBtn.onclick = {
@@ -81,19 +78,15 @@ fun main() {
             fileInput.multiple = true // to upload multiple files
 
             fileInput.onchange = {
-                val files = fileInput.files
-                if (files != null) {
-                    for (i in 0 until files.length) {
-                        val file = files.item(i)
-                        if (file != null) {
-                            if (file.type == "text/plain") {
-                                // Handle .txt files
-                                readFile(file)
-                            } else {
-                                // Handle binary files
-                                readBinaryFile(file)
-                            }
-                        }
+                val files = fileInput.files?.asList()
+
+                files?.forEach {
+                    if (it.type == "text/plain") {
+                        // Handle .txt files
+                        readFile(it)
+                    } else {
+                        // Handle binary files
+                        readBinaryFile(it)
                     }
                 }
             }
@@ -109,7 +102,9 @@ fun main() {
 
         // to delete last text area
         deleteDataBox.onclick = {
-            TextareaUtils.removeTextArea()
+            if (dataContainer.children.length > 1) { // there needs to be at least one data container left
+                TextareaUtils.removeTextArea()
+            }
         }
 
         liveDecode.onChange = {
@@ -142,15 +137,15 @@ fun main() {
         // (as do specific keystrokes, but we'll see if we want to worry about those)
         document.onclick = {
             // avoid immediately clearing selection from click associated with select event
-            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
-            if (deltaTimeMs > 250) {
+            val activeDebouncedSelection = lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250
+            if (activeDebouncedSelection) {
                 clearSelections()
             }
         }
 
         document.onkeydown = {
-            val deltaTimeMs = Date().getTime() - (lastSelectionEvent ?: 0.0)
-            if (deltaTimeMs > 250 && it.keyCode !in listOf(16, 17, 20)) {
+            val activeDebouncedSelection = lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250
+            if (activeDebouncedSelection && it.keyCode !in listOf(16, 17, 20)) {
                 clearSelections()
             }
         }
@@ -170,7 +165,7 @@ fun clearSelections() {
 }
 
 // decode one specific byte sequence
-fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean) : Boolean {
+fun decodeSingleMessage(bytes: ByteArray, taIndex: Int, showSSFContent: Boolean, tryhard: Boolean) : Boolean {
     // decode input
     val result = ByteWitch.analyze(bytes, tryhard)
 
@@ -252,7 +247,7 @@ fun decodeWithSSF(bytes: ByteArray, taIndex: Int): HTMLDivElement {
 
 // decode all text areas
 // force: forces a decode even if the content has not changed (e.g., when decoders have changed)
-fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
+fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false, tryhard: Boolean = false) {
     // don't decode if "live decode" is disabled and decode is not called from the "decode" button
     if (!(isLiveDecoding || liveDecodeEnabled)) return
 
@@ -266,26 +261,29 @@ fun mainDecode(isLiveDecoding: Boolean, force: Boolean = false) {
     // if any result is not empty, it will make the bytefinder visible
 
     val textareas = document.querySelectorAll(".input_area")
+
     for (i in 0 until textareas.length) {
         // get bytes from textarea
         val textarea = textareas[i] as HTMLTextAreaElement
-        val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         val inputText = textarea.value.trim()
-        val bytes = ByteWitch.getBytesFromInputEncoding(inputText)
+        val (bytes, _) = ByteWitch.getBytesFromInputEncoding(inputText)
+
+        // set size label to payload size
+        val sizeLabel = textarea.nextElementSibling as HTMLDivElement
         (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // clear selection info
 
         var anyDecoderMatched = false
 
-        // only decode text area if input changed or the Kaitai struct changed
+        // only decode text area if input changed, or the Kaitai struct changed, or we are doing manual tryhard decode
         val inputChanged = lastInputBytes[i]?.contentEquals(bytes)?.not() ?: true
-        if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged) {
+        if (force || KaitaiUI.hasChangedSinceLastDecode() || inputChanged || (!isLiveDecoding && tryhard)) {
             lastInputBytes[i] = bytes
             if (bytes.isNotEmpty()) {
                 parsedMessages[i] =
                     SSFParsedMessage(listOf(), bytes, i) // for float view if showSSFContent is set to false
 
                 anyDecoderMatched = anyDecoderMatched.or(
-                decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent)
+                decodeSingleMessage(bytes, i, showSSFContent = bytes.size <= byteLimitSSFContent, tryhard)
                 )
             } else {
                 val messageBox = getOrCreateMessageOutput(i)
