@@ -4,136 +4,176 @@ import kotlin.js.Date
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-// remove text area from view and corresponding listeners
-fun removeTextArea(dataContainer: Element) {
-    val lastIndex = dataContainer.children.length - 1
-    if (lastIndex < 0) return
 
-    // delete text area from view
-    dataContainer.removeChild(dataContainer.lastElementChild!!)
+object TextareaUtils {
 
-    parsedMessages.remove(lastIndex)
-    ssfEligible.remove(lastIndex)
+    private val dataContainer = document.getElementById("data_container")!!
+    private val textareaBindings = mutableListOf<TwoWayTextAreaBinding>()
+    private val textareaContainers = mutableListOf<HTMLDivElement>() // keep track of what textareas contain
 
-    removeAllSequenceAlignmentListeners()
-    if (ssfEligible.size >= 2) {
-        showStartSequenceAlignmentButton()
-    } else {
-        hideStartSequenceAlignmentButton()
-        hideSequenceAlignmentToggleButton()
 
-        // switch to segmentwise view if only one ssf item is left
-        if (!showSegmentWiseAlignment && ssfEligible.isNotEmpty()) {
-            showSegmentWiseAlignment = true
-            ssfEligible.forEach { idx ->
-                parsedMessages[idx]?.let { parsed ->
-                    rerenderSSF(idx, parsed)
+    // remove text area from view and corresponding listeners
+    fun removeTextArea() {
+        if (textareaContainers.size <= 1) return // always keep at least one text area
+
+        val textareaContainer = textareaContainers.removeLast()
+        val textareaIndex = textareaContainers.size
+        val storageKey = "input-data-$textareaIndex"
+
+        // remove binding and stored input data from session storage
+        textareaBindings.removeLast()
+        sessionStorage.removeItem(storageKey)
+
+        // delete text area from view
+        dataContainer.removeChild(textareaContainer)
+
+        parsedMessages.remove(textareaIndex)
+        lastInputBytes.remove(textareaIndex)
+        ssfEligible.remove(textareaIndex)
+
+        removeAllSequenceAlignmentListeners()
+        if (ssfEligible.size >= 2) {
+            showStartSequenceAlignmentButton()
+        } else {
+            hideStartSequenceAlignmentButton()
+            hideSequenceAlignmentToggleButton()
+
+            // switch to segmentwise view if only one ssf item is left
+            if (!showSegmentWiseAlignment && ssfEligible.isNotEmpty()) {
+                showSegmentWiseAlignment = true
+                ssfEligible.forEach { idx ->
+                    parsedMessages[idx]?.let { parsed ->
+                        rerenderSSF(idx, parsed)
+                    }
                 }
             }
         }
-    }
 
-    // delete from output view
-    val output = document.getElementById("output") as HTMLDivElement
-    val target = document.getElementById("message-output-$lastIndex") as? HTMLDivElement
-    if (target != null) {
-        output.removeChild(target)
-    }
-
-    // reset hexview to the bytes of the first textarea
-    setByteFinderContent(0)
-}
-
-// input listener for live decode of all text areas
-fun applyLiveDecodeListeners() {
-    val textareas = document.querySelectorAll(".input_area")
-    for (i in 0 until textareas.length) {
-        val ta = textareas[i] as HTMLTextAreaElement
-        ta.oninput = {
-            if (liveDecodeEnabled)
-                mainDecode(isLiveDecoding = true, tryhard = false)
+        // delete from output view
+        val output = document.getElementById("output") as HTMLDivElement
+        val target = document.getElementById("message-output-$textareaIndex") as? HTMLDivElement
+        if (target != null) {
+            output.removeChild(target)
         }
-    }
-}
 
-fun appendTextArea(content: String = "") {
-    val container = document.getElementById("data_container")!!
-
-    // create new textareaContainer if no empty one exists
-    val wrapper = document.createElement("div") as HTMLDivElement
-    wrapper.className = "textareaContainer"
-
-    val textarea = document.createElement("textarea") as HTMLTextAreaElement
-    textarea.className = "data input_area"
-    textarea.placeholder = "hex, base64, or hexdump. use # as line comment in hex mode."
-    textarea.value = content
-
-    val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(content)
-    val byteSizeText = "${bytes.size}B (0x${bytes.size.toString(16)})"
-
-    val sizeText = document.createElement("span") as HTMLSpanElement
-    sizeText.innerText = byteSizeText
-
-    val sizeLabel = document.createElement("div") as HTMLDivElement
-    sizeLabel.className = "sizeLabel"
-    sizeLabel.appendChild(sizeText)
-    sizeLabel.appendChild(document.createElement("span"))
-
-    val encodingLabel = document.createElement("div") as HTMLDivElement
-    encodingLabel.className = "encoding"
-    encodingLabel.innerText = encoding.label
-
-    wrapper.appendChild(textarea)
-    wrapper.appendChild(sizeLabel)
-    wrapper.appendChild(encodingLabel)
-    container.appendChild(wrapper)
-
-    textarea.oninput = {
-        if(liveDecodeEnabled)
-            mainDecode(isLiveDecoding = true, tryhard = false)
+        // reset hexview to the bytes of the first textarea
+        setByteFinderContent(0)
     }
 
-    textarea.onselect = {
-        lastSelectionEvent = Date().getTime()
-
-        // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
-        if(textarea.getAttribute("data-plainhex") == "true") {
-            clearSelections()
-            Logger.log("selected ${textarea.selectionStart} to ${textarea.selectionEnd}")
-
-            val prefix = textarea.value.substring(0, textarea.selectionStart!!)
-            val sizeLabel = textarea.nextElementSibling as HTMLDivElement
-
-            val r = Regex("#[^\n]*$")
-            if(r.containsMatchIn(prefix))
-                sizeLabel.innerText = "" // selection starts in a comment
-            else {
-                val selection = textarea.value.substring(textarea.selectionStart!!, textarea.selectionEnd!!)
-                val offset = ByteWitch.stripComments(prefix).length.toDouble()/2
-                val range = ByteWitch.stripComments(selection).length.toDouble()/2
-
-
-                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
+    // input listener for live decode of all text areas
+    fun applyLiveDecodeListeners() {
+        val textareas = document.querySelectorAll(".input_area")
+        for (i in 0 until textareas.length) {
+            val ta = textareas[i] as HTMLTextAreaElement
+            ta.oninput = {
+                if (liveDecodeEnabled)
+                    mainDecode(isLiveDecoding = true, tryhard = false)
             }
         }
     }
-}
 
+    fun appendTextArea(content: String? = null) {
+        val textareaIndex = textareaContainers.size
 
-// add content to textarea if no empty one exits yet
-fun appendTextareaForFileUpload(content: String) {
-    val container = document.getElementById("data_container")!!
-    val textareas = container.querySelectorAll(".input_area")
+        // create new textareaContainer if no empty one exists
+        val textareaContainer = document.createElement("div") as HTMLDivElement
+        textareaContainer.className = "textareaContainer"
 
-    // check if an empty text area already exists
-    for (i in 0 until textareas.length) {
-        val ta = textareas[i] as HTMLTextAreaElement
-        if (ta.value.trim().isEmpty()) {
-            ta.value = content
-            if (liveDecodeEnabled) mainDecode(isLiveDecoding = true, tryhard = false)
-            return
+        val textarea = document.createElement("textarea") as HTMLTextAreaElement
+        textarea.className = "data input_area"
+        textarea.placeholder = "hex, base64, or hexdump. use # as line comment in hex mode."
+        // textarea.value = content // set later via binding
+        textarea.setAttribute("data-textarea-id", textareaIndex.toString())
+
+        val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(content?:"")
+        val byteSizeText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+
+        val sizeText = document.createElement("span") as HTMLSpanElement
+        sizeText.innerText = byteSizeText
+
+        val sizeLabel = document.createElement("div") as HTMLDivElement
+        sizeLabel.className = "sizeLabel"
+        sizeLabel.appendChild(sizeText)
+        sizeLabel.appendChild(document.createElement("span")) // selection info
+
+        val encodingLabel = document.createElement("div") as HTMLDivElement
+        encodingLabel.className = "encoding"
+        encodingLabel.innerText = encoding.label
+
+        textareaContainer.appendChild(textarea)
+        textareaContainer.appendChild(sizeLabel)
+        textareaContainer.appendChild(encodingLabel)
+        dataContainer.appendChild(textareaContainer)
+        textareaContainers.add(textareaIndex, textareaContainer)
+
+        val binding = TwoWayTextAreaBinding(textarea, "input-data-$textareaIndex")
+        // if content is passed to this function, overwrite the stored content
+        // (this currently only happens when a file is imported)
+        if (content != null && content.isNotEmpty()) {
+            binding.value = content
         }
+        textareaBindings.add(binding)
+
+
+        textarea.oninput = {
+            if (liveDecodeEnabled)
+                mainDecode(isLiveDecoding = true, tryhard = false)
+
+            // update byte size label
+            val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(textarea.value)
+            (sizeLabel.firstChild as HTMLSpanElement).innerText = "${bytes.size}B (0x${bytes.size.toString(16)})"
+
+            // update encoding label
+            textarea.setAttribute("data-plainhex", (encoding == ByteWitch.Encoding.HEX).toString())
+            encodingLabel.innerText = encoding.label
+        }
+
+        textarea.addEventListener("selectionchange", {
+            lastSelectionEvent = Date().getTime()
+
+            // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
+            if (textarea.getAttribute("data-plainhex") == "true") {
+                val selectionStart = textarea.selectionStart!!
+                val selectionEnd = textarea.selectionEnd!!
+
+                clearSelections()
+                if (selectionStart == selectionEnd) {
+                    return@addEventListener
+                }
+                Logger.log("selected $selectionStart to $selectionEnd")
+
+                val prefix = textarea.value.substring(0, selectionStart)
+                val sizeLabel = textarea.nextElementSibling as HTMLDivElement
+
+                val r = Regex("#[^\n]*$")
+                if (r.containsMatchIn(prefix))
+                    sizeLabel.innerText = "" // selection starts in a comment
+                else {
+                    val selection = textarea.value.substring(selectionStart, selectionEnd)
+                    val range = ByteWitch.stripComments(selection).length.toDouble() / 2
+                    val offset = ByteWitch.stripComments(prefix).length.toDouble() / 2
+                    val offsetHex = "0x" + floor(offset).roundToInt().toString(16)
+
+                    (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText =
+                        " — selected ${range}B at offset $offset ($offsetHex)"
+                }
+            }
+        })
     }
 
-    appendTextArea(content)
+    // add content to textarea if no empty one exits yet
+    fun appendTextareaForFileUpload(content: String) {
+        // check if an empty text area already exists
+        for (textarea in textareaBindings) {
+            if (textarea.value.trim().isEmpty()) {
+                // found empty textarea, fill it with file content through binding
+                textarea.value = content
+                if (liveDecodeEnabled)
+                    mainDecode(isLiveDecoding = true, tryhard = false)
+                return
+            }
+        }
+
+        appendTextArea(content)
+    }
 }

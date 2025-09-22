@@ -6,6 +6,9 @@ enum class ByteOrder {
     BIG, LITTLE
 }
 
+fun byteArrayOfInts(vararg ints: Int) = ByteArray(ints.size) { pos -> ints[pos].toByte() }
+fun booleanArrayOfInts(vararg ints: Int): BooleanArray { return byteArrayOfInts(*ints).toBooleanArray() }
+
 @OptIn(ExperimentalUnsignedTypes::class)
 fun ByteArray.hex() = asUByteArray().joinToString("") { it.toString(16).padStart(2, '0') }
 fun ByteArray.fromIndex(i: Int) = sliceArray(i until size)
@@ -63,7 +66,75 @@ fun ByteArray.indicesOfAllSubsequences(target: ByteArray): Set<Int> {
     return matches
 }
 
+fun ByteArray.toBooleanArray(): BooleanArray {
+    return BooleanArray(size * 8) { i -> (this[i / 8].toInt() shr (7 - (i % 8)) and 1) == 1 }
+}
+
+fun ByteArray.toInt(endianness: ByteOrder = ByteOrder.BIG): Int {
+    if (this.size > 4) {
+        throw IllegalArgumentException("Int can not be larger than 4 Bytes")
+    }
+
+    var result = 0
+    var i = if (endianness == ByteOrder.LITTLE) this.size - 1 else 0
+    for (e in this) {
+        result = result or ((e.toInt() and 0xFF) shl 8 * i)
+        if (endianness == ByteOrder.LITTLE) i-- else i++
+    }
+    return result
+}
+
+@JsName("TextDecoder")
+external class TextDecoder(encoding: String = definedExternally) {
+    fun decode(input: dynamic): String
+}
+fun ByteArray.toUTF8String(): String {
+    val bytes = this  // needs to be copied over as "this" is not recognized in the js(str) call
+    val uint8Array = js("new Uint8Array(bytes)") // Convert Kotlin ByteArray to JS Uint8Array
+    val decoder = TextDecoder("utf-8")
+    return decoder.decode(uint8Array)
+}
+
+// BooleanArray
+
+fun BooleanArray.toByteArray(): ByteArray {
+    return ByteArray((size + 7) / 8) { byteIndex ->
+        var byte = 0
+        for (bit in 0 until 8) {
+            val i = byteIndex * 8 + bit
+            if (i < size && this[i]) {
+                byte = byte or (1 shl (7 - bit))
+            }
+        }
+        byte.toByte()
+    }
+}
+
+fun BooleanArray.padLeft(padSize: Int): BooleanArray {
+    if (padSize <= 0) return this
+    val padding = BooleanArray(padSize) { false }
+    return padding + this
+}
+
+// Bytes
+
+fun Byte.toBooleanArray(): BooleanArray {
+    return BooleanArray(8) { i ->
+        (this.toInt() shr (7 - i) and 1) == 1
+    }
+}
+
 // Integers
+
+fun Short.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): Short {
+    return if (byteOrder == ByteOrder.BIG) {
+        ((bytes[0].toInt() and 0xFF) shl 8 or
+                (bytes[1].toInt() and 0xFF)).toShort()
+    } else {
+        ((bytes[1].toInt() and 0xFF) shl 8 or
+                (bytes[0].toInt() and 0xFF)).toShort()
+    }
+}
 
 fun ULong.Companion.fromBytes(bytes: ByteArray, byteOrder: ByteOrder): ULong {
     check(bytes.size <= 8) { "trying to parse oversized bytearray ${bytes.hex()} as ULong" }

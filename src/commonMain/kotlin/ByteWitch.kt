@@ -1,5 +1,7 @@
 import bitmage.fromHex
 import decoders.*
+import kaitai.KTStruct
+import kaitai.KaitaiParser
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -13,6 +15,171 @@ object ByteWitch {
 
     enum class Encoding(val label: String) {
         NONE("none"), PLAIN("plain"), HEX("hex"), HEXDUMP("hexdump"), BASE64("base64")
+    }
+
+    val builtinDecoderListManager = DecoderListManager<ByteWitchDecoder>()
+    val builtinKaitaiDecoderListManager = DecoderListManager<Kaitai>()
+    val userKaitaiDecoderListManager = DecoderListManager<Kaitai>()
+
+    private var kaitaiLiveDecoder: ByteWitchDecoder? = null
+
+    init {
+        builtinDecoderListManager.setDecoders(
+            decoders.associateBy { it.name },
+        )
+        builtinDecoderListManager.setDecoderOrder(
+            decoders.map { it.name }
+        )
+    }
+
+    class DecoderListManager<DecoderType : ByteWitchDecoder> {
+        private var decoders: MutableMap<String, DecoderType> = mutableMapOf()
+        private var disabledDecoderIds = mutableSetOf<String>()
+        private var orderedDecoderIds = mutableListOf<String>()
+        private var activeOrderedDecoders = mutableListOf<DecoderType>()
+
+        fun setDecoders(decoders: Map<String, DecoderType>) {
+            this.decoders = decoders.toMutableMap()
+            updateActiveOrderedDecoders()
+        }
+
+        fun setDecoder(id: String, decoder: DecoderType) {
+            decoders[id] = decoder
+            if (!orderedDecoderIds.contains(id)) {
+                orderedDecoderIds.add(id)
+            }
+            updateActiveOrderedDecoders()
+        }
+
+        fun getDecoder(id: String): DecoderType? {
+            return decoders[id]
+        }
+
+        fun hasDecoder(id: String): Boolean {
+            return decoders.containsKey(id)
+        }
+
+        fun removeDecoder(id: String) {
+            decoders.remove(id)
+            orderedDecoderIds.remove(id)
+            disabledDecoderIds.remove(id)
+            updateActiveOrderedDecoders()
+        }
+
+        fun getAllDecoderNames() : List<Pair<String, String>> {
+            return decoders.map { entry ->
+                Pair(entry.key, entry.value.name)
+            }
+        }
+
+        fun setAllDecodersEnabled(enabled: Boolean) {
+            if (enabled) {
+                disabledDecoderIds.clear()
+            } else {
+                disabledDecoderIds.addAll(
+                    decoders.map { it.key }
+                )
+            }
+            updateActiveOrderedDecoders()
+        }
+
+        fun setDecoderEnabled(id: String, enabled: Boolean) {
+            if (enabled) {
+                disabledDecoderIds.remove(id)
+            } else {
+                disabledDecoderIds.add(id)
+            }
+            updateActiveOrderedDecoders()
+        }
+
+        fun setDecoderOrder(orderedIds: List<String>) {
+            orderedDecoderIds = orderedIds.toMutableList()
+            updateActiveOrderedDecoders()
+        }
+
+        fun getActiveOrderedDecoders(): List<DecoderType> {
+            return activeOrderedDecoders
+        }
+
+        private fun updateActiveOrderedDecoders() {
+            activeOrderedDecoders.clear()
+            activeOrderedDecoders.addAll(
+                orderedDecoderIds
+                    .filter { id -> !disabledDecoderIds.contains(id) }
+                    .mapNotNull { id -> decoders[id] }
+            )
+        }
+    }
+
+    enum class KaitaiDecoderType {
+        BUILTIN,
+        USER
+    }
+
+    fun registerKaitaiDecoder(name: String, kaitaiStruct: String, canonicalPath: String, type: KaitaiDecoderType): Boolean {
+        val struct = KaitaiParser.parseYaml(kaitaiStruct)
+        if (struct == null) {
+            Logger.log("Failed to parse Kaitai struct for $name ($type)")
+            return false
+        }
+        val decoder = Kaitai(name, struct, canonicalPath)
+        when (type) {
+            KaitaiDecoderType.BUILTIN -> {
+                builtinKaitaiDecoderListManager.setDecoder(name, decoder)
+            }
+
+            KaitaiDecoderType.USER -> {
+                userKaitaiDecoderListManager.setDecoder(name, decoder)
+            }
+        }
+        Logger.log("Registered bundled Kaitai decoder: $name ($type)")
+        return true
+    }
+
+    fun setKaitaiLiveDecoder(kaitaiStruct: String?): Boolean {
+        if (kaitaiStruct == null || kaitaiStruct.isBlank()) {
+            Logger.log("Kaitai live decoder set to null")
+            kaitaiLiveDecoder = null
+            return true
+        }
+
+        val struct = KaitaiParser.parseYaml(kaitaiStruct)
+        if (struct == null) {
+            Logger.log("Failed to parse Kaitai struct for live decoder")
+            kaitaiLiveDecoder = null
+            return false
+        }
+        //console.log(struct)
+        kaitaiLiveDecoder = Kaitai("Live", struct, "/Live")
+        Logger.log("Set Kaitai live decoder")
+        return true
+    }
+
+    fun findKaitaiStructByPath(canonicalPath: String) : KTStruct? {
+        // TODO: Add an index for faster lookup if needed
+
+        // Search in user decoders first
+        val userDecoder = userKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (userDecoder != null) {
+            return userDecoder.kaitaiStruct
+        }
+
+        // Then search in builtin decoders
+        val builtinDecoder = builtinKaitaiDecoderListManager.getActiveOrderedDecoders().firstOrNull { it.canonicalPath == canonicalPath }
+        if (builtinDecoder != null) {
+            return builtinDecoder.kaitaiStruct
+        }
+
+        // Not found
+        Logger.log("Kaitai struct not found for path: $canonicalPath")
+        return null
+    }
+
+    fun getAllDecoders(): List<ByteWitchDecoder> {
+        val allDecoders = userKaitaiDecoderListManager.getActiveOrderedDecoders() +
+                builtinKaitaiDecoderListManager.getActiveOrderedDecoders() +
+                builtinDecoderListManager.getActiveOrderedDecoders()
+        return listOfNotNull(kaitaiLiveDecoder) + allDecoders
     }
 
     fun stripComments(data: String): String {
@@ -56,13 +223,10 @@ object ByteWitch {
         }
     }
 
-
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
-        val allDecoders = decoders
-
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
-            return allDecoders.mapNotNull {
+            return getAllDecoders().mapNotNull {
                 val decode = it.tryhardDecode(data)
                 Logger.log("decode with ${it.name} yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
@@ -71,7 +235,7 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = decoders.map { Pair(it, it.confidence(data, 0)) }.filter { it.second.first > 0.3 }
+            val possibleDecoders = getAllDecoders().map { Pair(it, it.confidence(data, 0)) }.filter { it.second.first > 0.3 }
 
             return possibleDecoders.mapNotNull {
                 try {
@@ -85,8 +249,7 @@ object ByteWitch {
     }
 
     fun quickDecode(data: ByteArray, sourceOffset: Int): ByteWitchResult? {
-
-        decoders.forEach { decoder ->
+        getAllDecoders().forEach { decoder ->
             val confidence = decoder.confidence(data, sourceOffset)
             if (confidence.first > 0.75) {
                 try {

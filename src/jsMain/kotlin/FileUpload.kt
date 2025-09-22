@@ -23,7 +23,7 @@ fun readBinaryFile(file: File) {
         if (arrayBuffer != null) {
             val hexContent = arrayBufferToHex(arrayBuffer) // Convert binary data to hex
             // Display hex content in the textarea
-            appendTextareaForFileUpload(hexContent)
+            TextareaUtils.appendTextareaForFileUpload(hexContent)
         } else {
             console.error("Failed to read binary file content")
         }
@@ -45,7 +45,7 @@ fun readFile(file: File) {
         val content = reader.result?.toString() // Safely convert `result` to a string
         if (content != null) {
             // Write the file content to the textarea
-            appendTextareaForFileUpload(content)
+            TextareaUtils.appendTextareaForFileUpload(content)
         } else {
             console.error("File content is null")
         }

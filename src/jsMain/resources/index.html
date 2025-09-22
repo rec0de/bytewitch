@@ -18,646 +18,147 @@
     <meta property="og:description" content="Instant, in-browser decoding & visualization for bplist, ASN.1, protobuf, opack, msgpack, CBOR and many more." />
     <meta property="og:image" content="banner.png" />
 
-    <style>
-
-        :root {
-            --on-accent: #fff;
-            --content-back: #fee5ed;
-            --accent: #c9748f;
-            --accent-highlight: #b9466b;
-            --ssf: #a374c9;
-            --ssf-highlight: #8546b9;
-            --bplist: #7e74c9;
-            --bplist-highlight: #5547b8;
-            --nsarchive: #74c9c7;
-            --nsarchive-highlight: #46b9b6;
-            --opack: #74c97b;
-            --opack-highlight: #46b951;
-            --asn: #c574c9;
-            --asn-highlight: #b346b9;
-            --generic: #c9a074;
-            --generic-highlight: #b98346;
-            --neutral: #a0a0a0;
-            --neutral-highlight: #838383;
-            --rowgap: 0.3rem;
-            --sans: Lato, Roboto, Helvetica, sans-serif;
-            --mono: monospace;
-        }
-
-        html, body {
-            font-family: var(--sans);
-            margin: 0;
-            height: 100%;
-            width: 100%;
-        }
-
-        body {
-            background: #ccc;
-            background: url("back.jpg") repeat scroll 0% 0%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            box-sizing: border-box;
-            padding: 5px;
-        }
-
-        h1, h2, h3 {
-            margin: 0px;
-        }
-
-        h3 {
-            margin-bottom: var(--rowgap);
-        }
-
-        button {
-            border-radius: 0.3rem;
-            color: var(--on-accent);
-            background: var(--accent);
-            border: 0px;
-            padding: 0.4rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.1s ease;
-            transition: background 0.1s ease;
-        }
-
-        button:hover {
-            color: var(--accent);
-            background: var(--on-accent);
-        }
-
-        .header {
-            display: flex;
-            flex-direction: row;
-            gap: 1rem;
-            align-self: center;
-            align-items: center;
-        }
-
-        .header > img {
-            height: 4rem;
-        }
-
-        .legend {
-            display: flex;
-            flex-direction: row;
-            gap: 0.5rem;
-            color: #fff;
-            font-size: 0.75rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .parsebuttons {
-            width: 100%;
-            display: flex;
-            flex-direction: row;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        .parsebuttons > div {
-            flex-grow: 1;
-        }
-
-        .show-ssf-button {
-            align-self: flex-start;  /* verhindert das Strecken */
-            width: auto;             /* nur so breit wie Inhalt */
-        }
-
-
-        .container {
-            box-sizing: border-box;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin: 0.5rem;
-            float: right;
-            display: flex;
-            flex-direction: column;
-            background: var(--content-back);
-            max-width: 100%;
-        }
-
-        .textareaContainer {
-            position: relative;
-            font-family: monospace;
-            width: 100%;
-        }
-
-        .textareaContainer > textarea {
-            max-width: 100%;
-            height: 250px;
-            width: 800px;
-            max-height: 30vh;
-            box-sizing: border-box;
-        }
-
-        #data_container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .textareaContainer > textarea {
-            max-width: 100%;
-            width: 800px;
-            height: 250px;
-            max-height: 30vh;
-        }
-
-
-        .container > span {
-            padding-top:  0.5rem;
-            padding-bottom:  0.5rem;
-        }
-
-        .container > button {
-            padding-top:  0.25rem;
-            padding-bottom:  0.25rem;
-            margin-top:  0.5rem;
-        }
-
-        .textareaContainer > .sizeLabel, .textareaContainer > .encoding {
-            position: absolute;
-            bottom: 0.5rem;
-            background: var(--content-back);
-            padding: 0.25rem 0.5rem;
-            border-radius: 1rem;
-            font-size: 0.85em;
-            font-family: var(--mono);
-            font-weight: bold;
-        }
-
-        .textareaContainer > .encoding {
-            right: .25rem;
-        }
-
-        .textareaContainer > .sizeLabel {
-            left: .25rem;
-        }
-
-        .invisible {
-            display: none;
-        }
-
-        .parsecontent {
-            display: flex;
-            font-family: var(--mono);
-        }
-
-        .roundbox, .legend > div {
-            box-sizing: border-box;
-            border-radius: 0.3rem;
-            padding: var(--rowgap);
-        }
-
-        .protobuf {
-            box-sizing: border-box;
-            background: var(--accent);
-            display: flex;
-            flex-direction: column;
-            gap: var(--rowgap);
-        }
-
-        .protofield {
-            box-sizing: border-box;
-            background: rgba(255, 255, 255, 0.5);
-            display: flex;
-            flex-direction: row;
-            gap: 1rem;
-        }
-
-        .protofield > div {
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            gap: var(--rowgap);
-            align-items: start;
-        }
-
-        .protovalue {
-            box-sizing: border-box;
-            padding: var(--rowgap);
-            border-radius: 0.3rem;
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-
-        .ssf {
-            box-sizing: border-box;
-            background: var(--ssf);
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: var(--rowgap);
-        }
-
-        .ssffield {
-            box-sizing: border-box;
-            background: rgba(255, 255, 255, 0.5);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .ssffield.segmentwise > div {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: var(--rowgap);
-            align-items: start;
-        }
-
-        .ssffield.bytewise {
-            display: flex;
-            flex-wrap: wrap;
-            border-radius: 0.4rem;
-            border: 1px solid #bbb;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            gap: 0.1rem;
-            max-width: 100%;
-            flex-direction: row;
-        }
-
-        .view-default > .ssffield.roundbox > div {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .ssfvalue {
-            box-sizing: border-box;
-            padding: var(--rowgap);
-            border-radius: 0.3rem;
-            background: rgba(255, 255, 255, 0.5);
-
-            position: relative;
-        }
-
-        .bytegroup {
-            display: inline-block;
-            padding: 5px;
-            border: 1px solid #ccc;
-            background: white;
-            vertical-align: middle;
-            text-align: center;
-        }
-
-        .ascii-char {
-            display: block;
-            font-size: 10px;
-            color: #888;
-        }
-
-
-        .highlightbyte {
-            background: #e9e9e9;
-        }
-
-        .field-separator {
-            display: inline-block;
-            margin: 0;
-            font-weight: bold;
-            color: black;
-            cursor: move;
-            user-select: none;
-            position: relative;
-            z-index: 10;
-            transition: transform 0.1s ease;
-        }
-
-        @keyframes fadeOutShrink {
-            0% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            100% {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-        }
-
-        .field-separator.dragging {
-            opacity: 0.8;
-        }
-
-        .bplist {
-            background: var(--bplist);
-        }
-
-        .nsarchive {
-            background: var(--nsarchive);
-        }
-
-        .opack {
-            background: var(--opack);
-        }
-
-        .generic {
-            background: var(--generic);
-        }
-
-        .neutral {
-            background: var(--neutral);
-        }
-
-        .asn1 {
-            background: var(--asn);
-        }
-
-        .generic, .neutral, .asn1, .flexy {
-            display: flex;
-            gap: var(--rowgap);
-            align-items: start;
-            flex-wrap: wrap;
-        }
-
-        .bpvalue {
-            padding: var(--rowgap);
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 0.3rem;
-        }
-
-        .bpdict, .bparray, .bpset, .nsdict, .nsarray, .nsset, .opdict, .oparray {
-            padding: var(--rowgap);
-            border-radius: 0.3rem;
-            background: var(--bplist);
-            display: flex;
-            gap: var(--rowgap);
-            align-items: start;
-        }
-
-        .bpdict, .nsdict, .opdict, .largecollection {
-            flex-direction: column;
-        }
-
-        .bpdict > div, .nsdict > div, .opdict > div {
-            display: flex;
-            flex-direction: row;
-            gap: var(--rowgap);
-            align-items: center;
-        }
-
-        .bpdict > div > span, .nsdict > div > span, .opdict > div > span {
-            font-family: var(--sans);
-        }
-
-        .nsdict, .nsarray, .nsset {
-            background: var(--nsarchive);
-        }
-
-        .opdict, .oparray {
-            background: var(--opack);
-        }
-
-        .asn1sequence {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: var(--rowgap);
-        }
-
-        .stringlit {
-            font-family: var(--mono);
-            whitespace: pre-wrap;
-        }
-
-        .data {
-            overflow-wrap: anywhere;
-            word-break: break-all;
-        }
-
-        #output {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: 1rem;
-            justify-content: center;
-            align-items: flex-start;
-        }
-
-        #bytefinder {
-            display: none;
-        }
-
-        #hexview, #textview {
-            margin-top: var(--rowgap);
-            font-family: var(--mono);
-            overflow-wrap: anywhere;
-        }
-
-        #hexview > span, #textview > span {
-            background: var(--accent);
-        }
-
-        .protobuf.highlight {
-            background: var(--accent-highlight);
-        }
-
-        .ssf.highlight {
-            background: var(--ssf-highlight);
-        }
-
-        .asn1.highlight {
-            background: var(--asn-highlight);
-        }
-
-        .bplist.highlight {
-            background: var(--bplist-highlight);
-        }
-
-        .opack.highlight {
-            background: var(--opack-highlight);
-        }
-
-        .nsarchive.highlight {
-            background: var(--nsarchive-highlight);
-        }
-
-        .generic.highlight {
-            background: var(--generic-highlight);
-        }
-
-        .icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .icon-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 1.5rem;
-        }
-
-        .icon {
-            width: 28px;
-            height: 28px;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            cursor: pointer;
-            transition: transform 0.15s ease;
-        }
-
-        .icon:hover {
-            transform: scale(1.1);
-        }
-
-        .icon-add {
-            background-image: url("icon_add_red.png");
-        }
-
-        .icon-add:hover {
-            background-image: url("icon_add_red_filled.png");
-        }
-
-        .icon-delete {
-            background-image: url("icon_delete_red.png");
-        }
-
-        .icon-delete:hover {
-            background-image: url("icon_delete_red_filled.png");
-        }
-
-        .icon-edit {
-            background-image: url("icon_edit_white.png");
-        }
-
-        .icon-edit:hover {
-            background-image: url("icon_edit_white_filled.png");
-        }
-
-        .icon-finish {
-            background-image: url("icon_finish_white.png");
-        }
-
-        .icon-finish:hover {
-            background-image: url("icon_finish_white_filled.png");
-        }
-
-        .icon-toggle-left {
-            background-image: url("icon_switch_left_white.png");
-        }
-
-        .icon-toggle-right {
-            background-image: url("icon_switch_right_white.png");
-        }
-
-        .icon-alignment {
-            background-image: url("icon_alignment_white.png");
-        }
-
-        .icon-alignment:hover {
-            background-image: url("icon_alignment_white_filled.png");
-        }
-
-        .message-output {
-            flex: 1 1 calc(33.333% - 1rem); /* put three messages next to each other with a little gap */
-            box-sizing: border-box;
-            border: 2px solid #999;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            background-color: #f9f9f9;
-            margin-bottom: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            max-width: 100%;
-        }
-
-        .byteview-block {
-            font-family: var(--mono);
-            overflow-wrap: anywhere;
-            background: #fff;
-            padding: 0.5rem;
-            border-radius: 0.3rem;
-            border: 1px solid #ccc;
-        }
-
-
-        .separator-placeholder {
-            display: inline-block;
-            height:38px;
-            background-color: transparent;
-            cursor: pointer;
-            vertical-align: middle;
-            position: relative;
-        }
-
-        .separator-placeholder::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -2px;
-            width: 5px;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.1);
-            transition: background 0.2s ease, border-radius 0.2s ease;
-            z-index: 1;
-            border-radius: 2px;
-        }
-
-        .separator-placeholder:hover::before {
-            background: #999999;
-        }
-
-        .hovered-alignment {
-            outline: 1px solid #6a6a6a;
-        }
-
-        .highlighted {
-            background-color: rgba(255, 200, 0, 0.6);
-            border: 2px solid orange;
-        }
-
-        .neutral.highlight {
-            background: var(--neutral-highlight);
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <script src="bytewitch.js"></script>
-<div class="container" style="gap: 1rem; align-items: center;">
-    <div class="header">
-        <img src="icon.png">
-        <h1>bytewitch</h1>
-    </div>
 
+
+<div class="card" id="header">
+    <img src="icon.png">
+    <h1>bytewitch</h1>
     <div class="legend">
-        <div class="bplist">bplist</div><div class="protobuf">protobuf</div><div class="opack">opack</div><div class="nsarchive">nsarchive</div><div class="asn1">asn.1</div><div class="generic">generic</div>
+        <div class="bplist">bplist</div>
+        <div class="protobuf">protobuf</div>
+        <div class="opack">opack</div>
+        <div class="nsarchive">nsarchive</div>
+        <div class="asn1">asn.1</div>
+        <div class="generic">generic</div>
     </div>
-
-    <div id="data_container">
-        <!--<div class="textareaContainer">
-            <textarea class="data input_area" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>
-            <div class="sizeLabel"><span>0 B</span><span></span></div>
-        </div>-->
-    </div>
-
-    <div class="icon-buttons">
-        <div class="icon icon-add" id="add_data"></div>
-        <div class="icon icon-delete" id="delete_data"></div>
-    </div>
-
-    <div class="parsebuttons">
-        <span>
-            <input type="checkbox" id="livedecode" checked />
-            <label for="livedecode">live decode</label>
-        </span>
-        <div></div>
-        <button id="upload">upload file</button>
-        <button id="decode">decode</button>
-        <button id="tryhard">try harder</button>
+    <div style="display: flex; flex-grow: 1"></div>
+    <div style="display: flex; flex-direction: column; justify-content: space-between; height: 4rem">
+        <button id="settings-btn">show settings</button>
+        <button id="kaitai-btn">show kaitai</button>
     </div>
 </div>
 
-<div class="container" id="output"><i id="no_decode_yet">no valid decode yet</i></div>
+<div id="container" class="container">
+    <div id="editor" class="card">
+        <h2 style="align-self: start">
+            <img src="icons/binary_data_black.png"/>
+            Input
+        </h2>
+        <!--<textarea id="data" placeholder="hex, base64, or hexdump. use # as line comment in hex mode."></textarea>-->
+        <div id="data_container"></div>
 
-<div class="container" id="bytefinder">
-    <h3>Byte Finder</h3>
+        <div class="icon-buttons">
+            <div class="icon icon-add" id="add_data"></div>
+            <div class="icon icon-delete" id="delete_data"></div>
+        </div>
+
+        <div class="parsebuttons">
+          <span>
+              <input type="checkbox" id="livedecode" checked/>
+              <label for="livedecode">live decode</label>
+          </span>
+            <div></div>
+            <button id="upload">upload file</button>
+            <button id="decode">decode</button>
+            <button id="tryhard">try harder</button>
+        </div>
+    </div>
+
+    <template id="decoder-chip-template">
+        <div class="chip">
+            <span class="chip-name"></span>
+            <div class="chip-separator"></div>
+            <div class="chip-buttons">
+                <div class="chip-btn chip-enable-btn icon"></div>
+                <div class="chip-btn chip-edit-btn icon icon-edit-black"></div>
+                <div class="chip-btn chip-delete-btn icon icon-delete-black"></div>
+            </div>
+        </div>
+    </template>
+
+    <div id="settings" class="card card-hidden">
+        <h2>
+            <img src="icons/settings_black.png"/>
+            Settings
+        </h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem">
+            <div style="flex-grow: 1; flex-basis: 0;">
+              <input type="checkbox" id="ssf-decode" checked/>
+              <label for="ssf-decode">SwiftSegFinder Decoding</label>
+            </div>
+            <div style="flex-grow: 1; flex-basis: 0;">
+              <input type="checkbox" id="show-instances" checked/>
+              <label for="show-instances">Show Kaitai Instances</label>
+            </div>
+        </div>
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
+                <p>Builtin Decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="builtin-decoders-disable-all">disable all</button>
+                <button id="builtin-decoders-enable-all">enable all</button>
+                <button id="builtin-decoders-reset-order">reset order</button>
+            </div>
+            <div class="decoder-list" id="builtin-decoder-list"></div>
+        </div>
+    </div>
+
+    <div id="kaitai" class="card card-hidden">
+        <div style="display: flex; align-content: baseline">
+            <h2>
+                <img src="icons/kaitai_black.png"/>
+                Kaitai
+            </h2>
+            <div style="flex-grow: 1"></div>
+            <a href="https://kaitai.io/" target="_blank" rel="noopener noreferrer">Kaitai Struct</a>
+        </div>
+
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
+                <p>Builtin Kaitai Decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="builtin-kaitai-decoders-disable-all">disable all</button>
+                <button id="builtin-kaitai-decoders-enable-all">enable all</button>
+                <button id="builtin-kaitai-decoders-reset-order">reset order</button>
+            </div>
+            <div class="decoder-list" id="builtin-kaitai-decoder-list"></div>
+        </div>
+        <div class="decoder-list-container">
+            <div class="decoder-list-header">
+                <p>User Kaitai Decoders</p>
+                <div style="flex-grow: 1"></div>
+                <button id="user-kaitai-decoders-disable-all">disable all</button>
+                <button id="user-kaitai-decoders-enable-all">enable all</button>
+            </div>
+            <div class="decoder-list" id="user-kaitai-decoder-list"></div>
+        </div>
+
+        <div class="textareaContainer">
+            <textarea id="kaitaiinput" placeholder="Kaitai Struct"></textarea>
+            <div id="kaitai-valid" class="annotationLabel" style="display: none"><span>Not valid</span></div>
+        </div>
+        <div class="kaitaibuttons">
+              <span>
+                  <input type="checkbox" id="kaitai-live"/>
+                  <label for="kaitai-live">include live struct</label>
+              </span>
+            <div></div>
+            <label for="kaitai-name">Kaitai parser</label><input type="text" id="kaitai-name" placeholder="name"/>
+            <button id="save-kaitai">save parser</button>
+            <div></div>
+            <button id="upload-parser">upload struct</button>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="output"></div>
+
+<div class="card" id="bytefinder">
+    <h3>Byte Finder (Input <span id="bytefinder-input-id"></span>)</h3>
     <i>click parsed elements to highlight source bytes below</i>
     <div id="hexview"></div>
     <div id="textview"></div>

@@ -12,10 +12,18 @@ interface ByteWitchResult {
         return rangeTagsFor(sourceByteRange!!.first+start, sourceByteRange!!.first+start+length)
     }
 
+    fun bitOffsetTagsFor(startOffset: Int, endOffset: Int) : String {
+        return "data-start-bit-offset=\"${sourceRangeBitOffset.first}\" data-end-bit-offset=\"${sourceRangeBitOffset.second}\""
+    }
+
     val sourceByteRange: Pair<Int,Int>?
+    val sourceRangeBitOffset: Pair<Int,Int>
+        get() = Pair(0, 0) // default implementation, can be overridden
 
     val byteRangeDataTags: String
-        get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
+        get() = if (sourceByteRange == null || sourceByteRange!!.first < 0) "" else (
+                rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second) + " "
+                        + bitOffsetTagsFor(sourceRangeBitOffset.first, sourceRangeBitOffset.second))
 }
 
 class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suffix: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
