@@ -172,6 +172,8 @@ fun String.fromHex(): ByteArray {
         .toByteArray()
 }
 
+fun Byte.toHex(): String = this.toUByte().toString(16).padStart(2, '0')
+
 
 
 // by ephemient from https://slack-chats.kotlinlang.org/t/527242/i-have-a-bytearray-of-utf-16-encoded-bytes-read-from-a-cinte
@@ -232,7 +234,6 @@ fun UShortArray.utf16BEToUtf8(): UByteArray {
 
 fun String.toUnicodeCodepoints(): List<Int> {
     var i = 0
-    var j = 0
     val codepoints = mutableListOf<Int>()
     while (i < this.length) {
         val codepoint = when (val unit = this[i++].code) {
@@ -269,11 +270,11 @@ fun decodeBase32(values: List<Int>): ByteArray {
     val bytes = mutableListOf<Byte>()
     values.forEach { v ->
         val newBits = (v and 0x1F)
-        Logger.log("new bits: ${newBits.toString(2)}, current byte: ${currentByte.toString(2)}, missing bits $missingBits")
+        //Logger.log("new bits: ${newBits.toString(2)}, current byte: ${currentByte.toString(2)}, missing bits $missingBits")
         // decoded character fits entirely into current byte
         if(missingBits == 5) {
             currentByte = currentByte or newBits
-            Logger.log("finishing byte: ${currentByte.toString(2)}")
+            //Logger.log("finishing byte: ${currentByte.toString(2)}")
             bytes.add(currentByte.toByte())
             currentByte = 0
             missingBits = 8

@@ -5,3 +5,4 @@ kotlin-js-store
 gradlew.bat
 node_modules
 .kotlin/
+.DS_Store
