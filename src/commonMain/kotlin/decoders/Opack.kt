@@ -11,6 +11,7 @@ import looksLikeUtf8String
 import kotlin.math.absoluteValue
 
 
+// doc: https://pyatv.dev/documentation/protocols/#opack
 class OpackParser : ParseCompanion() {
 
     companion object : ByteWitchDecoder {
@@ -50,6 +51,7 @@ class OpackParser : ParseCompanion() {
     }
 
     private var sourceOffset = 0
+    private val pointerList = mutableListOf<OpackObject>()
 
     private val lastConsumedBytePosition: Int
         get() = sourceOffset + parseOffset
@@ -57,6 +59,7 @@ class OpackParser : ParseCompanion() {
     fun parseTopLevel(bytes: ByteArray, sourceOffsetParam: Int): OpackObject {
         parseOffset = 0
         sourceOffset = sourceOffsetParam
+        pointerList.clear()
         val result = parse(bytes)
 
         check(parseOffset >= bytes.size){ "input data not fully consumed" }
@@ -65,23 +68,40 @@ class OpackParser : ParseCompanion() {
     }
 
     private fun parse(bytes: ByteArray): OpackObject {
+        val startPosition = parseOffset
         val typeByte = bytes[parseOffset].toUByte().toUInt()
         //Logger.log("parsing type byte: 0x${typeByte.toString(16)}")
-        return when(typeByte) {
+        val parsed = when(typeByte) {
             0x01u, 0x02u -> parseAsBool(bytes)
+            0x04u ->  {
+                parseOffset += 1
+                OPNull(sourceOffset+parseOffset-1)
+            }
             0x05u -> parseAsUUID(bytes)
             0x06u -> parseAsDate(bytes)
+            0x07u -> {
+                parseOffset += 1
+                OPInt(-1, Pair(sourceOffset+parseOffset-1, sourceOffset+parseOffset))
+            }
             in 0x08u..0x2fu -> parseAsInt(bytes)
-            0x30u, 0x31u, 0x32u, 0x33u -> parseAsInt(bytes)
+            0x30u, 0x31u, 0x32u, 0x33u, 0x34u -> parseAsInt(bytes)
             0x35u, 0x36u -> parseAsFloat(bytes)
             in 0x40u..0x60u -> parseAsString(bytes)
             in 0x61u..0x64u -> parseAsString(bytes)
+            0x6Fu -> parseAsNullTerminatedString(bytes)
             in 0x70u..0x90u -> parseAsData(bytes)
             in 0x91u..0x94u -> parseAsData(bytes)
+            in 0xa0u..0xc0u -> parseAsPointer(bytes)
+            in 0xc1u..0xc4u -> parseAsPointer(bytes)
             in 0xd0u..0xdfu -> parseAsArray(bytes)
             in 0xe0u..0xefu -> parseAsDict(bytes)
             else -> throw Exception("Unsupported type 0x${typeByte.toString(16)}")
         }
+
+        if(parseOffset-startPosition > 1 && parsed !is OPArray && parsed !is OPDict && parsed !is OPPointer)
+            pointerList.add(parsed)
+
+        return parsed
     }
 
     private fun parseAsBool(bytes: ByteArray): OpackObject {
@@ -125,6 +145,7 @@ class OpackParser : ParseCompanion() {
             0x31 -> OPInt(readInt(bytes, 2, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             0x32 -> OPInt(readInt(bytes, 4, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
             0x33 -> OPInt(readLong(bytes, 8, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition))
+            0x34 -> OPInt(readLong(bytes, 16, byteOrder = ByteOrder.LITTLE), Pair(start, lastConsumedBytePosition)) // 16 byte length won't fit into long but who on earth would use that in the first place???
             else -> throw Exception("Unexpected OPACK int ${bytes.hex()}")
         }
     }
@@ -161,6 +182,18 @@ class OpackParser : ParseCompanion() {
         return OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
     }
 
+    private fun parseAsNullTerminatedString(bytes: ByteArray): OPString {
+        val start = sourceOffset + parseOffset
+        parseOffset += 1
+
+        val endIndex = bytes.fromIndex(parseOffset).indexOf(0.toByte())
+
+        val stringBytes = readBytes(bytes, endIndex)
+        parseOffset += 1 // strip null terminator
+        check(looksLikeUtf8String(stringBytes, false) > 0.5) { "OPString has implausible string content: ${stringBytes.hex()}" }
+        return OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
+    }
+
     private fun parseAsData(bytes: ByteArray): OPData {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
@@ -187,6 +220,22 @@ class OpackParser : ParseCompanion() {
         }
     }
 
+    private fun parseAsPointer(bytes: ByteArray): OPPointer {
+        val start = sourceOffset + parseOffset
+        val index = when(val type = readInt(bytes, 1)) {
+            in 0xa0..0xc0 -> type - 0xa0
+            0xc1 -> readInt(bytes, 1)
+            0xc2 -> readInt(bytes, 2, byteOrder = ByteOrder.LITTLE)
+            0xc3 -> readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
+            0xc4 -> readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
+            else -> throw Exception("Unexpected OPACK string ${bytes.hex()}")
+        }
+
+        check(index < pointerList.size) { "opack pointer out of range: $index, available objects ${pointerList.size}"}
+        val referenced = pointerList[index]
+        return OPPointer(referenced, Pair(start, lastConsumedBytePosition))
+    }
+
     private fun parseAsArray(bytes: ByteArray): OPArray {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
@@ -204,6 +253,7 @@ class OpackParser : ParseCompanion() {
             0xdf -> {
                 while(bytes[parseOffset].toInt() != 0x03)
                     entries.add(parse(bytes))
+                parseOffset += 1 // consume 0x03 end marker
             }
             else -> throw Exception("Unexpected OPACK array ${bytes.hex()}")
         }
@@ -228,6 +278,7 @@ class OpackParser : ParseCompanion() {
             0xef -> {
                 while(bytes[parseOffset].toInt() != 0x03)
                     entries[parse(bytes)] = parse(bytes)
+                parseOffset += 1 // consume 0x03 end marker
             }
             else -> throw Exception("Unexpected OPACK dict ${bytes.hex()}")
         }
@@ -269,6 +320,16 @@ class OPUndefined(bytePosition: Int) : OpackObject() {
 class CborEndMarker(bytePosition: Int) : OpackObject() {
     override val sourceByteRange = Pair(bytePosition, bytePosition+1)
     override fun toString() = "end"
+}
+
+class OPPointer(val referenced: OpackObject, override val sourceByteRange: Pair<Int, Int>) : OpackObject() {
+    override fun toString() = "pointer($referenced)"
+
+    override fun renderHTML(): String {
+        return "<div class=\"roundbox opack opdict\" $byteRangeDataTags>Pointer: ${referenced.renderHtmlValue()}</div>"
+    }
+
+    override fun renderHtmlValue() = "<div class=\"bpvalue\">${renderHTML()}</div>"
 }
 
 data class OPInt(val value: Long, override val sourceByteRange: Pair<Int, Int>): OpackObject() {

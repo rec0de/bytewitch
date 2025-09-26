@@ -152,7 +152,6 @@ fun mainDecode(isLiveDecoding: Boolean, tryhard: Boolean) {
                 hexview.innerText = ""
                 textview.innerHTML = ""
             }
-
         }
     }
 
