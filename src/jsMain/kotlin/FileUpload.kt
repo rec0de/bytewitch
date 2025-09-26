@@ -1,8 +1,6 @@
 import org.khronos.webgl.*
 import org.w3c.files.File
 import org.w3c.files.FileReader
-import kotlinx.browser.document
-import org.w3c.dom.HTMLTextAreaElement
 
 fun arrayBufferToHex(buffer: ArrayBuffer): String {
     val byteArray = Uint8Array(buffer) // Create a Uint8Array view for the buffer
@@ -38,7 +36,7 @@ fun readBinaryFile(file: File) {
 
 
 // read txt file and append to textarea
-fun readFile(file: File) {
+fun readTextFile(file: File) {
     val reader = FileReader()
 
     reader.onload = {

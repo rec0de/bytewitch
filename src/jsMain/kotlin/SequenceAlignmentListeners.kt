@@ -186,15 +186,15 @@ fun attachByteWiseSequenceAlignmentListeners(alignedSegments: List<AlignedSequen
 fun showSequenceAlignmentToggleButton() {
     hideStartSequenceAlignmentButton()
 
-    val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
+    val toggleButtons = document.querySelectorAll(".alignment-toggle-legend")
     for (i in 0 until toggleButtons.length) {
-        (toggleButtons[i] as HTMLElement).style.display = "block"
+        (toggleButtons[i] as HTMLElement).style.display = "flex"
     }
 }
 
 // hide toggle button to switch to segment wise sequence alignment
 fun hideSequenceAlignmentToggleButton() {
-    val toggleButtons = document.querySelectorAll(".toggle-seqalign-button")
+    val toggleButtons = document.querySelectorAll(".alignment-toggle-legend")
     for (i in 0 until toggleButtons.length) {
         (toggleButtons[i] as HTMLElement).style.display = "none"
     }
