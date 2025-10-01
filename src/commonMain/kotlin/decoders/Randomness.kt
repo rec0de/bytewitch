@@ -41,10 +41,17 @@ object Randomness : ByteWitchDecoder {
 
         // stats from https://www.itl.nist.gov/div898/handbook/eda/section3/eda35d.htm
         fun calcExpectedRuns(n1: Int, n2: Int) = (2*n1*n2).toDouble()/(n1+n2) + 1
-        fun calcRunSD(n1: Int, n2: Int) = (2*n1*n2*(2*n1*n2 - n1 - n2)).toDouble() / ((n1+n2)*(n1+n2)*(n1 + n2 - 1))
-        fun calcZ(n1: Int, n2: Int) = ((count - calcExpectedRuns(n1, n2)) / calcRunSD(n1, n2)).absoluteValue
+        fun calcRunSD(n1: Int, n2: Int, expected: Double): Double {
+            return sqrt(((expected-1)*(expected-2)) / (n1 + n2 - 1))
+        }
+        fun calcZ(n1: Int, n2: Int): Double {
+            val expected = calcExpectedRuns(n1, n1)
+            return ((count - calcExpectedRuns(n1, n2)) / calcRunSD(n1, n2, expected)).absoluteValue
+        }
 
         fun calcPLevel(): P {
+            //Logger.log("Run P level - n1 $n1 n2 $n2 count $count")
+            //Logger.log("Expected: ${calcExpectedRuns(n1, n2)} SD: ${calcRunSD(n1, n2, calcExpectedRuns(n1, n2))}")
             return when(calcZ(n1, n2)) {
                 in 0.0..1.96 -> P.INSIGNIFICANT
                 in 1.96..2.24 -> P.P_0_05
@@ -121,7 +128,7 @@ object Randomness : ByteWitchDecoder {
             fourGramCounts[lowerNibble] += 1
             fourGramCounts[upperNibble] += 1
 
-            byteCounts[byte.toInt()] += 1
+            byteCounts[byte.toUByte().toInt()] += 1
             oneCounts[byte.countOneBits()] += 1
 
             val lowBit = byte.toInt() and 0x01

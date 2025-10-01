@@ -181,7 +181,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "3a290a" to Pair("Smile Data Format", "https://github.com/FasterXML/smile-format-specification"),
         "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR"),
         "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/"),
-        "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip")
+        "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip"),
+        "c0a801" to Pair("Local IP address (192.168.1.x)", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
