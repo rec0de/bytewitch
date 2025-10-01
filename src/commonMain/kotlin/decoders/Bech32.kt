@@ -62,15 +62,12 @@ data class Bech32Result(
     val data: ByteArray,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
-
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val decode = ByteWitch.quickDecode(data, Int.MIN_VALUE)
+        val payloadHTML = wrapIfDifferentColour(decode, data, rangeTagsFor(sourceByteRange.first + hrp.length + 1, sourceByteRange.second-6))
 
-        val prePayload = "<div class=\"bpvalue data\" ${rangeTagsFor(sourceByteRange.first + hrp.length + 1, sourceByteRange.second-6)}>"
-        val postPayload = "</div>"
-        val payloadHTML = decode?.renderHTML() ?: "0x${data.hex()}"
-
-        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, hrp.length)}>$hrp</div>$prePayload$payloadHTML$postPayload</div>"
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, hrp.length)}>$hrp</div>$payloadHTML</div>"
     }
 
 }

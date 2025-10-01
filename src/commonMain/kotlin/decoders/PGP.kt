@@ -120,6 +120,7 @@ object PGP: ByteWitchDecoder, ParseCompanion() {
 }
 
 class PGPfile(val blocks: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return if(blocks.size == 1)
             blocks[0].renderHTML()
@@ -130,6 +131,7 @@ class PGPfile(val blocks: List<ByteWitchResult>, override val sourceByteRange: P
 }
 
 class PGPBigInt(private val bitSize: Int, val bytes: ByteArray, override val sourceByteRange: Pair<Int, Int>?): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"bpvalue\" ${relativeRangeTags(0, 2)}>$bitSize bits</div><div class=\"bpvalue data\" ${relativeRangeTags(2, bytes.size)}>0x${bytes.hex()}</div>"
     }
@@ -142,6 +144,7 @@ class PGPBigInt(private val bitSize: Int, val bytes: ByteArray, override val sou
 class PGPpubkey(val length: Int, val lengthSize: Int, val timestamp: Date, val user: String, val n: PGPBigInt, val e: PGPBigInt,
                 override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult{
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val typeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>CERT_PUBKEY</div>"
         val lengthHTML = "<div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>$length B</div>"
@@ -164,6 +167,7 @@ class PGPprivkey(
     val u: PGPBigInt,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult{
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val typeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>CERT_SECKEY</div>"
         val lengthHTML = "<div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>$length B</div>"
@@ -180,6 +184,7 @@ class PGPsignature(
     val sigBytes: PGPBigInt,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult{
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val typeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>SKE</div>"
         val lengthHTML = "<div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>$length B</div>"
@@ -195,6 +200,7 @@ class PGPencryption(
     val encBytes: PGPBigInt,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult{
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val typeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>PKE</div>"
         val lengthHTML = "<div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>$length B</div>"
@@ -204,6 +210,7 @@ class PGPencryption(
 }
 
 class PGPunknown(val type: Int, val length: Int, val lengthSize: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     private val typeLookup = mapOf(
         1 to "PKE",
         2 to "SKE",

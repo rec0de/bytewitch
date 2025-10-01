@@ -71,6 +71,7 @@ object MSZIP : ByteWitchDecoder, ParseCompanion() {
 
 class MSZIPData(val header: MSZIPHeader, val chunks: List<MSZIPChunk>, override val sourceByteRange: Pair<Int, Int>) :
     ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"roundbox generic largecollection\" $byteRangeDataTags>${header.renderHTML()} ${chunks.joinToString(" ") { "<div class=\"bpvalue\">${it.renderHTML()}</div>" }}</div>"
     }
@@ -82,7 +83,7 @@ class MSZIPHeader(
     val firstChunkLength: ULong,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
-
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val magicHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 6)}>WIN32_COMPRESSED_DATA</div>"
         val crcHTML = "<div class=\"bpvalue\" ${relativeRangeTags(6, 1)}>CRC: 0x${crc.toString(16)}</div>"
@@ -95,6 +96,7 @@ class MSZIPHeader(
 }
 
 class MSZIPChunk(val size: Int, val compressedData: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val sizeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 4)}>$size B</div>"
         val magicHTML = "<div class=\"bpvalue\" ${relativeRangeTags(4, 2)}>CK</div>"

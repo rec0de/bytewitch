@@ -206,18 +206,3 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean) = BWString("you should not see this", Pair(sourceOffset, sourceOffset))
 }
 
-class BWStringCollection(val elements: List<BWString>, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override fun renderHTML() = elements.joinToString(" ") { it.renderHTML() }
-}
-
-open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)}</div>"
-}
-
-class BWLinkedString(string: String, private val url: String, sourceByteRange: Pair<Int, Int>): BWString(string, sourceByteRange) {
-    override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)} <a href=\"${url}\" target=\"_blank\">(info)</a></div>"
-}
-
-class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override fun renderHTML() = "<div class=\"bpvalue data\" $byteRangeDataTags>$annotationHTML ${data.hex()}</div>"
-}

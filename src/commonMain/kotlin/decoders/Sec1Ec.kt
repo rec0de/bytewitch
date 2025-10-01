@@ -314,6 +314,8 @@ object EdDSA : ByteWitchDecoder {
 }
 
 class Sec1Point(private val x: ByteArray, private val y: ByteArray, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
+
     override fun renderHTML(): String {
 
         val compressed = if(y.size == 1) "Compressed" else "Uncompressed"
@@ -333,6 +335,8 @@ class Sec1Point(private val x: ByteArray, private val y: ByteArray, private val 
 }
 
 class GenericECPoint(private val x: ByteArray, private val y: ByteArray?, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
+
     override fun renderHTML(): String {
 
         val compressed = if(y == null) "possible compressed" else ""
@@ -350,6 +354,8 @@ class GenericECPoint(private val x: ByteArray, private val y: ByteArray?, privat
 }
 
 class EdDSAPubkey(private val x: ByteArray, private val y: Int, private val curve: String, val inlineDisplay: Boolean, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
+
     override fun renderHTML(): String {
 
         val identifier = if (inlineDisplay)

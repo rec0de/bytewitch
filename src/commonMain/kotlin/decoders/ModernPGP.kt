@@ -134,6 +134,7 @@ object ModernPGP: ByteWitchDecoder, ParseCompanion() {
 }
 
 class PGPnewblock(val type: Int, val length: Int, val lengthSize: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     private val typeLookup = mapOf(
         1 to "Public-Key Encrypted Session Key Packet",
         2 to "Signature Packet",
@@ -164,6 +165,7 @@ class PGPnewblock(val type: Int, val length: Int, val lengthSize: Int, val data:
 }
 
 class PGPuserid(val length: Int, val lengthSize: Int, val id: String, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>User ID Packet</div><div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>Length $length B</div><div class=\"bpvalue stringlit\" ${rangeTagsFor(sourceByteRange.first+lengthSize+1, sourceByteRange.second)}>${htmlEscape(id)}</div></div>"
     }
@@ -181,6 +183,7 @@ open class PGPsignatureV3(
     val signature: List<PGPBigInt>,
     override val sourceByteRange: Pair<Int, Int>
 ): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
 
     protected val pkcToString = mapOf(
         1 to "RSA",
@@ -249,6 +252,7 @@ class PGPsignatureV4(
     val signature: List<PGPBigInt>,
     override val sourceByteRange: Pair<Int, Int>
 ): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
 
     protected val pkcToString = mapOf(
         1 to "RSA",

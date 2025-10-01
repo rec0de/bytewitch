@@ -291,6 +291,7 @@ interface ProtoValue : ByteWitchResult {
 }
 
 class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byteArrayOf(), sourceByteRange: Pair<Int, Int>) : ProtoLen(bytes, sourceByteRange) {
+    override val colour = ByteWitchResult.Colour.PROTOBUF
     override fun toString() = "Protobuf($objs)"
 
     override fun asProtoBuf() = this
@@ -312,22 +313,14 @@ class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byte
                     is ProtoBuf, is ProtoBPList -> it.renderHTML()
                     is ProtoString -> {
                         val veryLong = if(it.stringValue.length > 300) " data" else ""
-                        "<div class=\"protovalue stringlit$veryLong\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
+                        "<div class=\"bwvalue stringlit$veryLong\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                     }
                     is ProtoLen -> {
                         val decode = ByteWitch.quickDecode(it.value, it.sourceByteRange.second - it.value.size)
 
-                        // we have to wrap in a protovalue if we have a nested decode of the same type to distinguish them visually
-                        // for nested decodes of different types we can omit it for cleaner display
-                        val requiresWrapping = decode == null || decode is ProtoValue
-
-                        val prePayload = if(requiresWrapping) "<div class=\"protovalue data\" ${it.byteRangeDataTags}>" else ""
-                        val postPayload = if(requiresWrapping) "</div>" else ""
-                        val payloadHTML = decode?.renderHTML() ?: it.renderHTML()
-
-                        "$prePayload$payloadHTML$postPayload"
+                        wrapIfDifferentColour(decode, it.renderHTML(), it.byteRangeDataTags)
                     }
-                    else -> "<div class=\"protovalue\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
+                    else -> "<div class=\"bwvalue\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                 }
             }
             "<div class=\"protofield roundbox\"><span>${fieldContents.first}</span><div>${renderedFieldContents}</div></div>"
@@ -347,6 +340,7 @@ class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byte
 }
 
 data class ProtoI32(val value: Int, override val sourceByteRange: Pair<Int, Int>) : ProtoValue {
+    override val colour = ByteWitchResult.Colour.PROTOBUF
     override val wireType = 5
     override fun toString() = "I32($value)"
 
@@ -358,7 +352,7 @@ data class ProtoI32(val value: Int, override val sourceByteRange: Pair<Int, Int>
 }
 
 data class ProtoI64(val value: Long, override val sourceByteRange: Pair<Int, Int>) : ProtoValue {
-
+    override val colour = ByteWitchResult.Colour.PROTOBUF
     override val wireType = 1
     override fun toString() = "I64($value)"
 
@@ -398,7 +392,7 @@ data class ProtoI64(val value: Long, override val sourceByteRange: Pair<Int, Int
 }
 
 data class ProtoVarInt(val value: Long, override val sourceByteRange: Pair<Int, Int>) : ProtoValue {
-
+    override val colour = ByteWitchResult.Colour.PROTOBUF
     override val wireType = 0
     override fun toString() = "VarInt($value)"
 
@@ -408,6 +402,7 @@ data class ProtoVarInt(val value: Long, override val sourceByteRange: Pair<Int, 
 }
 
 open class ProtoLen(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ProtoValue {
+    override val colour = ByteWitchResult.Colour.PROTOBUF
     override val wireType = 2 // LEN
     override fun toString() = "LEN(${value.hex()})"
 

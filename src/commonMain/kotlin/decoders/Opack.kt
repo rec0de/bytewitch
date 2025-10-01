@@ -237,6 +237,8 @@ class OpackParser : ParseCompanion() {
 }
 
 abstract class OpackObject : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.OPACK
+
     override fun renderHTML(): String {
         return "<div class=\"opack roundbox\">${renderHtmlValue()}</div>"
     }

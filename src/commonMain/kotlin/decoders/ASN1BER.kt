@@ -220,6 +220,7 @@ class ASN1BER : ParseCompanion() {
 }
 
 abstract class ASN1Result(val tag: ASN1BER.ASN1Tag, val length: Int, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.ASN1
     override fun renderHTML(): String {
         return "<div class=\"roundbox asn1\" $byteRangeDataTags>${renderHtmlValue()}</div>"
     }
@@ -241,16 +242,9 @@ class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArra
     override fun renderHtmlValue(): String {
         // try to decode nested stuff
         val decode = ByteWitch.quickDecode(payload, sourceByteRange.second - payload.size)
-        val payloadHtml = decode?.renderHTML() ?: ("0x" + payload.hex())
+        val payloadHtml = wrapIfDifferentColour(decode, payload, asnPayloadByteRangeDataTags)
 
-        // we have to wrap in a bpvalue if we have a nested decode of the same type to distinguish them visually
-        // for nested decodes of different types we can omit it for cleaner display
-        val requiresWrapping = decode == null || decode is ASN1Result
-
-        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>" else ""
-        val postPayload = if(requiresWrapping) "</div>" else ""
-
-        return "$tagLengthDivs $prePayload$payloadHtml$postPayload"
+        return "$tagLengthDivs $payloadHtml"
     }
 }
 

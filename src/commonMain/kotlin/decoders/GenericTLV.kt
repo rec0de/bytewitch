@@ -81,21 +81,15 @@ data class GenericTLVResult(
     val byteOrder: ByteOrder,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
 
     override fun renderHTML(): String {
         val encodedLength = Int.fromBytes(length, byteOrder)
         val endian = if(byteOrder == ByteOrder.BIG) "big" else "little"
         val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
 
-        // we have to wrap in a bpvalue if we have a nested decode of the same type to distinguish them visually
-        // for nested decodes of different types we can omit it for cleaner display
-        val requiresWrapping = decode == null || decode is GenericASN1Result || decode is Tlv8Result
-
-        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\">" else ""
-        val postPayload = if(requiresWrapping) "</div>" else ""
-        val payloadHTML = decode?.renderHTML() ?: "0x${value.hex()}"
-
-        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\">Type 0x${type.hex()}</div><div class=\"bpvalue\">Len: $encodedLength (${length.size} B, $endian endian)</div>$prePayload$payloadHTML$postPayload</div>"
+        val payloadHTML = wrapIfDifferentColour(decode, value, relativeRangeTags(type.size+length.size, value.size))
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\">Type 0x${type.hex()}</div><div class=\"bpvalue\">Len: $encodedLength (${length.size} B, $endian endian)</div>$payloadHTML</div>"
     }
 
 }

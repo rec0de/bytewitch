@@ -312,7 +312,7 @@ class BPListParser() {
 }
 
 abstract class BPListObject : ByteWitchResult {
-
+    override val colour = ByteWitchResult.Colour.BPLIST
     var rootByteRange: Pair<Int,Int>? = null
 
     override fun renderHTML(): String {
@@ -321,7 +321,7 @@ abstract class BPListObject : ByteWitchResult {
     }
 
     open fun renderHtmlValue(): String {
-        return "<div class=\"bpvalue\" $byteRangeDataTags>${htmlEscape(toString())}</div>"
+        return "<div class=\"bwvalue\" $byteRangeDataTags>${htmlEscape(toString())}</div>"
     }
 }
 
@@ -382,9 +382,8 @@ class BPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>)
     override fun toString() = "BPData(${value.hex()})"
 
     override fun renderHtmlValue(): String {
-        // try to decode string-based payloads despite this not being a string, same for opack
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
-        return decodeAttempt?.renderHTML() ?: "<div class=\"bpvalue data\" $byteRangeDataTags>0x${value.hex()}</div>"
+        return wrapIfDifferentColour(decodeAttempt, value, byteRangeDataTags)
     }
 }
 
@@ -455,6 +454,7 @@ data class BPDict(val values: Map<BPListObject, BPListObject>, override val sour
 }
 
 abstract class NSObject : BPListObject() {
+    override val colour = ByteWitchResult.Colour.NSARCHIVE
     override fun renderHTML(): String {
         val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
         return "<div class=\"nsarchive roundbox\" $rootRangeTags>${renderHtmlValue()}</div>"
@@ -515,16 +515,7 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
     override fun renderHtmlValue(): String {
         // try to decode string-based payloads despite this not being a string, same for opack
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.first)
-
-        // we have to wrap in an nsvalue if we have a nested decode of the same type to distinguish them visually
-        // for nested decodes of different types we can omit it for cleaner display
-        val requiresWrapping = decodeAttempt == null || decodeAttempt is NSObject
-
-        val prePayload = if(requiresWrapping) "<div class=\"bpvalue data\" $byteRangeDataTags>" else ""
-        val postPayload = if(requiresWrapping) "</div>" else ""
-        val payloadHTML = decodeAttempt?.renderHTML() ?: "0x${value.hex()}"
-
-        return "$prePayload$payloadHTML$postPayload"
+        return wrapIfDifferentColour(decodeAttempt, value, byteRangeDataTags)
     }
 }
 
