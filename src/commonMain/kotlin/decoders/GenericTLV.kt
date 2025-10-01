@@ -14,7 +14,7 @@ object GenericTLV : ByteWitchDecoder {
         if(data.size < 3)
             return Pair(0.0, null)
 
-        val lengthPrefixes = listOf(testLengthPrefixAtOffset(data, 0), testLengthPrefixAtOffset(data, 1), testLengthPrefixAtOffset(data, 2))
+        val lengthPrefixes = listOf(testLengthPrefixAtOffset(data, 1), testLengthPrefixAtOffset(data, 2))
 
         if(lengthPrefixes.all { it == null })
             return Pair(0.0, null)
@@ -22,9 +22,14 @@ object GenericTLV : ByteWitchDecoder {
         val validPrefix = lengthPrefixes.first { it != null }!!
         val payloadLen = validPrefix.first
 
+        val zeroPayloadLengthPenalty = if(validPrefix.first - validPrefix.second == 0 || validPrefix.first == 0) 0.5 else 0.0
+
+        val lengthBias = min((payloadLen+1).toDouble()/6, 1.0)
+        val score = lengthBias - zeroPayloadLengthPenalty
+
         // TLVs with a payload length of less than 5 bytes are considered uncertain decodings
         // (add 1 to distinguish zero-length TLVs from completely invalid decodes)
-        return Pair(min((payloadLen+1).toDouble()/6, 1.0), null)
+        return Pair(score, null)
     }
 
     private fun testLengthPrefixAtOffset(bytes: ByteArray, offset: Int): Triple<Int, Int, ByteOrder>? {

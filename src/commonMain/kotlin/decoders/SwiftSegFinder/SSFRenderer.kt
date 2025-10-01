@@ -1,5 +1,6 @@
 package decoders.SwiftSegFinder
 
+import bitmage.ByteOrder
 import bitmage.hex
 import bitmage.toHex
 import decoders.BWAnnotatedData
@@ -29,13 +30,12 @@ object SSFRenderer {
             when (segment.fieldType) {
                 SSFField.STRING, SSFField.STRING_PAYLOAD -> "<div class=\"ssffield roundbox data\" $valueLengthTag $valueAlignId>\"$text\"</div>"
 
-                SSFField.PAYLOAD_LENGTH_BIG_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN,
-                SSFField.MESSAGE_LENGTH_BIG_ENDIAN, SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN -> {
+                SSFField.PAYLOAD_LENGTH_BIG_ENDIAN, SSFField.MESSAGE_LENGTH_BIG_ENDIAN -> {
                     val payloadLength = SSFUtil.tryParseLength(
                         bytes = bytes,
                         offset = start + sourceOffset,
                         lengthFieldSize = segmentBytes.size,
-                        bigEndian = segment.fieldType == SSFField.PAYLOAD_LENGTH_BIG_ENDIAN
+                        byteOrder = ByteOrder.BIG
                     ) ?: 0
 
                     """
@@ -44,7 +44,20 @@ object SSFRenderer {
                         </div>
                     """.trimIndent()
                 }
+                SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN, SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN -> {
+                    val payloadLength = SSFUtil.tryParseLength(
+                        bytes = bytes,
+                        offset = start + sourceOffset,
+                        lengthFieldSize = segmentBytes.size,
+                        byteOrder = ByteOrder.LITTLE
+                    ) ?: 0
 
+                    """
+                        <div class="ssffield roundbox data" $valueLengthTag $valueAlignId>
+                            Length field: ${payloadLength}B
+                        </div>
+                    """.trimIndent()
+                }
                 else -> {
                     val decode = ByteWitch.quickDecode(segmentBytes, start + sourceOffset)
 

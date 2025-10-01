@@ -2,6 +2,7 @@ import decoders.SwiftSegFinder.SSFField
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import SequenceAlignment.SegmentWiseSequenceAlignment
+import bitmage.fromHex
 import kotlin.test.assertContentEquals
 import kotlin.test.assertNotEquals
 
@@ -9,56 +10,56 @@ class SegmentWiseSequenceAlignmentTests {
 
     @Test
     fun testCanberraDistanceEqualSegments() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("01 02 03")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("01 02 03")
+        val segmentA = "010203".fromHex()
+        val segmentB = "010203".fromHex()
         val dist = SegmentWiseSequenceAlignment.canberraDistance(segmentA, segmentB)
         assertEquals(0.0, dist)
     }
 
     @Test
     fun testCanberraDistanceUnequalSegments() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("02 04")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("00 01")
+        val segmentA = "0204".fromHex()
+        val segmentB = "0001".fromHex()
         val dist = SegmentWiseSequenceAlignment.canberraDistance(segmentA, segmentB)
         assertEquals(1.6, dist)
     }
 
     @Test
     fun testCanberraUlmDissimilarityEqualLength() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("00 00")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
+        val segmentA = "0000".fromHex()
+        val segmentB = "0000".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.UNKNOWN, SSFField.UNKNOWN)
         assertEquals(0.0, dissim)
     }
 
     @Test
     fun testCanberraUlmDissimilarityUnequalLength() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 00")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
+        val segmentA = "000000".fromHex()
+        val segmentB = "0000".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.UNKNOWN, SSFField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
     @Test
     fun testCanberraUlmDissimilarityEqualSegment() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("00 00 11")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("00 00")
+        val segmentA = "000011".fromHex()
+        val segmentB = "0000".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.UNKNOWN, SSFField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
     @Test
     fun testCanberraUlmDissimilarityShiftedSegment() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("01 02 03")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("00 01 02 03 04")
+        val segmentA = "010203".fromHex()
+        val segmentB = "0001020304".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.UNKNOWN, SSFField.UNKNOWN)
         assertNotEquals(0.0, dissim)
     }
 
     @Test
     fun testCanberraUlmDissimilarityEqualsCanberraDistance() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("A3 B7")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("C7 01")
+        val segmentA = "A3B7".fromHex()
+        val segmentB = "C701".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.UNKNOWN, SSFField.UNKNOWN)
         val dist = SegmentWiseSequenceAlignment.canberraDistance(segmentA, segmentB)
         assertEquals(dissim, dist/2)
@@ -66,16 +67,16 @@ class SegmentWiseSequenceAlignmentTests {
 
     @Test
     fun testCanberraUlmDissimilarityLengthField() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("01 02")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("34 78")
+        val segmentA = "0102".fromHex()
+        val segmentB = "3478".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
         assertEquals(0.0, dissim)
     }
 
     @Test
     fun testCanberraUlmDissimilarityLongLengthField() {
-        val segmentA = ByteWitch.getBytesFromInputEncoding("0013627282")
-        val segmentB = ByteWitch.getBytesFromInputEncoding("3488733711")
+        val segmentA = "0013627282".fromHex()
+        val segmentB = "3488733711".fromHex()
         val dissim = SegmentWiseSequenceAlignment.canberraUlmDissimilarity(segmentA, segmentB, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN, SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN)
         assertEquals(0.0, dissim)
     }
@@ -109,25 +110,25 @@ class SegmentWiseSequenceAlignmentTests {
 
     @Test
     fun testAveragePoolSegmentExactSplit() {
-        val input = ByteWitch.getBytesFromInputEncoding("10203040")
+        val input = "10203040".fromHex()
         val result = SegmentWiseSequenceAlignment.averagePoolSegment(input, 2)
-        val expected = ByteWitch.getBytesFromInputEncoding("1838") // [10,20] → 18; [30,40] → 38
+        val expected = "1838".fromHex() // [10,20] → 18; [30,40] → 38
         assertContentEquals(expected, result)
     }
 
     @Test
     fun testAveragePoolSegmentUnevenSplit1() {
-        val input = ByteWitch.getBytesFromInputEncoding("10203040506070")
+        val input = "10203040506070".fromHex()
         val result = SegmentWiseSequenceAlignment.averagePoolSegment(input, 3)
-        val expected = ByteWitch.getBytesFromInputEncoding("183860") // [10,20]→18; [30,40]→38; [50,60,70]→60
+        val expected = "183860".fromHex() // [10,20]→18; [30,40]→38; [50,60,70]→60
         assertContentEquals(expected, result)
     }
 
     @Test
     fun testAveragePoolSegmentUnevenSplit2() {
-        val input = ByteWitch.getBytesFromInputEncoding("AB9DE2C34A")
+        val input = "AB9DE2C34A".fromHex()
         val result = SegmentWiseSequenceAlignment.averagePoolSegment(input, 3)
-        val expected = ByteWitch.getBytesFromInputEncoding("ABBF86") // [AB]→AB; [9D,E2]→BF; [C3,4A]→86
+        val expected = "ABBF86".fromHex() // [AB]→AB; [9D,E2]→BF; [C3,4A]→86
         assertContentEquals(expected, result)
     }
 
@@ -135,7 +136,7 @@ class SegmentWiseSequenceAlignmentTests {
     fun testAveragePoolSegmentEmptyInput() {
         val input = byteArrayOf()
         val result = SegmentWiseSequenceAlignment.averagePoolSegment(input, 3)
-        val expected = ByteWitch.getBytesFromInputEncoding("000000") // no input → erverything should be 0
+        val expected = "000000".fromHex() // no input → erverything should be 0
         assertContentEquals(expected, result)
     }
 }

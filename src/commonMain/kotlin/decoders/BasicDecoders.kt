@@ -76,11 +76,12 @@ object IEEE754 : ByteWitchDecoder {
 
     private fun looksReasonable(positive: Boolean, exponent: Int, mantissa: Long, value: Double, isDouble: Boolean): Double {
         val positiveBonus = if(positive) 0.1 else 0.0
-        val mantissaComplexity = if(isDouble) mantissa.countTrailingZeroBits().toDouble() / 52 else mantissa.countTrailingZeroBits().toDouble() / 23
+        // 12 and 41 are the bits that are in the mantissa Long (64b) but not in the actual binary data for float and double respectively
+        val mantissaComplexity = if(isDouble) (mantissa.countTrailingZeroBits().toDouble() - 12) / 52 else (mantissa.countTrailingZeroBits().toDouble() - 41) / 23
         val magnitudeScore = (12 - abs(exponent)).toDouble() / 18
-        val stringLength = (8.0 - value.toString().length) / 8
+        val stringLength = (7.0 - value.toString().length) / 7
 
-        val score = positiveBonus + mantissaComplexity + magnitudeScore + stringLength
+        val score = positiveBonus + (mantissaComplexity + magnitudeScore + stringLength) / 2
         //Logger.log("number plausibility: positive $positiveBonus exponent $exponent / $magnitudeScore roundness $mantissaComplexity stringLength $stringLength total $score")
         return score
     }
@@ -88,29 +89,31 @@ object IEEE754 : ByteWitchDecoder {
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
         when(data.size) {
             4 -> {
+                val zeroBytePenalty = - (data.count { it.toInt() == 0 }.toDouble() / data.size) * 0.5
                 val partsBE = dissectFloat(data.readInt(ByteOrder.BIG))
                 val valueBE = data.readFloat(ByteOrder.BIG).toDouble()
-                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third.toLong(), valueBE, isDouble = false)
+                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third.toLong(), valueBE, isDouble = false) + zeroBytePenalty
                 if(scoreBE > 0.75)
                     return BWString("Float BE: $valueBE", Pair(sourceOffset, sourceOffset+4))
 
                 val partsLE = dissectFloat(data.readInt(ByteOrder.LITTLE))
                 val valueLE = data.readFloat(ByteOrder.LITTLE).toDouble()
-                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third.toLong(), valueLE, isDouble = false)
+                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third.toLong(), valueLE, isDouble = false) + zeroBytePenalty
                 if(scoreLE > 0.75)
                     return BWString("Float LE: $valueLE", Pair(sourceOffset, sourceOffset+4))
                 throw Exception("not a reasonable float / double")
             }
             8 -> {
+                val zeroBytePenalty = - (data.count { it.toInt() == 0 }.toDouble() / data.size) * 0.5
                 val partsBE = dissectDouble(data.readLong(ByteOrder.BIG))
                 val valueBE = data.readDouble(ByteOrder.BIG)
-                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third, valueBE, isDouble = true)
+                val scoreBE = looksReasonable(partsBE.first, partsBE.second, partsBE.third, valueBE, isDouble = true) + zeroBytePenalty
                 if(scoreBE > 0.75)
                     return BWString("Double BE: $valueBE", Pair(sourceOffset, sourceOffset+8))
 
                 val partsLE = dissectDouble(data.readLong(ByteOrder.LITTLE))
                 val valueLE = data.readDouble(ByteOrder.LITTLE)
-                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third, valueLE, isDouble = true)
+                val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third, valueLE, isDouble = true) + zeroBytePenalty
                 if(scoreLE > 0.75)
                     return BWString("Double LE: $valueLE", Pair(sourceOffset, sourceOffset+8))
                 throw Exception("not a reasonable float / double")

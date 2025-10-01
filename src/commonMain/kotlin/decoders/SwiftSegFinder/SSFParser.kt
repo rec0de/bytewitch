@@ -1,10 +1,11 @@
 package decoders.SwiftSegFinder
 
+import bitmage.ByteOrder
+import bitmage.fromBytes
 import decoders.*
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.random.Random
 
 data class GaussianKernel(val sigma: Double, val radius: Int, val weights: DoubleArray)
 
@@ -113,27 +114,28 @@ class SSFParser {
     // tries to detect length field that determines the rest of the message size in all messages
     fun detectMessageLengthField(messages: List<SSFParsedMessage>): List<SSFParsedMessage> {
         // test 1 byte, 2 byte and 4 bytes length field of both endian
+        // start with larger length fields to select largest fitting one
         val candidateConfigs = listOf(
-            Pair(1, true),
-            Pair(2, true),
-            Pair(2, false),
-            Pair(4, true),
-            Pair(4, false)
+            Pair(4, ByteOrder.BIG),
+            Pair(4, ByteOrder.LITTLE),
+            Pair(2, ByteOrder.BIG),
+            Pair(2, ByteOrder.LITTLE),
+            Pair(1, ByteOrder.BIG),
         )
 
         // check if any configuration exists
-        val validConfigs = candidateConfigs.filter { (size, isBigEndian) ->
+        val validConfigs = candidateConfigs.filter { (size, byteOrder) ->
             messages.all { msg ->
-                detectLengthFieldInMessage(msg, size, isBigEndian) != null
+                detectLengthFieldInMessage(msg, size, byteOrder) != null
             }
         }
         if (validConfigs.isEmpty()) return messages
 
-        val (chosenSize, chosenEndian) = validConfigs.first() // take first configuration
+        val (chosenSize, chosenByteOrder) = validConfigs.first() // take first configuration
 
         // create new segment in all messages
         return messages.map { msg ->
-            val match = detectLengthFieldInMessage(msg, chosenSize, chosenEndian)!!
+            val match = detectLengthFieldInMessage(msg, chosenSize, chosenByteOrder)!!
             val (lengthFieldOffset, lengthValue) = match
             val payloadStart = lengthFieldOffset + chosenSize
             // val payloadEnd = payloadStart + lengthValue
@@ -146,7 +148,7 @@ class SSFParser {
             replacedSegments.add(
                 SSFSegment(
                     lengthFieldOffset,
-            if (chosenEndian)
+            if (chosenByteOrder == ByteOrder.BIG)
                         SSFField.MESSAGE_LENGTH_BIG_ENDIAN
                     else
                         SSFField.MESSAGE_LENGTH_LITTLE_ENDIAN
@@ -168,13 +170,13 @@ class SSFParser {
     fun detectLengthFieldInMessage(
         msg: SSFParsedMessage,
         lengthFieldSize: Int,
-        bigEndian: Boolean
+        byteOrder: ByteOrder
     ): Pair<Int, Int>? {
         val bytes = msg.bytes
         val segments = msg.segments.sortedBy { it.offset }
 
         for (offset in 0 until bytes.size - lengthFieldSize) {
-            val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: continue
+            val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, byteOrder) ?: continue
             val payloadStart = offset + lengthFieldSize
             val payloadEnd = payloadStart + length
 
@@ -701,6 +703,7 @@ class SSFParser {
 
                 // only shift boundary if x0 bytes are less than 2 bytes long
                 if (extra in 1..2) {
+                    //Logger.log("shifting $extra null bytes into string at position $currStart")
                     val shiftedOffset = currStart + extra
                     val exists = segments.any { it.offset == shiftedOffset }
 
@@ -722,8 +725,9 @@ class SSFParser {
                     idx--
                 }
 
-                // only shift boundary if x0 bytes are less than 2 bytes long
-                if (count in 1..2) {
+                // only shift boundary if x0 bytes are less than 4 bytes long
+                if (count in 1..3) {
+                    //Logger.log("shifting $count null bytes into unknown at position $currStart")
                     newSegment = SSFSegment(currStart - count, currType)
                 }
             }
@@ -784,7 +788,7 @@ class SSFParser {
     // handle length field payload and add it to the result
     fun handlePrintablePayload(
         bytes: ByteArray, taken: BooleanArray, result: MutableList<SSFSegment>,
-        offset: Int, lengthFieldSize: Int, payloadLength: Int, bigEndian: Boolean
+        offset: Int, lengthFieldSize: Int, payloadLength: Int, byteOrder: ByteOrder
     ): Int? {
         // check if payload is printable
         val payloadStart = offset + lengthFieldSize
@@ -802,7 +806,7 @@ class SSFParser {
         }
 
         // finally add fields
-        if (bigEndian) {
+        if (byteOrder == ByteOrder.BIG) {
             result.add(SSFSegment(offset,SSFField.PAYLOAD_LENGTH_BIG_ENDIAN))
         } else {
             result.add(SSFSegment(offset,SSFField.PAYLOAD_LENGTH_LITTLE_ENDIAN))
@@ -820,11 +824,11 @@ class SSFParser {
         result: MutableList<SSFSegment>,
         offset: Int,
         lengthFieldSize: Int,
-        bigEndian: Boolean
+        byteOrder: ByteOrder
     ): Int? {
         if (offset + lengthFieldSize >= bytes.size) return null
 
-        val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, bigEndian) ?: return null
+        val length = SSFUtil.tryParseLength(bytes, offset, lengthFieldSize, byteOrder) ?: return null
 
         val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + length
@@ -833,7 +837,7 @@ class SSFParser {
         if (payloadEnd > bytes.size || length < 3) return null
         if ((offset until payloadEnd).any { taken[it] }) return null
 
-        return handlePrintablePayload(bytes, taken, result, offset, lengthFieldSize, length, bigEndian)
+        return handlePrintablePayload(bytes, taken, result, offset, lengthFieldSize, length, byteOrder)
     }
 
 
@@ -844,21 +848,21 @@ class SSFParser {
 
         while (i < bytes.size - 1) {
             // Try 2-byte length field (big endian)
-            var newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, true)
+            var newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, ByteOrder.BIG)
             if (newIndex != null) {
                 i = newIndex
                 continue
             }
 
             // Try 2-byte length field (little endian)
-            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, false)
+            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 2, ByteOrder.LITTLE)
             if (newIndex != null) {
                 i = newIndex
                 continue
             }
 
             // Try 1-byte length field
-            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 1, true)
+            newIndex = checkLengthPrefixedSegment(bytes, taken, segments, i, 1, ByteOrder.BIG)
             if (newIndex != null) {
                 i = newIndex
                 continue
@@ -878,25 +882,13 @@ object SSFUtil {
         bytes: ByteArray,
         offset: Int,
         lengthFieldSize: Int,
-        bigEndian: Boolean
+        byteOrder: ByteOrder
     ): Int? {
         return try {
             when (lengthFieldSize) {
                 1 -> bytes[offset].toUByte().toInt()
-                2 -> if (bigEndian)
-                    (bytes[offset].toUByte().toInt() shl 8) or bytes[offset + 1].toUByte().toInt()
-                else
-                    (bytes[offset + 1].toUByte().toInt() shl 8) or bytes[offset].toUByte().toInt()
-                4 -> if (bigEndian)
-                    (bytes[offset].toUByte().toInt() shl 24) or
-                            (bytes[offset + 1].toUByte().toInt() shl 16) or
-                            (bytes[offset + 2].toUByte().toInt() shl 8) or
-                            (bytes[offset + 3].toUByte().toInt())
-                else
-                    (bytes[offset + 3].toUByte().toInt() shl 24) or
-                            (bytes[offset + 2].toUByte().toInt() shl 16) or
-                            (bytes[offset + 1].toUByte().toInt() shl 8) or
-                            (bytes[offset].toUByte().toInt())
+                2 -> Int.fromBytes(bytes.sliceArray(offset until offset+2), byteOrder, explicitlySigned = false)
+                4 -> Int.fromBytes(bytes.sliceArray(offset until offset+4), byteOrder, explicitlySigned = false)
                 else -> null
             }
         } catch (e: IndexOutOfBoundsException) {
@@ -909,14 +901,5 @@ object SSFUtil {
         val start = message.segments[index].offset
         val end = message.segments.getOrNull(index + 1)?.offset ?: message.bytes.size
         return start until end
-    }
-
-    fun setSSFFieldfromDecoder(decoder: ByteWitchDecoder): SSFField {
-        return when (decoder.name.lowercase()) {
-            "utf8" -> SSFField.STRING
-            "utf16" -> SSFField.UNKNOWN // STRING_UTF16
-            "ieee754" -> SSFField.UNKNOWN // FLOAT
-            else -> SSFField.UNKNOWN
-        }
     }
 }
