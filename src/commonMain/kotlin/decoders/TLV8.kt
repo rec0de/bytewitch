@@ -45,16 +45,17 @@ object TLV8 : ByteWitchDecoder {
 }
 
 class Tlv8Result(val tlvs: List<Tlv8Entry>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"generic roundbox\" $byteRangeDataTags>${tlvs.joinToString("") { it.renderHTML() }}</div>"
     }
 }
 
 class Tlv8Entry(val type: Int, val length: Int, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
-        Logger.log("TLV8 nested quick decode of ${value.hex()}")
         val parseAttempt = ByteWitch.quickDecode(value, sourceByteRange.first+2)
-        val valueHTML = parseAttempt?.renderHTML() ?: "0x${value.hex()}"
+        val valueHTML = wrapIfDifferentColour(parseAttempt, value, "")
         return "<div class=\"bpvalue flexy\" $byteRangeDataTags>Type 0x${type.toString(16)} Length $length Value $valueHTML</div>"
     }
 }

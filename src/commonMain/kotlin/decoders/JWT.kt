@@ -1,6 +1,7 @@
 package decoders
 
 import bitmage.hex
+import htmlEscape
 
 object JWT: ByteWitchDecoder {
     override val name = "JWT"
@@ -24,9 +25,9 @@ object JWT: ByteWitchDecoder {
 
         val headerEnd = sourceOffset + parts[0].encodeToByteArray().size
         val payloadEnd = headerEnd + 1 + parts[1].encodeToByteArray().size
-        val header = JWTString(decoded[0].decodeToString(), Pair(sourceOffset, headerEnd))
-        val payload = JWTString(decoded[1].decodeToString(), Pair(headerEnd+1, payloadEnd))
-        val signature = JWTData(decoded[2], Pair(payloadEnd+1, sourceOffset+data.size))
+        val header = BWString(decoded[0].decodeToString(), Pair(sourceOffset, headerEnd))
+        val payload = BWString(decoded[1].decodeToString(), Pair(headerEnd+1, payloadEnd))
+        val signature = BWAnnotatedData("", decoded[2], Pair(payloadEnd+1, sourceOffset+data.size))
 
         return JWTResult(header, payload, signature, Pair(sourceOffset, sourceOffset+data.size))
     }
@@ -35,25 +36,13 @@ object JWT: ByteWitchDecoder {
 }
 
 data class JWTResult(
-    val header: JWTString,
-    val payload: JWTString,
-    val signature: JWTData,
+    val header: BWString,
+    val payload: BWString,
+    val signature: BWAnnotatedData,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
-
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"roundbox generic\" $byteRangeDataTags>${header.renderHTML()} ${payload.renderHTML()} ${signature.renderHTML()}</div>"
-    }
-}
-
-data class JWTString(val content: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override fun renderHTML(): String {
-        return "<div class=\"bpvalue\" $byteRangeDataTags>$content</div>"
-    }
-}
-
-data class JWTData(val content: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override fun renderHTML(): String {
-        return "<div class=\"bpvalue data\" $byteRangeDataTags>0x${content.hex()}</div>"
     }
 }

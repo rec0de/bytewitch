@@ -81,9 +81,10 @@ data class AppleProtocolBuffer(
     val tlvs: List<AppleProtobufTLV>,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val metadataHTML = strings?.toList()?.joinToString("") { it.renderHTML() } ?: ""
-        return "<div class=\"generic roundbox\" $byteRangeDataTags>$metadataHTML${tlvs.joinToString("") { "<div class=\"bpvalue data\">${it.renderHTML()}</div>" }}</div>"
+        return "<div class=\"generic roundbox\" $byteRangeDataTags>$metadataHTML${tlvs.joinToString("") { "<div class=\"bwvalue data\">${it.renderHTML()}</div>" }}</div>"
     }
 }
 
@@ -93,8 +94,9 @@ data class AppleProtobufTLV(
     val value: ProtoBuf,
     override val sourceByteRange: Pair<Int, Int>
 ) : ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val payloadHTML = value.renderHTML()
-        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\">Type ${type}</div><div class=\"bpvalue\">Len: $length</div>$payloadHTML</div>"
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bwvalue\">Type ${type}</div><div class=\"bwvalue\">Len: $length</div>$payloadHTML</div>"
     }
 }

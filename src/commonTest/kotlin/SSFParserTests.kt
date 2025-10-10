@@ -1,3 +1,4 @@
+import bitmage.ByteOrder
 import bitmage.fromHex
 import decoders.SwiftSegFinder.*
 import kotlin.collections.listOf
@@ -434,7 +435,7 @@ class SSFParserTests {
             offset = 0,
             lengthFieldSize = 1,
             payloadLength = 7,
-            bigEndian = false
+            byteOrder = ByteOrder.LITTLE
         )
 
         assertEquals(8, newIndex)
@@ -451,7 +452,7 @@ class SSFParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<SSFSegment>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, ByteOrder.LITTLE)
 
         assertEquals(7, nextIndex) // i + 1 + 6
         assertEquals(
@@ -470,7 +471,7 @@ class SSFParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<SSFSegment>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 2, false)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 2, ByteOrder.LITTLE)
 
         assertEquals(8, nextIndex) // i + 2 + 6
         assertEquals(
@@ -489,7 +490,7 @@ class SSFParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<SSFSegment>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, ByteOrder.LITTLE)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -502,7 +503,7 @@ class SSFParserTests {
         val taken = BooleanArray(bytes.size) { false }
         val result = mutableListOf<SSFSegment>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, ByteOrder.LITTLE)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -516,7 +517,7 @@ class SSFParserTests {
         taken[3] = true // simulate overlap
         val result = mutableListOf<SSFSegment>()
 
-        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, false)
+        val nextIndex = parser.checkLengthPrefixedSegment(bytes, taken, result, 0, 1, ByteOrder.LITTLE)
 
         assertNull(nextIndex)
         assertTrue(result.isEmpty())
@@ -535,7 +536,7 @@ class SSFParserTests {
             offset = 0,
             lengthFieldSize = 1,
             payloadLength = 5,
-            bigEndian = false
+            byteOrder = ByteOrder.LITTLE
         )
 
         assertNull(newIndex)
@@ -642,42 +643,42 @@ class SSFParserTests {
     @Test
     fun testTryParseLength_1Byte() {
         val bytes = byteArrayOf(0x0A)
-        val length = SSFUtil.tryParseLength(bytes, 0, 1, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 1, ByteOrder.BIG)
         assertEquals(10, length)
     }
 
     @Test
     fun testTryParseLength_2Byte_BigEndian() {
         val bytes = byteArrayOf(0x01, 0x02) // 0x0102 = 258
-        val length = SSFUtil.tryParseLength(bytes, 0, 2, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 2, ByteOrder.BIG)
         assertEquals(258, length)
     }
 
     @Test
     fun testTryParseLength_2Byte_LittleEndian() {
         val bytes = byteArrayOf(0x02, 0x01) // 0x0102 = 258 (little endian)
-        val length = SSFUtil.tryParseLength(bytes, 0, 2, false)
+        val length = SSFUtil.tryParseLength(bytes, 0, 2, ByteOrder.LITTLE)
         assertEquals(258, length)
     }
 
     @Test
     fun testTryParseLength_4Byte_BigEndian() {
         val bytes = byteArrayOf(0x00, 0x00, 0x01, 0x00) // 256
-        val length = SSFUtil.tryParseLength(bytes, 0, 4, true)
+        val length = SSFUtil.tryParseLength(bytes, 0, 4, ByteOrder.BIG)
         assertEquals(256, length)
     }
 
     @Test
     fun testTryParseLength_4Byte_LittleEndian() {
         val bytes = byteArrayOf(0x00, 0x01, 0x00, 0x00) // 256
-        val length = SSFUtil.tryParseLength(bytes, 0, 4, false)
+        val length = SSFUtil.tryParseLength(bytes, 0, 4, ByteOrder.LITTLE)
         assertEquals(256, length)
     }
 
     @Test
     fun testTryParseLength_invalidLengthSize_returnsNull() {
         val bytes = byteArrayOf(0x01, 0x02, 0x03)
-        val length = SSFUtil.tryParseLength(bytes, 0, 3, true) // unsupported size
+        val length = SSFUtil.tryParseLength(bytes, 0, 3, ByteOrder.BIG) // unsupported size
         assertNull(length)
     }
 
@@ -746,7 +747,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        val result = parser.detectLengthFieldInMessage(msg, 1, byteOrder = ByteOrder.LITTLE)
         assertEquals(0 to 3, result)
     }
 
@@ -759,7 +760,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 2, bigEndian = true)
+        val result = parser.detectLengthFieldInMessage(msg, 2, byteOrder = ByteOrder.BIG)
         assertEquals(0 to 3, result)
     }
 
@@ -772,7 +773,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        val result = parser.detectLengthFieldInMessage(msg, 1, byteOrder = ByteOrder.LITTLE)
         assertNull(result)
     }
 
@@ -785,7 +786,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        val result = parser.detectLengthFieldInMessage(msg, 1, byteOrder = ByteOrder.LITTLE)
         assertNull(result)
     }
 
@@ -798,7 +799,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        val result = parser.detectLengthFieldInMessage(msg, 1, byteOrder = ByteOrder.LITTLE)
         assertNull(result)
     }
 
@@ -814,7 +815,7 @@ class SSFParserTests {
             msgIndex = 0
         )
 
-        val result = parser.detectLengthFieldInMessage(msg, 1, bigEndian = false)
+        val result = parser.detectLengthFieldInMessage(msg, 1, byteOrder = ByteOrder.LITTLE)
         assertEquals(2 to 3, result)
     }
 

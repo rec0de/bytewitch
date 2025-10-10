@@ -258,6 +258,7 @@ object Randomness : ByteWitchDecoder {
 }
 
 class RandomnessAnalysis(private val boxes: List<String>, override val sourceByteRange: Pair<Int, Int>?): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.NEUTRAL
     override fun renderHTML(): String {
         return "<div class=\"roundbox neutral\" style=\"flex-direction: column;\" $byteRangeDataTags> ${boxes.joinToString(" ")} </div>"
     }

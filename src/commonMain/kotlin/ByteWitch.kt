@@ -7,7 +7,7 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32,
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32, DMAP,
         Randomness, HeuristicSignatureDetector
     )
 
