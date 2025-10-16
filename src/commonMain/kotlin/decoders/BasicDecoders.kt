@@ -182,7 +182,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "d9d9f7" to Pair("CBOR magic", "https://en.wikipedia.org/wiki/CBOR"),
         "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/"),
         "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip"),
-        "c0a801" to Pair("Local IP address (192.168.1.x)", null)
+        "c0a801" to Pair("Local IP address (192.168.1.x)", null),
+        "46617364554153" to Pair("osascript", "https://github.com/Jinmo/applescript-disassembler")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
