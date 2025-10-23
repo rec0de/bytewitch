@@ -209,11 +209,11 @@ class OpackParser : ParseCompanion() {
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x93 -> {
-                val length = readInt(bytes, 3, byteOrder = ByteOrder.LITTLE)
+                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             0x94 -> {
-                val length = readInt(bytes, 4, byteOrder = ByteOrder.LITTLE)
+                val length = readInt(bytes, 8, byteOrder = ByteOrder.LITTLE)
                 return OPData(readBytes(bytes, length), Pair(start, lastConsumedBytePosition))
             }
             else -> throw Exception("Unexpected OPACK data ${bytes.hex()}")
