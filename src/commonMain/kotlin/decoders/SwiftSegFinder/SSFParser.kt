@@ -277,7 +277,17 @@ class SSFParser {
         val taken = BooleanArray(bytes.size) { false } // list of bytes that have already been assigned
 
         // pre processing
-        val fixedSegments = detectLengthPrefixedFields(bytes, taken)
+        val fixedSegments = detectLengthPrefixedFields(bytes, taken).toMutableList()
+
+        ByteWitch.segmentFindingDecoders.forEach { decoder ->
+            val segments = decoder.findDecodableSegments(bytes)
+            segments.forEach { range ->
+                for (i in range.first until range.second)
+                    taken[i] = true
+                fixedSegments.add(SSFSegment(range.first,SSFField.UNKNOWN))
+            }
+        }
+
 
         // find all bytes without a corresponding segment
         val freeRanges = mutableListOf<Pair<Int, Int>>()

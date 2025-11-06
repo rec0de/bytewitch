@@ -64,12 +64,16 @@ object SSFRenderer {
                     // check if we have to wrap content
                     val requiresWrapping = decode == null || decode is BWString || decode is BWAnnotatedData
                     val pre = if (requiresWrapping) "<div class=\"ssffield roundbox data\" $valueLengthTag $valueAlignId>" else "<div $valueAlignId>"
-                    val post = if (requiresWrapping) "</div>" else "</div>"
+                    val post = "</div>"
 
                     // if it doesn't find a suitable decoder show the hex output
                     if (decode == null) {
                         "$pre$hex$post"
-                    } else {
+                    }
+                    else if(decode is BWString) {
+                        "$pre\"${decode.string}\"$post"
+                    }
+                    else {
                         "$pre${decode.renderHTML()}$post"
                     }
                 }

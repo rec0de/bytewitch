@@ -14,6 +14,9 @@ object ByteWitch {
         Randomness, HeuristicSignatureDetector
     )
 
+    // Decoders that may be used to segment unknown payloads as SSF preprocessing
+    val segmentFindingDecoders = listOf<ByteWitchDecoder>(Utf16Decoder)
+
     enum class Encoding(val label: String) {
         NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64")
     }

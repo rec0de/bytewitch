@@ -91,20 +91,29 @@ object Utf16Decoder : ByteWitchDecoder {
                         inString = false
                         if(i - currentStringStart >= minLength*2)
                             strings.add(Pair(currentStringStart, i-1))
+                        if(data[i] == 0.toByte()) {
+                            inString = true
+                            currentStringStart = i
+                            expectingZero = false
+                        }
                     }
                     else -> {
                         expectingZero = !expectingZero
                     }
                 }
             }
-            else {
-                if (data[i] == 0.toByte()) {
-                    inString = true
-                    expectingZero = false
-                    currentStringStart = i
-                }
+            else if (data[i] == 0.toByte()) {
+                inString = true
+                expectingZero = false
+                currentStringStart = i
             }
         }
+
+        if(inString && data.size - 1 - currentStringStart >= minLength * 2) {
+            val endIndex = if(data.last() == 0.toByte()) data.size - 1 else data.size
+            strings.add(Pair(currentStringStart, endIndex))
+        }
+
         return strings
     }
 }
