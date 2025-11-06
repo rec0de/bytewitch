@@ -359,20 +359,19 @@
             flex-wrap: wrap;
         }
 
+        .bpdict, .bparray, .bpset, .nsdict, .nsarray, .nsset, .nsobject, .opdict, .oparray {
+            padding: var(--rowgap);
+            border-radius: 0.3rem;
+            display: flex;
+            gap: var(--rowgap);
+            align-items: start;
+        }
+
         .bwvalue, .bpvalue, .protovalue {
             box-sizing: border-box;
             padding: var(--rowgap);
             background: rgba(255, 255, 255, 0.5);
             border-radius: 0.3rem;
-        }
-
-        .bpdict, .bparray, .bpset, .nsdict, .nsarray, .nsset, .opdict, .oparray {
-            padding: var(--rowgap);
-            border-radius: 0.3rem;
-            background: var(--bplist);
-            display: flex;
-            gap: var(--rowgap);
-            align-items: start;
         }
 
         .bpdict, .nsdict, .opdict, .largecollection {
@@ -390,8 +389,12 @@
             font-family: var(--sans);
         }
 
-        .nsdict, .nsarray, .nsset {
+        .nsdict, .nsarray, .nsset, .nsobject {
             background: var(--nsarchive);
+        }
+
+        .bpdict, .bparray, .bpset {
+            background: var(--bplist);
         }
 
         .opdict, .oparray {

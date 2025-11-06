@@ -21,6 +21,14 @@ fun ByteArray.decodeAsUTF16LE(): String {
     return shorts.map { Char(it) }.toCharArray().concatToString()
 }
 
+fun ByteArray.stripLeadingZeros(): ByteArray {
+    val firstNonZero = this.indexOfFirst { it != 0.toByte() }
+    return if(firstNonZero == -1)
+        byteArrayOf()
+    else
+        this.fromIndex(firstNonZero)
+}
+
 fun ByteArray.indexOfSubsequence(target: ByteArray): Int {
     var targetPosition = -1
     var offset = 0

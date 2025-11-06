@@ -1,4 +1,7 @@
+import bitmage.ByteOrder
 import bitmage.fromHex
+import bitmage.stripLeadingZeros
+import bitmage.toBytes
 import decoders.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -12,7 +15,7 @@ object ByteWitch {
     )
 
     enum class Encoding(val label: String) {
-        NONE("none"), PLAIN("plain"), HEX("hex"), HEXDUMP("hexdump"), BASE64("base64")
+        NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64")
     }
 
     fun stripComments(data: String): String {
@@ -35,6 +38,10 @@ object ByteWitch {
         // allow some overrides
         if(cleanedData.startsWith("#plain"))
             return Pair(cleanedData.removePrefix("#plain").trim().encodeToByteArray(), Encoding.PLAIN)
+        else if(cleanedData.startsWith("#decimal")) {
+            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal")))
+            return if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
+        }
 
         // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
         val isBase64 = cleanedData.removePrefix("0x").replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=]+[G-Z+/=\\-_][A-Z0-9+/=\\-_]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
@@ -151,5 +158,30 @@ object ByteWitch {
         catch (e: Exception) {
             byteArrayOf()
         }
+    }
+
+    private fun parseDecimals(input: String): ByteArray? {
+        val numbers = input.split(" ", "\n").filter { !it.matches(Regex("\\s*")) }.map {
+            when {
+                it.startsWith("0x") -> {
+                    val hex = it.removePrefix("0x")
+                    // pad to full bytes
+                    val padded = if(hex.length % 2 == 0) hex else "0$hex"
+                    padded.fromHex()
+                }
+                it.startsWith("0b") -> {
+                    val binary = it.removePrefix("0b")
+                    val padding = binary.length % 8
+                    val padded = "0".repeat(padding) + binary
+                    padded.chunked(8).map { byte -> byte.toInt(2).toByte() }.toByteArray()
+                }
+                it.matches(Regex("\\d+")) -> {
+                    it.toLong().toBytes(ByteOrder.BIG).stripLeadingZeros()
+                }
+                else -> return null
+            }
+        }
+
+        return numbers.fold(byteArrayOf()) { buf, elem -> buf + elem }
     }
 }
