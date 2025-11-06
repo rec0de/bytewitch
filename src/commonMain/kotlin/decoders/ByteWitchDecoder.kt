@@ -27,4 +27,10 @@ interface ByteWitchDecoder {
             return null
         }
     }
+
+    // Decoders may support finding data they can decode (i.e. based on headers) within larger blobs
+    // if so, they may implement this method to surface that info to ByteWitch for better decoding
+    fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
+        return emptyList()
+    }
 }

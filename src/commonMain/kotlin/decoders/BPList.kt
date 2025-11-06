@@ -32,12 +32,31 @@ class BPListParser() {
         }
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+            val candidates = findDecodableSegments(data)
+            if(candidates.isEmpty())
+                return null
+
+            val firstCandidate = candidates.first()
+            val prefix = data.untilIndex(firstCandidate.first)
+            val content = data.sliceArray(firstCandidate.first until firstCandidate.second)
+
+            try {
+                val result = BPListParser().parse(content, prefix.size)
+                return if(content.size == data.size)
+                    result
+                else
+                    PartialDecode(prefix, result, data.fromIndex(firstCandidate.second), Pair(0, data.size))
+            } catch(e: Exception) {
+                return null
+            }
+        }
+
+        override fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
             // find offset of bplist header
             val headerPosition = data.indexOfSubsequence("bplist00".encodeToByteArray())
             if(headerPosition == -1)
-                return null
+                return emptyList()
 
-            val prefix = data.sliceArray(0 until headerPosition)
             var remainder = data.fromIndex(headerPosition)
             val remainderSize = remainder.size
 
@@ -50,7 +69,7 @@ class BPListParser() {
             while(alreadySearchedOffset < remainderSize) {
                 val footerCandidatePosition = remainder.indexOfSubsequence("0000000000".fromHex())
                 if(footerCandidatePosition == -1 || remainder.size - footerCandidatePosition < 32)
-                    return null
+                    return emptyList()
 
                 val tableSize = remainder[footerCandidatePosition + 6]
                 val refSize = remainder[footerCandidatePosition + 7]
@@ -81,19 +100,11 @@ class BPListParser() {
             }
 
             if(footerEnd == -1)
-                return null
+                return emptyList()
 
             val content = data.sliceArray(headerPosition until headerPosition+footerEnd)
 
-            try {
-                val result = BPListParser().parse(content, prefix.size)
-                return if(content.size == data.size)
-                    result
-                else
-                    PartialDecode(prefix, result, data.fromIndex(headerPosition+footerEnd), Pair(0, data.size))
-            } catch(e: Exception) {
-                return null
-            }
+            return listOf(Pair(headerPosition, headerPosition+content.size))
         }
     }
 
@@ -448,40 +459,41 @@ data class BPDict(val values: Map<BPListObject, BPListObject>, override val sour
     override fun renderHtmlValue(): String {
         if(values.isEmpty())
             return "<div class=\"bpvalue\" $byteRangeDataTags>{∅}</div>"
-        val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${it.second.renderHtmlValue()}</div>" }
+        val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${if(it.second is NSObject) it.second.renderHTML() else { Logger.log(it.second); it.second.renderHtmlValue() }}</div>" }
         return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bplist bpdict\">$entries</div></div>"
     }
 }
 
 abstract class NSObject : BPListObject() {
     override val colour = ByteWitchResult.Colour.NSARCHIVE
-    override fun renderHTML(): String {
-        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
-        return "<div class=\"nsarchive roundbox\" $rootRangeTags>${renderHtmlValue()}</div>"
+    override fun renderHtmlValue(): String {
+        return "<div class=\"bwvalue\">${renderHTML()}</div>"
     }
 }
 
 data class NSArray(val values: List<BPListObject>, override val sourceByteRange: Pair<Int, Int>?): NSObject() {
     override fun toString() = values.toString()
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
         if(values.isEmpty())
-            return "<div class=\"bpvalue\">[∅]</div>"
+            return "<div class=\"nsarray\"><div class=\"bpvalue\">[∅]</div></div>"
         val entries = values.joinToString(""){ it.renderHtmlValue() }
         val maybelarge = if(entries.length > 700) "largecollection" else ""
-        return "<div class=\"bpvalue\"><div class=\"nsarray $maybelarge\">$entries</div></div>"
+        return "<div class=\"nsarray $maybelarge\" $rootRangeTags>$entries</div>"
     }
 }
 
 data class NSSet(val values: Set<BPListObject>, override val sourceByteRange: Pair<Int, Int>?): NSObject() {
     override fun toString() = values.toString()
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
         if(values.isEmpty())
-            return "<div class=\"bpvalue\"><∅></div>"
+            return "<div class=\"nsarray\"><div class=\"bpvalue\">&lt;∅&gt;</div></div>"
         val entries = values.joinToString(""){ it.renderHtmlValue() }
         val maybelarge = if(entries.length > 500) "largecollection" else ""
-        return "<div class=\"bpvalue\"><div class=\"nsset $maybelarge\">$entries</div></div>"
+        return "<div class=\"nsset $maybelarge\" $rootRangeTags>$entries</div>"
     }
 }
 
@@ -489,30 +501,45 @@ data class NSDict(val values: Map<BPListObject, BPListObject>) : NSObject() {
     override val sourceByteRange: Pair<Int, Int>? = null
     override fun toString() = values.toString()
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
         if(values.isEmpty())
-            return "<div class=\"bpvalue\">{∅}</div>"
+            return "<div class=\"nsdict\"><div class=\"bpvalue\">{∅}</div></div>"
         val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${it.second.renderHtmlValue()}</div>" }
-        return "<div class=\"bpvalue\"><div class=\"nsdict\">$entries</div></div>"
+        return "<div class=\"nsdict\" $rootRangeTags>$entries</div>"
     }
 }
 
 data class NSDate(val value: Date, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = value.toString()
+
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
+        return "<div class=\"nsobject\" $rootRangeTags><div class=\"bwvalue\">NSDate</div><div class=\"bwvalue\" $byteRangeDataTags>$value</div></div>"
+    }
 }
 
 data class NSUUID(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = value.hex() // for now
+
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
+        return "<div class=\"nsobject\" $rootRangeTags><div class=\"bwvalue\">NSUUID</div><div class=\"bwvalue data\" $byteRangeDataTags>0x${value.hex()}</div></div>"
+    }
 }
 
 data class NSURL(val value: String, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = value // for now
+    override fun renderHTML(): String {
+        val rootRangeTags = if(rootByteRange != null) "data-start=\"${rootByteRange!!.first}\" data-end=\"${rootByteRange!!.second}\"" else ""
+        return "<div class=\"nsobject\" $rootRangeTags><div class=\"bwvalue\">NSURL</div><div class=\"bwvalue stringlit\" $byteRangeDataTags>$value</div></div>"
+    }
 }
 
 data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>) : NSObject() {
     override fun toString() = "NSData(${value.hex()})"
 
-    override fun renderHtmlValue(): String {
+    override fun renderHTML(): String {
         // try to decode string-based payloads despite this not being a string, same for opack
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.first)
         return wrapIfDifferentColour(decodeAttempt, value, byteRangeDataTags)

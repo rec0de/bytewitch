@@ -69,6 +69,44 @@ object Utf16Decoder : ByteWitchDecoder {
         else
             null
     }
+
+    // look for printable ASCII ranges encoded in UTF16
+    override fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
+        val minLength = 4
+        var currentStringStart = 0
+        var inString = false
+        var expectingZero = false
+
+        val strings = mutableListOf<Pair<Int, Int>>()
+
+        for (i in data.indices) {
+            if(inString) {
+                when {
+                    expectingZero && data[i] != 0.toByte() -> {
+                        inString = false
+                        if(i - currentStringStart >= minLength*2)
+                            strings.add(Pair(currentStringStart, i))
+                    }
+                    !expectingZero && data[i] !in 0x20..0x7e -> {
+                        inString = false
+                        if(i - currentStringStart >= minLength*2)
+                            strings.add(Pair(currentStringStart, i-1))
+                    }
+                    else -> {
+                        expectingZero = !expectingZero
+                    }
+                }
+            }
+            else {
+                if (data[i] == 0.toByte()) {
+                    inString = true
+                    expectingZero = false
+                    currentStringStart = i
+                }
+            }
+        }
+        return strings
+    }
 }
 
 object IEEE754 : ByteWitchDecoder {
@@ -183,7 +221,8 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "c301" to Pair("AVRO single object encoding marker", "https://avro.apache.org/docs/1.12.0/specification/"),
         "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip"),
         "c0a801" to Pair("Local IP address (192.168.1.x)", null),
-        "46617364554153" to Pair("osascript", "https://github.com/Jinmo/applescript-disassembler")
+        "46617364554153" to Pair("osascript", "https://github.com/Jinmo/applescript-disassembler"),
+        "53616c7465645f5f" to Pair("openssl encrypted", "https://github.com/openssl/openssl/blob/ca95d136d238e5ead679df8a7573ecccef37cc0e/apps/enc.c#L121")
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
