@@ -2,10 +2,13 @@ package decoders.SwiftSegFinder
 
 import bitmage.ByteOrder
 import bitmage.fromBytes
+import bitmage.hex
 import decoders.*
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.math.log2
+import kotlin.ranges.contains
 
 data class GaussianKernel(val sigma: Double, val radius: Int, val weights: DoubleArray)
 
@@ -506,17 +509,25 @@ class SSFParser {
         if (length <= 0) return false
 
         var nullByteCount = 0
+        var symbolCount = 0
         for (i in start until end) {
             val byte = bytes[i]
-            if (byte == 0x00.toByte()) {
-                nullByteCount++
-            } else if (!isPrintableChar(byte)) {
-                return false
+            when {
+                byte == 0.toByte() -> nullByteCount += 1
+                isAlphanumeric(byte) -> continue
+                isPrintableChar(byte) -> symbolCount += 1
+                else -> return false
             }
         }
 
         val nullRatio = nullByteCount.toDouble() / length
-        return nullRatio < 0.33 // only accept sequence as text if less than 33% of the sequence are 0x00 bytes
+        val symbolRatio = symbolCount.toDouble() / length
+        return nullRatio < 0.33 && symbolRatio < 0.33 // only accept sequence as text if less than 33% of the sequence are 0x00 bytes (or non-alphanumeric ASCII)
+    }
+
+    // check if byte is a printable char
+    fun isAlphanumeric(byte: Byte): Boolean {
+        return byte in 0x30..0x39 || byte in 0x41..0x5a || byte in 0x61..0x7a
     }
 
     // check if byte is a printable char
@@ -620,10 +631,36 @@ class SSFParser {
         var h = 0.0
         for (c in counts) if (c > 0) {
             val p = c / total
-            h -= p * ln(p)
+            h -= p * log2(p)
         }
 
-        return h / ln(256.0)
+        return h / 8
+    }
+
+    // H in [0,1] using two-bit-alphabet (|A|=4)
+    fun entropyTwobitNormalized(segment: ByteArray): Double {
+        if (segment.isEmpty()) return 0.0
+
+        val counts = IntArray(4)
+        segment.forEach { byte ->
+            val a = byte.toInt() and 0x03
+            val b = (byte.toInt() shr 2) and 0x03
+            val c = (byte.toInt() shr 4) and 0x03
+            val d = (byte.toInt() shr 6) and 0x03
+            counts[a] += 1
+            counts[b] += 1
+            counts[c] += 1
+            counts[d] += 1
+        }
+
+        val total = segment.size.toDouble() * 4
+        var h = 0.0
+        for (c in counts) if (c > 0) {
+            val p = c / total
+            h -= p * log2(p)
+        }
+
+        return h / 2
     }
 
     // compute the byte-wise xor of the first l bytes of two arrays
@@ -651,26 +688,28 @@ class SSFParser {
             val (start, fieldType) = segments[index]
             val end = if (index + 1 < segments.size) segments[index + 1].offset else bytes.size
             val segA = bytes.sliceArray(start until end)
-            // val hA = entropyNibblesNormalized(segA) // nibble entropy of segment A
-            val hA = entropyBytesNormalized(segA) // byte entropy of segment A
+            val hA = entropyTwobitNormalized(segA) // nibble entropy of segment A
+            //val hA = entropyBytesNormalized(segA) // byte entropy of segment A
 
             if (index + 1 < segments.size) { // check if a following segment exists
                 val (nextStart, nextType) = segments[index + 1]
                 if (fieldType == nextType) { // check that both field have the same field type
                     val nextEnd = if (index + 2 < segments.size) segments[index + 2].offset else bytes.size
                     val segB = bytes.sliceArray(nextStart until nextEnd)
-                    // val hB = entropyNibblesNormalized(segB) // nibble entropy of segment B
-                    val hB = entropyBytesNormalized(segB) // byte entropy of segment B
+                    val hB = entropyTwobitNormalized(segB) // nibble entropy of segment B
+                    //val hB = entropyBytesNormalized(segB) // byte entropy of segment B
 
                     val diff = kotlin.math.abs(hA - hB)
-                    if (hA > 0.7 && hB > 0.7 && diff < 0.05) {
+                    if (hA > 0.75 && hB > 0.75 && diff < 0.05) {
                         // xor of the start bytes for both segments
+                        Logger.log("entropy merge candidate ${segA.hex()} and ${segB.hex()}")
                         val xor = xorPrefix(segA, segB, 2)
-                        // val hX = entropyNibblesNormalized(xor)
-                        val hX = entropyBytesNormalized(xor)
+                        val hX = entropyTwobitNormalized(xor)
+                        //val hX = entropyBytesNormalized(xor)
 
-                        if (hX > 0.8) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
+                        if (hX > 0.7) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
                             // merge segments together
+                            Logger.log("entropy merge for ${segA.hex()} and ${segB.hex()}")
                             result.add(SSFSegment(start, fieldType))
                             index += 2 // skip the following field because we want to merge it to this one
                             continue
@@ -804,10 +843,12 @@ class SSFParser {
         val payloadStart = offset + lengthFieldSize
         val payloadEnd = payloadStart + payloadLength
         val payload = bytes.sliceArray(payloadStart until payloadEnd)
-        if (!payload.all { isPrintableChar(it) }) return null
 
-        // check if all following three bytes are also printable
-        val lookaheadEnd = minOf(payloadEnd + 3, bytes.size)
+        if (!payload.all { isPrintableChar(it) } || payload.count { !isAlphanumeric(it) } > payload.size/3)
+            return null
+
+        // check if all following two bytes are also printable
+        val lookaheadEnd = minOf(payloadEnd + 2, bytes.size)
         if (payloadEnd < lookaheadEnd) { // skip if there are no follow-up bytes
             val lookahead = bytes.sliceArray(payloadEnd until lookaheadEnd)
             if (lookahead.all { isPrintableChar(it) }) {

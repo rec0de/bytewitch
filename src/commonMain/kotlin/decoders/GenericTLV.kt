@@ -5,6 +5,7 @@ import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
 import bitmage.hex
+import bitmage.untilIndex
 import kotlin.math.min
 
 object GenericTLV : ByteWitchDecoder {
@@ -14,18 +15,30 @@ object GenericTLV : ByteWitchDecoder {
         if(data.size < 3)
             return Pair(0.0, null)
 
-        val lengthPrefixes = listOf(testLengthPrefixAtOffset(data, 1), testLengthPrefixAtOffset(data, 2))
+        val lengthPrefixesOneByteType = testLengthPrefixAtOffset(data, 1)
+        val lengthPrefixesTwoByteType = testLengthPrefixAtOffset(data, 2)
 
-        if(lengthPrefixes.all { it == null })
+        if(lengthPrefixesOneByteType == null && lengthPrefixesTwoByteType == null)
             return Pair(0.0, null)
 
-        val validPrefix = lengthPrefixes.first { it != null }!!
-        val payloadLen = validPrefix.first
+        val typeLen: Int
+        val validPrefix = if(lengthPrefixesOneByteType != null)  {
+            typeLen = 1
+            lengthPrefixesOneByteType
+        }
+        else {
+            typeLen = 2
+            lengthPrefixesTwoByteType!!
+        }
 
-        val zeroPayloadLengthPenalty = if(validPrefix.first - validPrefix.second == 0 || validPrefix.first == 0) 0.5 else 0.0
+        val payloadLen = validPrefix.first
+        val actualData = data.size - typeLen - validPrefix.second
+        val zeroPayloadLengthPenalty = if(actualData == 0) 0.5 else 0.0
+        val zeroTypePenalty = if(Int.fromBytes(data.untilIndex(typeLen), ByteOrder.BIG) == 0) 0.2 else 0.0
+        val oddLengthPenalty = if(validPrefix.second == 3) 0.15 else 0.0
 
         val lengthBias = min((payloadLen+1).toDouble()/6, 1.0)
-        val score = lengthBias - zeroPayloadLengthPenalty
+        val score = lengthBias - zeroPayloadLengthPenalty - zeroTypePenalty - oddLengthPenalty
 
         // TLVs with a payload length of less than 5 bytes are considered uncertain decodings
         // (add 1 to distinguish zero-length TLVs from completely invalid decodes)

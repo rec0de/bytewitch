@@ -67,14 +67,10 @@ object SSFRenderer {
                     val post = "</div>"
 
                     // if it doesn't find a suitable decoder show the hex output
-                    if (decode == null) {
-                        "$pre$hex$post"
-                    }
-                    else if(decode is BWString) {
-                        "$pre\"${decode.string}\"$post"
-                    }
-                    else {
-                        "$pre${decode.renderHTML()}$post"
+                    when (decode) {
+                        null -> "$pre$hex$post"
+                        is BWString -> "$pre\"${decode.string}\"$post"
+                        else -> "$pre${decode.renderHTML()}$post"
                     }
                 }
             }
