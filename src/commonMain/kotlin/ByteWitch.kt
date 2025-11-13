@@ -10,8 +10,8 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, EdDSA, ECCurves, MSZIP, Bech32, DMAP,
-        Randomness, HeuristicSignatureDetector
+        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, MSZIP, Bech32, DMAP,
+        EdDSA, ECCurves, Randomness, HeuristicSignatureDetector
     )
 
     // Decoders that may be used to segment unknown payloads as SSF preprocessing
@@ -21,9 +21,10 @@ object ByteWitch {
         NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64")
     }
 
-    fun stripComments(data: String): String {
+    fun stripComments(data: String, keepLinebreaks: Boolean = false): String {
         // allow use of # as line comment
-        val stripped = data.split("\n").joinToString("") { line ->
+        val linesep = if(keepLinebreaks) "\n" else ""
+        val stripped = data.split("\n").joinToString(linesep) { line ->
             val commentMarker = line.indexOfFirst { it == '#' }
             val lineEnd = if (commentMarker == -1) line.length else commentMarker
             line.take(lineEnd)
@@ -42,7 +43,7 @@ object ByteWitch {
         if(cleanedData.startsWith("#plain"))
             return Pair(cleanedData.removePrefix("#plain").trim().encodeToByteArray(), Encoding.PLAIN)
         else if(cleanedData.startsWith("#decimal")) {
-            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal")))
+            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal"), keepLinebreaks = true))
             return if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
         }
 
