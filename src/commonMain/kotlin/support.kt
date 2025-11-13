@@ -20,15 +20,23 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
 
-    if(veryWeird || string.isEmpty()) {
-        //Logger.log("very weird string: $string")
+    val unpairedSurrogates = string.withIndex().any { (i, char) ->
+        val isHighSurrogate = char.code in 0xD800..0xDB7F
+        val isLowSurrogate = char.code in 0xDC00..0xDFFF
+        val nextIsLowSurrogate = string.length > i+1 && string[i+1].code in 0xDC00..0xDFFF
+        val prevIsHighSurrogate = i > 0 && string[i-1].code in 0xD800..0xDB7F
+        (isHighSurrogate && !nextIsLowSurrogate) || (isLowSurrogate && !prevIsHighSurrogate)
+    }
+
+    if(veryWeird || string.isEmpty() || unpairedSurrogates) {
+        //Logger.log("very weird string: $string (unpaired: $unpairedSurrogates)")
         return 0.0
     }
 
     val lengthBias = if(enableLengthBias) max((10-string.length).toDouble()/10, 0.0) * 0.6 else 0.0
 
     // string is mostly printable ASCII, seems plausible
-    // avoid two-letter strings with one ascii char getting good ascii percentage by setting "min length" to 7val asciiPercentage = printableASCII.length.toDouble() / string.length
+    // avoid two-letter strings with one ascii char getting good ascii percentage by setting "min length" to 7
     val asciiPercentage = printableASCII.length.toDouble() / string.length
     val biasedAsciiPercentage = printableASCII.length.toDouble() / max(string.length, 7)
     if((biasedAsciiPercentage > 0.8 || asciiPercentage == 1.0) && weirdASCII.isEmpty()) {
@@ -38,7 +46,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
 
     // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
     // let's sort the characters into some bins matching the largest character blocks on the BMP
-    val binCount = 24
+    val binCount = 25
     val bins = IntArray(binCount){ 0 }
 
     string.forEach {
@@ -66,11 +74,12 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
             in 0x1000..0x109F -> bins[20] += 1 // Myanmar
             in 0x0F00.. 0x0FFF -> bins[21] += 1 // tibetan, rare
             in 0x1C80..0x2000 -> bins[22] += 1 // misc extensions and supplements, rare
+            in 0x1100.. 0x11FF -> bins[23] += 1 // hangul jamo, rare
             else -> bins[binCount-1] += 1 // others
         }
     }
 
-    val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], bins[19], bins[21], bins[22], weirdASCII.length)
+    val rares = listOf(bins[2], bins[4], bins[5], bins[6], bins[7], bins[10], bins[19], bins[21], bins[22], bins[23], weirdASCII.length)
     val multipleRares = rares.count { it > 0 } > 1
     val rareNonAsciiShare = rares.sum().toDouble() / (string.length - printableASCII.length)
     val hasRareCJK = bins[2] > 0
@@ -80,7 +89,7 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val rareCharactersPenalty = if(multipleRares || weirdASCII.isNotEmpty()) max(rareNonAsciiShare * 2, 0.2) else if(hasRareCJK || rareNonAsciiShare < 0.05) rareNonAsciiShare else (1-rareNonAsciiShare)
 
     // CJK characters are the most likely to generate "randomly" and should usually not co-occur with non-CJK characters, excluding common ASCII
-    val cjk = bins[0] + bins[1] + bins[2] + bins[7] + bins[10]
+    val cjk = bins[0] + bins[1] + bins[2] + bins[7] + bins[10] + bins[23]
     val nonCJKnonLatin = bins.sum() - cjk - bins[13] - bins[14] - bins[22] - bins[binCount-1]
     val mixedCJKnonCJKPenalty = if(cjk > 0 && nonCJKnonLatin > 0) 1.0 else 0.0
 
