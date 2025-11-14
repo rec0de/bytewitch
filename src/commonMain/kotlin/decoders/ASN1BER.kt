@@ -336,7 +336,7 @@ class ASN1ObjectIdentifier(tag: ASN1BER.ASN1Tag, length: Int, val value: ByteArr
 
         val oid = subidentifiers.joinToString(".")
 
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags><a href=\"https://oid-rep.orange-labs.fr/get/$oid\" target=\"_blank\">$oid</a></div>"
+        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags><a href=\"https://oid-base.com/get/$oid\" target=\"_blank\">$oid</a></div>"
     }
 }
 

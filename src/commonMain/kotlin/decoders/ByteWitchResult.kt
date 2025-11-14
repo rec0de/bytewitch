@@ -40,11 +40,11 @@ class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suff
 
     override fun renderHTML(): String {
         val pre = if(prefix.isNotEmpty())
-            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.first}\" data-end=\"${sourceByteRange.first + prefix.size}\">0x${prefix.hex()}</div>"
+            "<div class=\"bwvalue data\" data-start=\"${sourceByteRange.first}\" data-end=\"${sourceByteRange.first + prefix.size}\">0x${prefix.hex()}</div>"
         else ""
 
         val post = if(suffix.isNotEmpty())
-            "<div class=\"bpvalue data\" data-start=\"${sourceByteRange.second - suffix.size}\" data-end=\"${sourceByteRange.second}\">0x${suffix.hex()}</div>"
+            "<div class=\"bwvalue data\" data-start=\"${sourceByteRange.second - suffix.size}\" data-end=\"${sourceByteRange.second}\">0x${suffix.hex()}</div>"
         else ""
 
         return "<div class=\"roundbox generic largecollection\" $byteRangeDataTags>$pre ${result.renderHTML()} $post</div>"
@@ -58,15 +58,17 @@ class BWStringCollection(val elements: List<BWString>, override val sourceByteRa
 
 open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.PLAIN
-    override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)}</div>"
+    override fun renderHTML() = "<div class=\"bwvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)}</div>"
 }
 
 class BWLinkedString(string: String, private val url: String, sourceByteRange: Pair<Int, Int>): BWString(string, sourceByteRange) {
     override val colour = ByteWitchResult.Colour.PLAIN
-    override fun renderHTML() = "<div class=\"bpvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)} <a href=\"${url}\" target=\"_blank\">(info)</a></div>"
+    override fun renderHTML() = "<div class=\"bwvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)} <a href=\"${url}\" target=\"_blank\">(info)</a></div>"
 }
 
 class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.PLAIN
-    override fun renderHTML() = "<div class=\"bpvalue data\" $byteRangeDataTags>$annotationHTML 0x${data.hex()}</div>"
+    override fun renderHTML() = "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML 0x${data.hex()}</div>"
 }
+
+fun bwvalue(content: String, rangeTags: String, data: Boolean = false) = "<div class=\"bwvalue${if(data) " data" else ""}\" $rangeTags>$content</div>"

@@ -62,7 +62,7 @@ object SSFRenderer {
                     val decode = ByteWitch.quickDecode(segmentBytes, start + sourceOffset)
 
                     // check if we have to wrap content
-                    val requiresWrapping = decode == null || decode is BWString || decode is BWAnnotatedData
+                    val requiresWrapping = decode == null || decode is BWString
                     val pre = if (requiresWrapping) "<div class=\"ssffield roundbox data\" $valueLengthTag $valueAlignId>" else "<div $valueAlignId>"
                     val post = "</div>"
 

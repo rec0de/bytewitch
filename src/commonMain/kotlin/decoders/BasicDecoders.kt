@@ -231,7 +231,9 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "0a51e5c01800" to Pair("Microsoft Compression Header", "https://github.com/frereit/pymszip"),
         "c0a801" to Pair("Local IP address (192.168.1.x)", null),
         "46617364554153" to Pair("osascript", "https://github.com/Jinmo/applescript-disassembler"),
-        "53616c7465645f5f" to Pair("openssl encrypted", "https://github.com/openssl/openssl/blob/ca95d136d238e5ead679df8a7573ecccef37cc0e/apps/enc.c#L121")
+        "53616c7465645f5f" to Pair("openssl encrypted", "https://github.com/openssl/openssl/blob/ca95d136d238e5ead679df8a7573ecccef37cc0e/apps/enc.c#L121"),
+        "6738746b" to Pair("Apple notarized ticket content magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
+        "73386368" to Pair("Apple notarized ticket magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

@@ -12,6 +12,8 @@ object PGP: ByteWitchDecoder, ParseCompanion() {
     override val name = "PGPv1.0"
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        check(!inlineDisplay) { "not decoding nested PGPv1.0"}
+
         parseOffset = 0
         val blocks = mutableListOf<ByteWitchResult>()
         check(data.size > 10) { "unreasonably short PGP message" }
