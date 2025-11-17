@@ -85,8 +85,8 @@ fun main() {
         }
 
         // a click anywhere clears any present selection
-        // (as do specific keystrokes, but we'll see if we want to worry about those)
-        document.onclick = {
+        // use mousedown to avoid triggering on mouse-up event of selection drag
+        document.onmousedown = {
             // avoid immediately clearing selection from click associated with select event
             if (lastSelectionEvent != null && Date().getTime() - lastSelectionEvent!! > 250) {
                 clearSelections()

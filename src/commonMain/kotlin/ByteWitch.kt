@@ -22,13 +22,16 @@ object ByteWitch {
         NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64")
     }
 
-    fun stripComments(data: String, keepLinebreaks: Boolean = false): String {
+    fun stripComments(data: String, keepWhitespace: Boolean = false): String {
         // allow use of # as line comment
-        val linesep = if(keepLinebreaks) "\n" else ""
+        val linesep = if(keepWhitespace) "\n" else ""
         val stripped = data.split("\n").joinToString(linesep) { line ->
             val commentMarker = line.indexOfFirst { it == '#' }
             val lineEnd = if (commentMarker == -1) line.length else commentMarker
-            line.take(lineEnd)
+            if(keepWhitespace)
+                line.take(lineEnd)
+            else
+                line.take(lineEnd).replace(Regex("\\s+"), "")
         }
 
         return stripped
@@ -44,7 +47,7 @@ object ByteWitch {
         if(cleanedData.startsWith("#plain"))
             return Pair(cleanedData.removePrefix("#plain").trim().encodeToByteArray(), Encoding.PLAIN)
         else if(cleanedData.startsWith("#decimal")) {
-            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal"), keepLinebreaks = true))
+            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal"), keepWhitespace = true))
             return if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
         }
 

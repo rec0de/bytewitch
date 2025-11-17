@@ -44,18 +44,6 @@ fun removeTextArea(dataContainer: Element) {
     setByteFinderContent(0)
 }
 
-// input listener for live decode of all text areas
-fun applyLiveDecodeListeners() {
-    val textareas = document.querySelectorAll(".input_area")
-    for (i in 0 until textareas.length) {
-        val ta = textareas[i] as HTMLTextAreaElement
-        ta.oninput = {
-            if (liveDecodeEnabled)
-                mainDecode(isLiveDecoding = true, tryhard = false)
-        }
-    }
-}
-
 fun appendTextArea(content: String = "") {
     val container = document.getElementById("data_container")!!
 
@@ -93,9 +81,7 @@ fun appendTextArea(content: String = "") {
             mainDecode(isLiveDecoding = true, tryhard = false)
     }
 
-    textarea.onselect = {
-        lastSelectionEvent = Date().getTime()
-
+    textarea.addEventListener("selectionchange", {
         // we can only do the offset and range calculations if we have plain hex input (i.e. no base64, hexdump)
         if(textarea.getAttribute("data-plainhex") == "true") {
             clearSelections()
@@ -105,18 +91,19 @@ fun appendTextArea(content: String = "") {
             val sizeLabel = textarea.nextElementSibling as HTMLDivElement
 
             val r = Regex("#[^\n]*$")
-            if(r.containsMatchIn(prefix))
-                sizeLabel.innerText = "" // selection starts in a comment
+            if(r.containsMatchIn(prefix) || (textarea.selectionEnd?:0) - (textarea.selectionStart?:0) == 0)
+                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = "" // selection starts in a comment
             else {
+                lastSelectionEvent = Date().getTime()
+
                 val selection = textarea.value.substring(textarea.selectionStart!!, textarea.selectionEnd!!)
                 val offset = ByteWitch.stripComments(prefix).length.toDouble()/2
                 val range = ByteWitch.stripComments(selection).length.toDouble()/2
 
-
-                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
+                (sizeLabel.firstChild!!.nextSibling as HTMLSpanElement).innerText = " — selected ${range}B (0x${floor(range).roundToInt().toString(16)}) at offset $offset (0x${floor(offset).roundToInt().toString(16)})"
             }
         }
-    }
+    })
 }
 
 
