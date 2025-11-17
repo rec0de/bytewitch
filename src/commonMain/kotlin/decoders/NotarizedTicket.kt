@@ -26,10 +26,12 @@ object NotarizedTicket: ByteWitchDecoder, ParseCompanion() {
         check(parseOffset == preContent + contentLen.toInt()) { "expected content block to be $contentLen B but got ${parseOffset-preContent} B"}
 
         check(bytes.size - parseOffset >= 72) { "insufficient bytes for signature, expected 72 got only ${bytes.size-parseOffset}"}
+        val signatureOffset = parseOffset
         val signature = readBytes(bytes, 72)
 
         val derResult = ASN1BER.decode(derPayload, sourceOffset + 16, inlineDisplay = true)
-        return NotarizedTicketResult(version, derLen.toInt(), contentLen.toInt(), derResult, contentPayload, signature, sourceByteRange = Pair(sourceOffset, sourceOffset+parseOffset))
+        val derSignature = ASN1BER.decode(signature, sourceOffset + signatureOffset, inlineDisplay = true)
+        return NotarizedTicketResult(version, derLen.toInt(), contentLen.toInt(), derResult, contentPayload, derSignature, sourceByteRange = Pair(sourceOffset, sourceOffset+parseOffset))
     }
 
     private fun decodeContent(bytes: ByteArray, sourceOffset: Int): NTContentBlock {
@@ -61,7 +63,7 @@ class NotarizedTicketResult(
     val contentSize: Int,
     val derPayload: ByteWitchResult,
     val content: NTContentBlock,
-    val signature: ByteArray,
+    val signature: ByteWitchResult,
     override val sourceByteRange: Pair<Int, Int>?
 ): ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
@@ -71,7 +73,7 @@ class NotarizedTicketResult(
         val derLenTag = bwvalue("DER Size $derSize B", relativeRangeTags(8, 4))
         val contentLenTag = bwvalue("Content Size $contentSize B", relativeRangeTags(12, 4))
         val contentTag = "<div class=\"bwvalue\">${content.renderHTML()}</div>"
-        val signatureTag = bwvalue("Signature 0x${signature.hex()}", relativeRangeTags(content.sourceByteRange.second, signature.size), data = true)
+        val signatureTag = signature.renderHTML()
         return "<div class=\"roundbox generic\" $byteRangeDataTags>$versionTag $derLenTag $contentLenTag ${derPayload.renderHTML()} $contentTag $signatureTag</div>"
     }
 }
