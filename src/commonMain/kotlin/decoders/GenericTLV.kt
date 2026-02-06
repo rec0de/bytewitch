@@ -92,7 +92,7 @@ object GenericTLV : ByteWitchDecoder {
     }
 }
 
-data class GenericTLVResult(
+class GenericTLVResult(
     val type: ByteArray,
     val length: ByteArray,
     val value: ByteArray,

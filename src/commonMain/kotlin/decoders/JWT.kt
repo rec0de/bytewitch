@@ -23,6 +23,8 @@ object JWT: ByteWitchDecoder {
 
         val decoded = parts.map { ByteWitch.decodeBase64(it) }
 
+        check(decoded[0].isNotEmpty() && decoded[1].isNotEmpty())
+
         val headerEnd = sourceOffset + parts[0].encodeToByteArray().size
         val payloadEnd = headerEnd + 1 + parts[1].encodeToByteArray().size
         val header = BWString(decoded[0].decodeToString(), Pair(sourceOffset, headerEnd))
