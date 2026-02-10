@@ -35,7 +35,15 @@ object AppleAuth : ByteWitchDecoder, ParseCompanion() {
 
         val authData = readBytes(data, dataLen)
 
-        val platform = if(version >= 5) readUInt(data, 4, ByteOrder.BIG).toInt() else null
+        // value is apparently sign | value encoded
+        val platform = if(version >= 5) {
+            val raw = readUInt(data, 4, ByteOrder.BIG)
+            val sign = (raw shr 31) == 0u
+            val rest = raw and 0x7fffffffu
+            if(sign) rest.toInt() else - rest.toInt()
+        }
+        else
+            null
 
         check(parseOffset == data.size) { "anisette decode has data left over" }
         return Anisette(version, platform, authData, Pair(start, sourceOffset+parseOffset))

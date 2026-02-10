@@ -10,9 +10,10 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
-        ProtobufParser, ASN1BER, Sec1Ec, PGP, ModernPGP, GenericTLV, TLV8, IEEE754, MSZIP, Bech32, DMAP,
+        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, IEEE754, MSZIP, Bech32, DMAP,
         NotarizedTicket, AppleAuth,
-        EdDSA, ECCurves, Randomness, HeuristicSignatureDetector
+        EdDSA, ECCurves, Randomness, HeuristicSignatureDetector,
+        /* PGP, ModernPGP */
     )
 
     // Decoders that may be used to segment unknown payloads as SSF preprocessing

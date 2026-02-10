@@ -125,7 +125,7 @@ class CborParser : ParseCompanion() {
                 }
                 else {
                     val stringBytes = readBytes(bytes, length.toInt())
-                    check(looksLikeUtf8String(stringBytes, false) > 0.5) { "cbor string with implausible content: ${stringBytes.hex()}" }
+                    check(stringBytes.size < 4 || looksLikeUtf8String(stringBytes, false) > 0.5) { "cbor string with implausible content: ${stringBytes.hex()}" }
                     OPString(stringBytes.decodeToString(), Pair(start, lastConsumedBytePosition))
                 }
             }
