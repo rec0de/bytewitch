@@ -128,7 +128,7 @@ class ASN1BER : ParseCompanion() {
             }
         }
         else if(tag.primitive) {
-            GenericASN1Result(tag, len, payload, Pair(sourceOffset, sourceOffset+parseOffset))
+            GenericASN1Result(tag, len, payload, byteRange)
         }
         else {
             parseOffset -= payload.size

@@ -52,8 +52,8 @@ class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suff
 }
 
 class BWStringCollection(val elements: List<BWString>, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
-    override val colour = ByteWitchResult.Colour.PLAIN
-    override fun renderHTML() = elements.joinToString(" ") { it.renderHTML() }
+    override val colour = ByteWitchResult.Colour.NEUTRAL
+    override fun renderHTML() = "<div class=\"roundbox neutral\">" + elements.joinToString(" ") { it.renderHTML() } + "</div>"
 }
 
 open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
@@ -70,5 +70,8 @@ class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override 
     override val colour = ByteWitchResult.Colour.PLAIN
     override fun renderHTML() = "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML 0x${data.hex()}</div>"
 }
+
+class BWRangeTaggedData(val data: ByteArray, val start: Int)
+class BWRangeTaggedInt(val value: Int, val start: Int, val length: Int)
 
 fun bwvalue(content: String, rangeTags: String, data: Boolean = false) = "<div class=\"bwvalue${if(data) " data" else ""}\" $rangeTags>$content</div>"
