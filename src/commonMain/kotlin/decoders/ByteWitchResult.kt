@@ -13,15 +13,22 @@ interface ByteWitchResult {
 
     fun renderHTML(): String
 
-    fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String) = wrapIfSameColour(subresult, "0x${data.hex()}", rangeTags)
-
-    fun wrapIfSameColour(subresult: ByteWitchResult?, fallback: String, rangeTags: String): String {
-        return if(subresult != null && (subresult.colour == Colour.PLAIN || subresult.colour != colour))
+    fun wrapIfSameColour(subresult: ByteWitchResult): String {
+        return if(subresult.colour == Colour.PLAIN || subresult.colour != colour)
             subresult.renderHTML()
         else {
-            "<div class=\"bwvalue data\" $rangeTags>${subresult?.renderHTML() ?: fallback}</div>"
+            "<div class=\"bwvalue data\">${subresult.renderHTML()}</div>"
         }
     }
+
+    fun wrapIfSameColour(subresult: ByteWitchResult?, fallback: String, rangeTags: String): String {
+        return if(subresult == null)
+            bwvalue(fallback, rangeTags, data = true)
+        else
+            wrapIfSameColour(subresult)
+    }
+
+    fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String) = wrapIfSameColour(subresult, "0x${data.hex()}", rangeTags)
 
     fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
     fun relativeRangeTags(start: Int, length: Int) : String {
@@ -40,10 +47,11 @@ class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedDat
 
     override fun renderHTML(): String {
         val items = parts.mapNotNull {
-            if(it.first == null && it.second != null && it.second!!.data.isEmpty())
-                null
-            else
-                wrapIfSameColour(it.first, it.second!!.data, rangeTagsFor(it.second!!.start, it.second!!.start + it.second!!.data.size))
+            when {
+                it.first != null -> wrapIfSameColour(it.first!!)
+                it.second != null && it.second!!.data.isNotEmpty() -> bwvalue("0x${it.second!!.data.hex()}",  rangeTagsFor(it.second!!.start, it.second!!.start + it.second!!.data.size), data = true)
+                else -> null
+            }
         }
 
         return "<div class=\"roundbox neutral largecollection\" $byteRangeDataTags>${items.joinToString(" ")}</div>"
