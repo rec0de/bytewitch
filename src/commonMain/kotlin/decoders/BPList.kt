@@ -31,80 +31,59 @@ class BPListParser() {
             return BPListParser().parse(data, sourceOffset)
         }
 
-        override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-            val candidates = findDecodableSegments(data)
-            if(candidates.isEmpty())
-                return null
-
-            val firstCandidate = candidates.first()
-            val prefix = data.untilIndex(firstCandidate.first)
-            val content = data.sliceArray(firstCandidate.first until firstCandidate.second)
-
-            try {
-                val result = BPListParser().parse(content, prefix.size)
-                return if(content.size == data.size)
-                    result
-                else
-                    PartialDecode(prefix, result, data.fromIndex(firstCandidate.second), Pair(0, data.size))
-            } catch(e: Exception) {
-                return null
-            }
-        }
-
         override fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
             // find offset of bplist header
-            val headerPosition = data.indexOfSubsequence("bplist00".encodeToByteArray())
-            if(headerPosition == -1)
+            val headerPositions = data.indicesOfAllSubsequences("bplist0".encodeToByteArray()).toMutableList()
+            if(headerPositions.isEmpty())
                 return emptyList()
 
-            var remainder = data.fromIndex(headerPosition)
-            val remainderSize = remainder.size
+            val decodableSegments = mutableListOf<Pair<Int, Int>>()
 
-            val nestedBplistPositions = remainder.indicesOfAllSubsequences("bplist0".encodeToByteArray()).toMutableList()
-            nestedBplistPositions.remove(0)
+            while(headerPositions.isNotEmpty()) {
+                val topLevelHeaderPos = headerPositions.removeAt(0)
 
-            // find plausible footer
-            var footerEnd = -1
-            var alreadySearchedOffset = 0
-            while(alreadySearchedOffset < remainderSize) {
-                val footerCandidatePosition = remainder.indexOfSubsequence("0000000000".fromHex())
-                if(footerCandidatePosition == -1 || remainder.size - footerCandidatePosition < 32)
-                    return emptyList()
+                // find plausible footer
+                var footerEnd = -1
+                var alreadySearchedOffset = topLevelHeaderPos
+                while(alreadySearchedOffset < data.size) {
+                    val footerCandidatePosition = data.indexOfSubsequence("0000000000".fromHex(), alreadySearchedOffset)
+                    if(footerCandidatePosition == -1 || data.size - footerCandidatePosition < 32)
+                        return emptyList()
 
-                val tableSize = remainder[footerCandidatePosition + 6]
-                val refSize = remainder[footerCandidatePosition + 7]
-                val objCount = remainder.fromIndex(footerCandidatePosition + 8).readLong(ByteOrder.BIG)
-                val topOffset = remainder.fromIndex(footerCandidatePosition + 16).readLong(ByteOrder.BIG)
-                val tablePosition = remainder.fromIndex(footerCandidatePosition + 24).readLong(ByteOrder.BIG)
+                    val tableSize = data[footerCandidatePosition + 6]
+                    val refSize = data[footerCandidatePosition + 7]
+                    val objCount = data.fromIndex(footerCandidatePosition + 8).readLong(ByteOrder.BIG)
+                    val topOffset = data.fromIndex(footerCandidatePosition + 16).readLong(ByteOrder.BIG)
+                    val tablePosition = data.fromIndex(footerCandidatePosition + 24).readLong(ByteOrder.BIG)
 
-                if(tableSize in 1..3 && refSize in 1..3 && objCount < 10000 && topOffset < 10000 && tablePosition < alreadySearchedOffset+footerCandidatePosition) {
-                    footerEnd = alreadySearchedOffset + footerCandidatePosition + 32
-                    // footer belongs to nested bplist
-                    if(nestedBplistPositions.any { it < footerEnd }) {
-                        // remove closest preceding header from consideration
-                        val matchingHeader = nestedBplistPositions.filter { it < footerEnd }.max()
-                        nestedBplistPositions.remove(matchingHeader)
+                    if(tableSize in 1..4 && refSize in 1..3 && objCount < 50000 && topOffset < 10000 && tablePosition < footerCandidatePosition) {
+                        footerEnd = footerCandidatePosition + 32
+                        // footer belongs to nested bplist
+                        if(headerPositions.any { it < footerEnd }) {
+                            // remove closest preceding header from consideration
+                            val matchingHeader = headerPositions.filter { it < footerEnd }.max()
+                            headerPositions.remove(matchingHeader)
 
-                        // skip ahead to end of recognized footer
-                        remainder = remainder.fromIndex(footerEnd)
-                        alreadySearchedOffset = footerEnd
-                        continue
+                            // skip ahead to end of recognized footer
+                            alreadySearchedOffset = footerEnd
+                            continue
+                        }
+                        else {
+                            break
+                        }
                     }
-                    else {
-                        break
-                    }
+
+                    alreadySearchedOffset = footerCandidatePosition+1
                 }
 
-                remainder = remainder.fromIndex(footerCandidatePosition+1)
-                alreadySearchedOffset += footerCandidatePosition+1
+                // no footer found, end of input
+                if(footerEnd == -1)
+                    return decodableSegments
+
+                decodableSegments.add(Pair(topLevelHeaderPos, footerEnd))
             }
 
-            if(footerEnd == -1)
-                return emptyList()
-
-            val content = data.sliceArray(headerPosition until headerPosition+footerEnd)
-
-            return listOf(Pair(headerPosition, headerPosition+content.size))
+            return decodableSegments
         }
     }
 
@@ -394,7 +373,7 @@ class BPData(val value: ByteArray, override val sourceByteRange: Pair<Int, Int>)
 
     override fun renderHtmlValue(): String {
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
-        return wrapIfDifferentColour(decodeAttempt, value, byteRangeDataTags)
+        return wrapIfSameColour(decodeAttempt, value, byteRangeDataTags)
     }
 }
 
@@ -459,7 +438,7 @@ data class BPDict(val values: Map<BPListObject, BPListObject>, override val sour
     override fun renderHtmlValue(): String {
         if(values.isEmpty())
             return "<div class=\"bpvalue\" $byteRangeDataTags>{∅}</div>"
-        val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${if(it.second is NSObject) it.second.renderHTML() else { Logger.log(it.second); it.second.renderHtmlValue() }}</div>" }
+        val entries = values.toList().joinToString(""){ "<div>${it.first.renderHtmlValue()}<span>→</span> ${if(it.second is NSObject) it.second.renderHTML() else { it.second.renderHtmlValue() }}</div>" }
         return "<div class=\"bpvalue\" $byteRangeDataTags><div class=\"bplist bpdict\">$entries</div></div>"
     }
 }
@@ -542,7 +521,7 @@ data class NSData(val value: ByteArray, override val sourceByteRange: Pair<Int, 
     override fun renderHTML(): String {
         // try to decode string-based payloads despite this not being a string, same for opack
         val decodeAttempt = ByteWitch.quickDecode(value, sourceByteRange.first)
-        return wrapIfDifferentColour(decodeAttempt, value, byteRangeDataTags)
+        return wrapIfSameColour(decodeAttempt, value, byteRangeDataTags)
     }
 }
 

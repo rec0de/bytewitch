@@ -41,7 +41,12 @@ class ProtobufParser {
                         result
                     }
                     else {
-                        PartialDecode(prefix, result, data.fromIndex(parser.offset+effectiveStartOffset), Pair(0, data.size))
+                        val parts = listOf(
+                            Pair(null, BWRangeTaggedData(prefix, 0)),
+                            Pair(result, null),
+                            Pair(null, BWRangeTaggedData(data.fromIndex(parser.offset+effectiveStartOffset), parser.offset+effectiveStartOffset))
+                        )
+                        MultiPartialDecode(parts, Pair(0, data.size))
                     }
                 } catch (e: Exception) {
                     Logger.log(e.toString())
@@ -318,7 +323,7 @@ class ProtoBuf(val objs: Map<Int, List<ProtoValue>>, val bytes: ByteArray = byte
                     is ProtoLen -> {
                         val decode = ByteWitch.quickDecode(it.value, it.sourceByteRange.second - it.value.size)
 
-                        wrapIfDifferentColour(decode, it.renderHTML(), it.byteRangeDataTags)
+                        wrapIfSameColour(decode, it.renderHTML(), it.byteRangeDataTags)
                     }
                     else -> "<div class=\"bwvalue\" ${it.byteRangeDataTags}>${it.renderHTML()}</div>"
                 }

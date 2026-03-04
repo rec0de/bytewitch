@@ -2,7 +2,6 @@ package decoders
 
 import ParseCompanion
 import bitmage.ByteOrder
-import bitmage.fromBytes
 import bitmage.hex
 import bitmage.readInt
 
@@ -75,7 +74,7 @@ data class DmapTlv(
         val payloadHTML = when {
             semanticRenderingSupported(key, length) -> "<div class=\"bwvalue\" ${relativeRangeTags(8, length)}>${renderSupported(key, value)}</div>"
             decode is DmapResult -> "<div class=\"bwvalue flexy\">${decode.tlvs.joinToString(" ") { it.renderHTML() }}</div>"
-            else -> wrapIfDifferentColour(decode, value, relativeRangeTags(8, length))
+            else -> wrapIfSameColour(decode, value, relativeRangeTags(8, length))
 
         }
 

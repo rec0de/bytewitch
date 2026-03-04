@@ -13,9 +13,9 @@ interface ByteWitchResult {
 
     fun renderHTML(): String
 
-    fun wrapIfDifferentColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String) = wrapIfDifferentColour(subresult, "0x${data.hex()}", rangeTags)
+    fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String) = wrapIfSameColour(subresult, "0x${data.hex()}", rangeTags)
 
-    fun wrapIfDifferentColour(subresult: ByteWitchResult?, fallback: String, rangeTags: String): String {
+    fun wrapIfSameColour(subresult: ByteWitchResult?, fallback: String, rangeTags: String): String {
         return if(subresult != null && (subresult.colour == Colour.PLAIN || subresult.colour != colour))
             subresult.renderHTML()
         else {
@@ -35,19 +35,18 @@ interface ByteWitchResult {
         get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
 }
 
-class PartialDecode(val prefix: ByteArray, val result: ByteWitchResult, val suffix: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
-    override val colour = ByteWitchResult.Colour.GENERIC
+class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedData?>>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    override val colour = ByteWitchResult.Colour.NEUTRAL
 
     override fun renderHTML(): String {
-        val pre = if(prefix.isNotEmpty())
-            "<div class=\"bwvalue data\" data-start=\"${sourceByteRange.first}\" data-end=\"${sourceByteRange.first + prefix.size}\">0x${prefix.hex()}</div>"
-        else ""
+        val items = parts.mapNotNull {
+            if(it.first == null && it.second != null && it.second!!.data.isEmpty())
+                null
+            else
+                wrapIfSameColour(it.first, it.second!!.data, rangeTagsFor(it.second!!.start, it.second!!.start + it.second!!.data.size))
+        }
 
-        val post = if(suffix.isNotEmpty())
-            "<div class=\"bwvalue data\" data-start=\"${sourceByteRange.second - suffix.size}\" data-end=\"${sourceByteRange.second}\">0x${suffix.hex()}</div>"
-        else ""
-
-        return "<div class=\"roundbox generic largecollection\" $byteRangeDataTags>$pre ${result.renderHTML()} $post</div>"
+        return "<div class=\"roundbox neutral largecollection\" $byteRangeDataTags>${items.joinToString(" ")}</div>"
     }
 }
 

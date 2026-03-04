@@ -245,13 +245,13 @@ object Randomness : ByteWitchDecoder {
             return BWAnnotatedData("<span title=\"entropy: $entropyNum/$entropyScale, looks $judgementString\">$emoji</span>", data, Pair(sourceOffset, sourceOffset+data.size))
         }
         else {
-            val entropy = "<div class=\"bpvalue\">$emoji Looks <b>$judgementString</b>. Entropy: $entropyEmoji $entropyNum/${entropyScale}b</div>"
-            val twogramsHTML = "<div class=\"bpvalue\">Distribution of 2-bit words: $twogramsPLevel</div>"
-            val onecountsHTML = "<div class=\"bpvalue\">One bit counts per byte: $oneCountsPLevel</div>"
-            val highBitsHTML = "<div class=\"bpvalue\">High bits: $highBitsPLevel, run count ${highBitRuns.calcPLevel()}, max run len=${highBitRuns.maxRunLen} ${highBitRuns.longestRunProb()}</div>"
-            val lowBitsHTML = "<div class=\"bpvalue\">Low bits: $lowBitsPLevel, run count ${lowBitRuns.calcPLevel()}, max run len=${lowBitRuns.maxRunLen} ${lowBitRuns.longestRunProb()}</div>"
-            val medianRunsHTML = "<div class=\"bpvalue\">Byte value runs: ${medianRuns.calcPLevel()}, max run len=${medianRuns.maxRunLen} ${medianRuns.longestRunProb()}</div>"
-            //val asciiRunsHTML = "<div class=\"bpvalue\">Printable ASCII runs: ${printableRuns.calcPLevel()}, max run len=${printableRuns.maxRunLen}</div>"
+            val entropy = "<div class=\"bwvalue\">$emoji Looks <b>$judgementString</b>. Entropy: $entropyEmoji $entropyNum/${entropyScale}b</div>"
+            val twogramsHTML = "<div class=\"bwvalue\">Distribution of 2-bit words: $twogramsPLevel</div>"
+            val onecountsHTML = "<div class=\"bwvalue\">One bit counts per byte: $oneCountsPLevel</div>"
+            val highBitsHTML = "<div class=\"bwvalue\">High bits: $highBitsPLevel, run count ${highBitRuns.calcPLevel()}, max run len=${highBitRuns.maxRunLen} ${highBitRuns.longestRunProb()}</div>"
+            val lowBitsHTML = "<div class=\"bwvalue\">Low bits: $lowBitsPLevel, run count ${lowBitRuns.calcPLevel()}, max run len=${lowBitRuns.maxRunLen} ${lowBitRuns.longestRunProb()}</div>"
+            val medianRunsHTML = "<div class=\"bwvalue\">Byte value runs: ${medianRuns.calcPLevel()}, max run len=${medianRuns.maxRunLen} ${medianRuns.longestRunProb()}</div>"
+            //val asciiRunsHTML = "<div class=\"bwvalue\">Printable ASCII runs: ${printableRuns.calcPLevel()}, max run len=${printableRuns.maxRunLen}</div>"
             return RandomnessAnalysis(listOf(entropy, twogramsHTML, onecountsHTML, highBitsHTML, lowBitsHTML, medianRunsHTML), Pair(sourceOffset, sourceOffset+data.size))
         }
     }
@@ -260,6 +260,6 @@ object Randomness : ByteWitchDecoder {
 class RandomnessAnalysis(private val boxes: List<String>, override val sourceByteRange: Pair<Int, Int>?): ByteWitchResult {
     override val colour = ByteWitchResult.Colour.NEUTRAL
     override fun renderHTML(): String {
-        return "<div class=\"roundbox neutral\" style=\"flex-direction: column;\" $byteRangeDataTags> ${boxes.joinToString(" ")} </div>"
+        return "<details class=\"roundbox neutral\" style=\"flex-direction: column;\" $byteRangeDataTags><summary>${boxes.first()}</summary><div class=\"flexy\" style=\"flex-direction: column;\">${boxes.subList(1, boxes.size).joinToString(" ")}</div></details>"
     }
 }

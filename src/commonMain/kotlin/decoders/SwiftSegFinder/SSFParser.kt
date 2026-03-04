@@ -702,14 +702,14 @@ class SSFParser {
                     val diff = kotlin.math.abs(hA - hB)
                     if (hA > 0.75 && hB > 0.75 && diff < 0.05) {
                         // xor of the start bytes for both segments
-                        Logger.log("entropy merge candidate ${segA.hex()} and ${segB.hex()}")
+                        //Logger.log("entropy merge candidate ${segA.hex()} and ${segB.hex()}")
                         val xor = xorPrefix(segA, segB, 2)
                         val hX = entropyTwobitNormalized(xor)
                         //val hX = entropyBytesNormalized(xor)
 
                         if (hX > 0.7) { // in the paper it's set to 0.95 instead of 0.8. Algorithm 3, however, says 0.8
                             // merge segments together
-                            Logger.log("entropy merge for ${segA.hex()} and ${segB.hex()}")
+                            //Logger.log("entropy merge for ${segA.hex()} and ${segB.hex()}")
                             result.add(SSFSegment(start, fieldType))
                             index += 2 // skip the following field because we want to merge it to this one
                             continue

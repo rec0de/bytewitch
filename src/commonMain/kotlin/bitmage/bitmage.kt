@@ -29,9 +29,9 @@ fun ByteArray.stripLeadingZeros(): ByteArray {
         this.fromIndex(firstNonZero)
 }
 
-fun ByteArray.indexOfSubsequence(target: ByteArray): Int {
+fun ByteArray.indexOfSubsequence(target: ByteArray, startingOffset: Int = 0): Int {
     var targetPosition = -1
-    var offset = 0
+    var offset = startingOffset
     var matchIndex = 0
 
     while(offset < size) {

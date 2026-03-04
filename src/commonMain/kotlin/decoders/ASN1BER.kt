@@ -1,12 +1,13 @@
 package decoders
 
 import ByteWitch
-import Logger
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromBytes
+import bitmage.fromHex
 import bitmage.fromIndex
 import bitmage.hex
+import bitmage.indicesOfAllSubsequences
 import dateFromUTCString
 import htmlEscape
 import looksLikeUtf8String
@@ -24,23 +25,46 @@ class ASN1BER : ParseCompanion() {
             return result
         }
 
+        override fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
+            val oneByteSequenceStarts = data.indicesOfAllSubsequences("3081".fromHex())
+            val twoByteSequenceStarts = data.indicesOfAllSubsequences("3082".fromHex())
+
+            val oneByteSegs = oneByteSequenceStarts.map { start ->
+                val length = data[start+2].toUByte().toInt()
+                Pair(start, start+length+3)
+            }.filter { it.second <= data.size && it.second - it.first > 127 } // one byte sequence length should only be chosen for length > 127
+
+            val twoByteSegs = twoByteSequenceStarts.map { start ->
+                val length = Int.fromBytes(data.sliceArray(start+2..start+3), ByteOrder.BIG)
+                Pair(start, start+length+4)
+            }.filter { it.second <= data.size && it.second - it.first > 255 } // two byte sequence length should only be chosen for length > 255
+
+            val segments = (oneByteSegs + twoByteSegs).toList().sortedBy { it.second - it.first }
+            val toplevel = segments.filter { inner -> segments.none { outer -> outer.first < inner.first && outer.second >= inner.second }}
+
+            return toplevel
+        }
+
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
             val decoder = ASN1BER()
+
             try {
                 val result = decoder.decode(data, 0)
                 val remainder = data.fromIndex(decoder.parseOffset)
 
                 // parsed ASN.1 should represent at least 30% of input data
                 if(remainder.size > data.size * 0.7)
-                    return null
+                    return super.tryhardDecode(data)
 
                 return if(remainder.isEmpty())
                     result
-                else
-                    PartialDecode(byteArrayOf(), result, remainder, Pair(0, data.size))
+                else {
+                    val parts = listOf(Pair(result, null), Pair(null, BWRangeTaggedData(remainder, decoder.parseOffset)))
+                    MultiPartialDecode(parts, Pair(0, data.size))
+                }
             } catch (e: Exception) {
                 Logger.log(e.toString())
-                return null
+                return super.tryhardDecode(data)
             }
         }
 
@@ -242,7 +266,7 @@ class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArra
     override fun renderHtmlValue(): String {
         // try to decode nested stuff
         val decode = ByteWitch.quickDecode(payload, sourceByteRange.second - payload.size)
-        val payloadHtml = wrapIfDifferentColour(decode, payload, asnPayloadByteRangeDataTags)
+        val payloadHtml = wrapIfSameColour(decode, payload, asnPayloadByteRangeDataTags)
 
         return "$tagLengthDivs $payloadHtml"
     }

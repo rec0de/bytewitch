@@ -29,7 +29,7 @@ class BsonParser : ParseCompanion() {
                 return if(remainder.isEmpty())
                     result
                 else
-                    PartialDecode(byteArrayOf(), result, remainder, Pair(0, data.size))
+                    MultiPartialDecode(listOf(Pair(result, null), Pair(null, BWRangeTaggedData(remainder, parser.parseOffset))), Pair(0, data.size))
 
             } catch (e: Exception) {
                 Logger.log(e.toString())

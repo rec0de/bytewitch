@@ -1,7 +1,6 @@
 package decoders
 
 import bitmage.decodeBase32
-import bitmage.hex
 
 object Bech32: ByteWitchDecoder {
     override val name = "bech32"
@@ -23,7 +22,7 @@ object Bech32: ByteWitchDecoder {
         val alphabet = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
         val values = dataPart.lowercase().map { alphabet.indexOf(it) }
 
-        Logger.log("$humanReadable $dataPart")
+        //Logger.log("$humanReadable $dataPart")
         check(verifyChecksum(humanReadable.lowercase(), values)) { "invalid bech32 checksum" }
 
         val decoded = decodeBase32(values.subList(0, values.size-6))
@@ -65,7 +64,7 @@ data class Bech32Result(
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val decode = ByteWitch.quickDecode(data, Int.MIN_VALUE)
-        val payloadHTML = wrapIfDifferentColour(decode, data, rangeTagsFor(sourceByteRange.first + hrp.length + 1, sourceByteRange.second-6))
+        val payloadHTML = wrapIfSameColour(decode, data, rangeTagsFor(sourceByteRange.first + hrp.length + 1, sourceByteRange.second-6))
 
         return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, hrp.length)}>$hrp</div>$payloadHTML</div>"
     }

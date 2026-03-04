@@ -4,7 +4,6 @@ import ByteWitch
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
-import bitmage.hex
 
 object TLV8 : ByteWitchDecoder {
     override val name = "tlv8"
@@ -92,7 +91,7 @@ class TlvChainResult(val tlvs: List<TlvChainEntry>, override val sourceByteRange
         return if(tlvs.size == 1)
             tlvs.first().renderHTML()
         else
-            "<div class=\"generic roundbox\" $byteRangeDataTags>${tlvs.joinToString("") { wrapIfDifferentColour(it, "", rangeTagsFor(it.sourceByteRange.first, it.sourceByteRange.second)) }}</div>"
+            "<div class=\"generic roundbox\" $byteRangeDataTags>${tlvs.joinToString("") { wrapIfSameColour(it, "", rangeTagsFor(it.sourceByteRange.first, it.sourceByteRange.second)) }}</div>"
     }
 }
 
@@ -100,7 +99,7 @@ class TlvChainEntry(val type: Int, val length: Int, val value: ByteArray, overri
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val parseAttempt = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
-        val valueHTML = wrapIfDifferentColour(parseAttempt, value, relativeRangeTags(typeLength+lengthLength, value.size))
+        val valueHTML = wrapIfSameColour(parseAttempt, value, relativeRangeTags(typeLength+lengthLength, value.size))
         return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bwvalue\" ${relativeRangeTags(0, typeLength)}>Type 0x${type.toString(16)}</div><div class=\"bpvalue\" ${relativeRangeTags(typeLength, lengthLength)}>Len: $length</div>$valueHTML</div>"
     }
 }

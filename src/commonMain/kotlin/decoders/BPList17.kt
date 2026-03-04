@@ -31,7 +31,12 @@ class BPList17 {
                 val prefix = data.untilIndex(headerPos)
                 val parse = parser.parse(data.fromIndex(headerPos), headerPos)
                 val endPos = parse.rootByteRange!!.second
-                PartialDecode(prefix, parse, data.fromIndex(endPos), Pair(0, data.size))
+                val parts = listOf(
+                    Pair(null, BWRangeTaggedData(prefix, 0)),
+                    Pair(parse, null),
+                    Pair(null, BWRangeTaggedData(data.fromIndex(endPos), endPos))
+                )
+                MultiPartialDecode(parts, Pair(0, data.size))
             }
             else
                 null

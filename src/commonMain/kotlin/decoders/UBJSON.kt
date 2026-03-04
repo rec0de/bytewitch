@@ -31,9 +31,10 @@ class UbjsonParser : ParseCompanion() {
 
                 return if(remainder.isEmpty())
                     result
-                else
-                    PartialDecode(byteArrayOf(), result, remainder, Pair(0, data.size))
-
+                else {
+                    val taggedRemainder = BWRangeTaggedData(remainder, parser.parseOffset)
+                    MultiPartialDecode(listOf(Pair(result, null), Pair(null, taggedRemainder)), Pair(0, data.size))
+                }
             } catch (e: Exception) {
                 Logger.log(e.toString())
                 return null
