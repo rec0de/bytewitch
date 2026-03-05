@@ -148,6 +148,7 @@ open class ParseCompanion {
     protected var parseOffset = 0
 
     protected fun readBytes(bytes: ByteArray, length: Int): ByteArray {
+        check(length >= 0)
         val sliced = bytes.sliceArray(parseOffset until parseOffset + length)
         parseOffset += length
         return sliced

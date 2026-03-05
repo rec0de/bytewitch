@@ -234,6 +234,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "53616c7465645f5f" to Pair("openssl encrypted", "https://github.com/openssl/openssl/blob/ca95d136d238e5ead679df8a7573ecccef37cc0e/apps/enc.c#L121"),
         "6738746b" to Pair("Apple notarized ticket content magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
         "73386368" to Pair("Apple notarized ticket magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
+        "ffffa55a" to Pair("Apple Cellular Trace Protocol (ACP)", null)
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

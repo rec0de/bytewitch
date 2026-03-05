@@ -96,6 +96,23 @@ class ASN1BER : ParseCompanion() {
             throw Exception("excessive length: $len")
 
         val payloadStartOffset = parseOffset
+
+        // read indefinite length encoding
+        if(len == -1 && !tag.primitive) {
+            val elements = mutableListOf<ASN1Result>()
+            while(parseOffset < bytes.size) {
+                // check for end-of-sequence marker 0x0000
+                if(bytes[parseOffset].toInt() == 0 && bytes[parseOffset+1].toInt() == 0) {
+                    parseOffset += 2
+                    break
+                }
+
+                elements.add(decode(bytes, sourceOffset))
+            }
+            return ASN1Constructed(tag, parseOffset-payloadStartOffset, elements, Pair(start, sourceOffset+parseOffset))
+        }
+
+
         val payload = readBytes(bytes, len)
         val byteRange = Pair(start, sourceOffset+parseOffset)
 
@@ -193,7 +210,7 @@ class ASN1BER : ParseCompanion() {
         val firstByte = readBytes(bytes, 1)[0].toUByte().toInt()
         return when(firstByte) {
             in 0..127 -> firstByte
-            128 -> throw Exception("indefinite length not supported")
+            128 -> -1 // indefinite length
             in 129..254 -> readInt(bytes, firstByte - 128)
             255 -> throw Exception("reserved length tag value 255")
             else -> throw Exception("unreachable")
@@ -259,7 +276,7 @@ abstract class ASN1Result(val tag: ASN1BER.ASN1Tag, val length: Int, override va
         get() = rangeTagsFor(sourceByteRange.second-length, sourceByteRange.second)
 
     val tagLengthDivs: String
-        get() = "<div class=\"bpvalue\" $asnTagByteRangeDataTags>$tag</div> <div class=\"bpvalue\" $asnLengthByteRangeDataTags>length $length</div>"
+        get() = "${bwvalue(tag.toString(), asnTagByteRangeDataTags)} ${bwvalue("length $length", asnLengthByteRangeDataTags)}"
 }
 
 class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArray, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
@@ -275,7 +292,7 @@ class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArra
 class ASN1Constructed(tag: ASN1BER.ASN1Tag, length: Int, val elements: List<ASN1Result>, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
         return if(elements.size == 1)
-            "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>${elements[0].renderHTML()}</div>"
+            "$tagLengthDivs ${bwvalue(elements.first().renderHTML(), asnPayloadByteRangeDataTags, data = true)}"
             else
                 "$tagLengthDivs <div class=\"bpvalue asn1sequence\" $asnPayloadByteRangeDataTags>${elements.joinToString("") { it.renderHTML() }}</div>"
     }
@@ -295,19 +312,19 @@ class ASN1Integer(tag: ASN1BER.ASN1Tag, length: Int, val value: ByteArray, sourc
             value.size <= 8 -> Long.fromBytes(value, ByteOrder.BIG).toString()
             else -> "0x${value.hex()}"
         }
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$valueRendering</div>"
+        return "$tagLengthDivs ${bwvalue(valueRendering, asnPayloadByteRangeDataTags, data = true)}"
     }
 }
 
 class ASN1Time(tag: ASN1BER.ASN1Tag, length: Int, val value: String, sourceByteRange: Pair<Int, Int>, private val rendering: String) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$rendering</div>"
+        return "$tagLengthDivs ${bwvalue(rendering, asnPayloadByteRangeDataTags, data = true)}"
     }
 }
 
 class ASN1Boolean(tag: ASN1BER.ASN1Tag, length: Int, val value: Boolean, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
     override fun renderHtmlValue(): String {
-        return "$tagLengthDivs <div class=\"bpvalue data\" $asnPayloadByteRangeDataTags>$value</div>"
+        return "$tagLengthDivs ${bwvalue(value.toString(), asnPayloadByteRangeDataTags, data = true)}"
     }
 }
 
