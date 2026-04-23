@@ -39,10 +39,13 @@ object ByteWitch {
     }
 
     fun getBytesFromInputEncoding(data: String): Pair<ByteArray, Encoding> {
-        val cleanedData = data.trim()
+        var cleanedData = data.trim()
 
         if(cleanedData.isEmpty())
             return Pair(byteArrayOf(), Encoding.NONE)
+
+        val reverse = cleanedData.startsWith("#rev")
+        cleanedData = cleanedData.removePrefix("#rev")
 
         // allow some overrides
         if(cleanedData.startsWith("#plain"))
@@ -58,7 +61,7 @@ object ByteWitch {
         val commentsStripped = stripComments(cleanedData).removePrefix("0x")
         val isHex = Regex("[0-9a-fA-F\\s]+").matches(commentsStripped)
 
-        return when {
+        val decode = when {
             isBase64 -> Pair(decodeBase64(cleanedData.replace("\n", "")), Encoding.BASE64)
             isHexdump -> Pair(decodeHexdump(cleanedData), Encoding.HEXDUMP)
             isHex -> {
@@ -70,6 +73,11 @@ object ByteWitch {
             }
             else -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
         }
+
+        if(reverse)
+            decode.first.reverse()
+
+        return decode
     }
 
 
