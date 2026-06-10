@@ -22,6 +22,7 @@ object AppleAuth : ByteWitchDecoder, ParseCompanion() {
         // 00000005 00000010 7b92ab616d3245b65cdc12726305ca7b 00000004 // SideStore / Apple Music Android
         // 00000005 00000010 8c37b82fd01b312bccba2e03ee48dd56 00000003 // iOS 15.7.3
         // 00000005 00000010 e1b1ab79f61ac1f56f26eb3fc720c4e2 00000003 // watchOS 7.3.3
+        // 00000005 00000010 f6eba82d193b47d1d4cf6a53a203cabc 00000001 // MacBook AOSUtilities "-2"
         val start = sourceOffset + parseOffset
 
         // conservative length estimate, real data should be either 24 or 28 B
@@ -81,7 +82,7 @@ object AppleAuth : ByteWitchDecoder, ParseCompanion() {
 
 class Anisette(val version: Int, val platform: Int?, val authData: ByteArray, override val sourceByteRange: Pair<Int, Int>?) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
-    private val platformLookup = mapOf<Int, String>(3 to "iOS/watchOS?", 4 to "Android/AppleMusic?")
+    private val platformLookup = mapOf<Int, String>(1 to "MacOS?", 3 to "iOS/watchOS?", 4 to "Android/AppleMusic?")
 
     override fun renderHTML(): String {
         val platformHtml = if(platform != null) "<div class=\"bwvalue\" ${relativeRangeTags(8+authData.size, 4)}>Platform: $platform (${platformLookup.getOrElse(platform){ "unknown" }})</div>" else ""

@@ -208,7 +208,6 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "FD377A58" to Pair("xz compression", null),
         "04224D18" to Pair("LZ4 frame", null),
         "0061736D" to Pair("web assembly binary", null),
-        "62767832" to Pair("lzfse compression", null),
         "0000000C4A584C200D0A870A" to Pair("JPEG XL header", null),
         "424f4d53746f7265" to Pair("BOMStore (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
         "70627a78" to Pair("pbzx (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
@@ -234,7 +233,15 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "53616c7465645f5f" to Pair("openssl encrypted", "https://github.com/openssl/openssl/blob/ca95d136d238e5ead679df8a7573ecccef37cc0e/apps/enc.c#L121"),
         "6738746b" to Pair("Apple notarized ticket content magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
         "73386368" to Pair("Apple notarized ticket magic", "https://www.mothersruin.com/software/Archaeology/reverse/tickets.html"),
-        "ffffa55a" to Pair("Apple Cellular Trace Protocol (ACP)", null)
+        "ffffa55a" to Pair("Apple Cellular Trace Protocol (ACP)", null),
+        "62763431" to Pair("Apple Chunked LZ4 (compressed block)", "https://github.com/ydkhatri/UnifiedLogReader/blob/master/scripts/tracev3_decompress.py"),
+        "6276342d" to Pair("Apple Chunked LZ4 (uncompressed block)", "https://github.com/ydkhatri/UnifiedLogReader/blob/master/scripts/tracev3_decompress.py"),
+        "62763424" to Pair("Apple Chunked LZ4 (end marker)", "https://github.com/ydkhatri/UnifiedLogReader/blob/master/scripts/tracev3_decompress.py"),
+        "62767824" to Pair("LZFSE (end of stream)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
+        "6276782d" to Pair("LZFSE (raw data)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
+        "62767831" to Pair("LZFSE (compressed, uncompressed tables)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
+        "62767832" to Pair("LZFSE (compressed, compressed tables", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
+        "6276786e" to Pair("LZFSE (lzvn compressed)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

@@ -6,6 +6,7 @@
 
     <meta name=viewport content="width=device-width, initial-scale=1">
     <link rel="icon" sizes="300x300" href="icon.png">
+    <link rel="canonical" href="https://bytewitch.boo" />
 
     <!-- Primary Meta Tags -->
     <meta name="title" content="bytewitch - binary payload analyzer" />
@@ -13,7 +14,7 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://rec0de.net/open/bytewitch" />
+    <meta property="og:url" content="https://bytewitch.boo" />
     <meta property="og:title" content="bytewitch - binary payload analyzer" />
     <meta property="og:description" content="Instant, in-browser decoding & visualization for bplist, ASN.1, protobuf, opack, msgpack, CBOR and many more." />
     <meta property="og:image" content="banner.png" />
@@ -623,6 +624,15 @@
 </head>
 <body>
 <script src="bytewitch.js"></script>
+<script type="text/javascript">
+    // redirect to canonical domain
+    if(window.location == "https://rec0de.net/open/bytewitch/") {
+        window.location = "https://bytewitch.boo"
+    }
+    else if(window.location == "https://rec0de.net/open/bytewitch/staging/") {
+        window.location = "https://bytewitch.boo/staging/"
+    }
+</script>
 <div class="container" style="gap: 1rem; align-items: center;">
     <div class="header">
         <img src="icon.png">
