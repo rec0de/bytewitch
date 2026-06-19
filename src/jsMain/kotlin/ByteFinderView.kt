@@ -36,10 +36,10 @@ fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
     // apply highlighting in textview
     val textview = document.getElementById("textview")!!
     textview.innerHTML = textview.textContent!! // re-set previous highlights
-    val txtText = textview.childNodes[0]!!
+    val txtText = textview.childNodes[0]!! as Text
     val txtRange = document.createRange()
-    txtRange.setStart(txtText, start);
-    txtRange.setEnd(txtText, end);
+    txtRange.setStart(txtText, start)
+    txtRange.setEnd(txtText, minOf(end, txtText.length))
     txtRange.surroundContents(document.createElement("span"))
 }
 

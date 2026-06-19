@@ -1,12 +1,21 @@
 import bitmage.ByteOrder
+import bitmage.decodeBase85
 import bitmage.fromHex
 import bitmage.stripLeadingZeros
 import bitmage.toBytes
 import decoders.*
+import preprocessing.And
+import preprocessing.Preprocessor
+import preprocessing.Xor
+import preprocessing.Reverse
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.min
 
 object ByteWitch {
+    private val preprocessors = listOf<Preprocessor>(Reverse, Xor, And)
+    private val preprocCommands = preprocessors.associateBy { it.command }
+
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser,
@@ -20,7 +29,7 @@ object ByteWitch {
     val segmentFindingDecoders = listOf<ByteWitchDecoder>(Utf16Decoder)
 
     enum class Encoding(val label: String) {
-        NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64")
+        NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64"), BASE85("ascii85")
     }
 
     fun stripComments(data: String, keepWhitespace: Boolean = false): String {
@@ -40,19 +49,40 @@ object ByteWitch {
 
     fun getBytesFromInputEncoding(data: String): Pair<ByteArray, Encoding> {
         var cleanedData = data.trim()
+        val preprocessingCommands = mutableListOf<Pair<Preprocessor, String>>()
 
         if(cleanedData.isEmpty())
             return Pair(byteArrayOf(), Encoding.NONE)
 
-        val reverse = cleanedData.startsWith("#rev")
-        cleanedData = cleanedData.removePrefix("#rev")
+        // save recognized preprocessor commands for later
+        while(preprocCommands.keys.any { cmd -> cleanedData.startsWith("#$cmd") }) {
+            val lineEnd = cleanedData.indexOf('\n')
+
+            var cmdEnd = lineEnd
+            val spaceIdx = cleanedData.indexOf(' ')
+            if(spaceIdx in 1..<lineEnd)
+                cmdEnd = spaceIdx
+
+            val args = cleanedData.substring(cmdEnd, lineEnd)
+            val cmd = cleanedData.substring(1, cmdEnd)
+            cleanedData = cleanedData.substring(lineEnd+1)
+
+            val preprocessor = preprocCommands[cmd]!!
+            preprocessingCommands.add(Pair(preprocessor, args))
+        }
+
+        cleanedData = cleanedData.trim()
 
         // allow some overrides
-        if(cleanedData.startsWith("#plain"))
-            return Pair(cleanedData.removePrefix("#plain").trim().encodeToByteArray(), Encoding.PLAIN)
+        var isPlain = false
+        var isDecimal = false
+        if(cleanedData.startsWith("#plain")) {
+            isPlain = true
+            cleanedData = cleanedData.removePrefix("#plain").trim()
+        }
         else if(cleanedData.startsWith("#decimal")) {
-            val parsed = parseDecimals(stripComments(cleanedData.removePrefix("#decimal"), keepWhitespace = true))
-            return if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
+            isDecimal = true
+            cleanedData = cleanedData.removePrefix("#decimal").trim()
         }
 
         // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
@@ -60,8 +90,16 @@ object ByteWitch {
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s*\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
         val commentsStripped = stripComments(cleanedData).removePrefix("0x")
         val isHex = Regex("[0-9a-fA-F\\s]+").matches(commentsStripped)
+        val isBase85 = (cleanedData.startsWith("<~") || cleanedData.length > 250) && cleanedData.removePrefix("<~").removeSuffix("~>").replace("\n", "").matches(Regex(
+            "^[0-9A-Za-uyz\\[\\]!\"#$%&'()*+,\\-./:;<=>?@\\\\^_`]+$"
+        ))
 
         val decode = when {
+            isPlain -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
+            isDecimal -> {
+                val parsed = parseDecimals(stripComments(cleanedData, keepWhitespace = true))
+                if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
+            }
             isBase64 -> Pair(decodeBase64(cleanedData.replace("\n", "")), Encoding.BASE64)
             isHexdump -> Pair(decodeHexdump(cleanedData), Encoding.HEXDUMP)
             isHex -> {
@@ -71,13 +109,17 @@ object ByteWitch {
                 else
                     Pair(filtered.fromHex(), Encoding.HEX)
             }
+            isBase85 -> Pair(decodeBase85(cleanedData), Encoding.BASE85)
             else -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
         }
 
-        if(reverse)
-            decode.first.reverse()
+        var processedBytes = decode.first
+        preprocessingCommands.forEach { (proc, args) ->
+            Logger.log("Applying preprocessor '${proc.command}' with args '$args'")
+            processedBytes = proc.process(args, processedBytes)
+        }
 
-        return decode
+        return Pair(processedBytes, decode.second)
     }
 
 
@@ -178,7 +220,7 @@ object ByteWitch {
         }
     }
 
-    private fun parseDecimals(input: String): ByteArray? {
+    fun parseDecimals(input: String): ByteArray? {
         val numbers = input.split(" ", "\n").filter { !it.matches(Regex("\\s*")) }.map {
             when {
                 it.startsWith("0x") -> {

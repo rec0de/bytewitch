@@ -305,3 +305,45 @@ fun decodeBase32(values: List<Int>): ByteArray {
 
     return bytes.toTypedArray().toByteArray()
 }
+
+fun decodeBase85(input: String): ByteArray {
+    val effective = input.removePrefix("<~").removeSuffix("~>").replace("\n", "")
+    var currentChunk = 0
+    var missingChars = 5
+    val bytes = mutableListOf<Byte>()
+
+    effective.forEach { c ->
+        // special shorthands
+        if(c == 'z')
+            bytes.addAll(listOf(0, 0, 0, 0))
+        else if(c == 'y')
+            bytes.addAll(listOf(0x20, 0x20, 0x20, 0x20))
+        else {
+            val code = c.code - 0x21
+            currentChunk *= 85
+            currentChunk += code
+            missingChars -= 1
+
+            if(missingChars == 0) {
+                bytes.addAll(currentChunk.toBytes(ByteOrder.BIG).toList())
+                currentChunk = 0
+                missingChars = 5
+            }
+        }
+    }
+
+    // payload not cleanly divisible by 4
+    if(missingChars != 5) {
+        val paddingBytes = missingChars
+        while(missingChars > 0) {
+            currentChunk *= 85
+            currentChunk += 84
+            missingChars -= 1
+        }
+        val remainder = currentChunk.toBytes(ByteOrder.BIG).untilIndex(4-paddingBytes)
+        bytes.addAll(remainder.toList())
+    }
+
+
+    return bytes.toTypedArray().toByteArray()
+}
