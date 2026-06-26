@@ -620,6 +620,13 @@
         summary {
             cursor: pointer;
         }
+
+        #log {
+            background: var(--accent);
+            color: var(--on-accent);
+            padding: 0.6rem;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -654,6 +661,8 @@
         <div class="icon icon-add" id="add_data"></div>
         <div class="icon icon-delete" id="delete_data"></div>
     </div>
+
+    <div id="log" class="bwvalue"></div>
 
     <div class="parsebuttons">
         <span>

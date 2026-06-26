@@ -7,9 +7,7 @@ import kotlin.math.min
 
 // replicate required Date functionality from JVM
 // timestamp is milliseconds since January 1, 1970, 00:00:00
-expect class Date(timestamp: Long) {
-    fun toAppleTimestamp(): Double
-}
+expect class Date(timestamp: Long)
 
 expect fun currentTimestamp(): Long
 

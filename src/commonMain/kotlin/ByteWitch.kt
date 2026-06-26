@@ -5,15 +5,15 @@ import bitmage.stripLeadingZeros
 import bitmage.toBytes
 import decoders.*
 import preprocessing.And
+import preprocessing.BytewiseCalc
 import preprocessing.Preprocessor
 import preprocessing.Xor
 import preprocessing.Reverse
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.math.min
 
 object ByteWitch {
-    private val preprocessors = listOf<Preprocessor>(Reverse, Xor, And)
+    private val preprocessors = listOf<Preprocessor>(Reverse, Xor, And, BytewiseCalc)
     private val preprocCommands = preprocessors.associateBy { it.command }
 
     private val decoders = listOf<ByteWitchDecoder>(
@@ -56,7 +56,9 @@ object ByteWitch {
 
         // save recognized preprocessor commands for later
         while(preprocCommands.keys.any { cmd -> cleanedData.startsWith("#$cmd") }) {
-            val lineEnd = cleanedData.indexOf('\n')
+            var lineEnd = cleanedData.indexOf('\n')
+            if(lineEnd == -1)
+                lineEnd = cleanedData.length
 
             var cmdEnd = lineEnd
             val spaceIdx = cleanedData.indexOf(' ')
@@ -98,7 +100,12 @@ object ByteWitch {
             isPlain -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
             isDecimal -> {
                 val parsed = parseDecimals(stripComments(cleanedData, keepWhitespace = true))
-                if(parsed != null) Pair(parsed, Encoding.DECIMAL) else Pair(byteArrayOf(), Encoding.NONE)
+                if(parsed != null)
+                    Pair(parsed, Encoding.DECIMAL)
+                else {
+                    Logger.showUserVisibleMessage("malformed decimal input")
+                    Pair(byteArrayOf(), Encoding.NONE)
+                }
             }
             isBase64 -> Pair(decodeBase64(cleanedData.replace("\n", "")), Encoding.BASE64)
             isHexdump -> Pair(decodeHexdump(cleanedData), Encoding.HEXDUMP)
@@ -116,7 +123,12 @@ object ByteWitch {
         var processedBytes = decode.first
         preprocessingCommands.forEach { (proc, args) ->
             Logger.log("Applying preprocessor '${proc.command}' with args '$args'")
-            processedBytes = proc.process(args, processedBytes)
+            val preprocOut = proc.process(args, processedBytes)
+            processedBytes = preprocOut.first
+            if(preprocOut.second != null) {
+                Logger.showUserVisibleMessage(preprocOut.second!!)
+                Logger.tag("preprocessing", preprocOut.second!!)
+            }
         }
 
         return Pair(processedBytes, decode.second)
@@ -124,6 +136,7 @@ object ByteWitch {
 
 
     fun analyze(data: ByteArray, tryhard: Boolean): List<Pair<String, ByteWitchResult>> {
+        Logger.clearUserVisibleMessage()
         val allDecoders = decoders
 
         if(tryhard) {
@@ -234,6 +247,23 @@ object ByteWitch {
                     val padding = binary.length % 8
                     val padded = "0".repeat(padding) + binary
                     padded.chunked(8).map { byte -> byte.toInt(2).toByte() }.toByteArray()
+                }
+                it.startsWith("0") && it[1] in "tqson" -> {
+                    val baseID = it[1]
+                    val base = when(baseID){
+                        // bit of an arcane shorthand but okay
+                        't' -> 3
+                        'q' -> 4
+                        'Q' -> 5
+                        's' -> 6
+                        'S' -> 7
+                        'o' -> 8
+                        'n' -> 9
+                        else -> return null
+                    }
+                    val digits = it.substring(2)
+                    val value = digits.toLong(base)
+                    value.toBytes(ByteOrder.BIG).stripLeadingZeros()
                 }
                 it.matches(Regex("\\d+")) -> {
                     it.toLong().toBytes(ByteOrder.BIG).stripLeadingZeros()

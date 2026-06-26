@@ -2,5 +2,6 @@ package preprocessing
 
 interface Preprocessor {
     val command: String
-    fun process(args: String, payload: ByteArray): ByteArray
+    val doc: String
+    fun process(args: String, payload: ByteArray): Pair<ByteArray, String?>
 }

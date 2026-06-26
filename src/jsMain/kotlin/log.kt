@@ -1,16 +1,21 @@
+import kotlinx.browser.document
+import org.w3c.dom.HTMLDivElement
 
 actual object Logger {
     actual fun tag(tag: String, msg: String) = log("[$tag] $msg")
     actual fun log(vararg o: Any?) = console.log(*o)
+    actual fun showUserVisibleMessage(msg: String) {
+        val div = (document.getElementById("log") as HTMLDivElement)
+        div.innerText = msg
+        div.style.display = "block"
+    }
+    actual fun clearUserVisibleMessage() {
+        (document.getElementById("log") as HTMLDivElement).style.display = "none"
+    }
 }
 
 actual class Date actual constructor(timestamp: Long) {
-
     private val internal = kotlin.js.Date(timestamp)
-    actual fun toAppleTimestamp(): Double {
-        TODO("Not yet implemented")
-    }
-
     override fun toString() = internal.toString()
 }
 
