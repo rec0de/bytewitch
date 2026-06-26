@@ -1,11 +1,10 @@
 package decoders
 
 import kotlin.math.*
+import kotlin.random.Random
 
 object Randomness : ByteWitchDecoder {
     override val name = "randomness"
-
-    override fun tryhardDecode(data: ByteArray) = null
 
     override fun confidence(data: ByteArray, sourceOffset: Int) = if(data.size >= 16) Pair(0.76, null) else Pair(0.00, null)
 
@@ -213,14 +212,15 @@ object Randomness : ByteWitchDecoder {
         val byteEntropyRound = (entropyBytes*10).roundToInt().toDouble() / 10
 
         val byteEntropyEmoji = when {
-            entropyBytes > 6.5 -> die
+            entropyBytes > 7 -> die
+            entropyBytes > 6 -> "\uD83D\uDCBE"
             entropyBytes > 5 -> "\uD83D\uDCDA"
-            entropyBytes > 3 -> "📖"
+            entropyBytes > 3.5 -> "📖"
             else -> "\uD83D\uDDD2\uFE0F"
         }
 
         val nibEntropyEmoji = when {
-            entropyNibbles > 3.5 -> "\uD83C\uDFB2"
+            entropyNibbles > 3.5 -> die
             entropyNibbles > 3.1 -> "\uD83D\uDCDA"
             entropyNibbles > 2.5 -> "📖"
             else -> "\uD83D\uDDD2\uFE0F"
@@ -255,9 +255,54 @@ object Randomness : ByteWitchDecoder {
             return RandomnessAnalysis(listOf(entropy, twogramsHTML, onecountsHTML, highBitsHTML, lowBitsHTML, medianRunsHTML), Pair(sourceOffset, sourceOffset+data.size))
         }
     }
+
+    override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
+        val baseline = decode(data, 0, inlineDisplay = false) as RandomnessAnalysis
+
+        // on top of the basic randomness tests, let's try finding patterns by splitting input into groups
+        // this spots repeating xor patterns, for example
+
+        val subgroupCounts = mutableMapOf<Int, MutableMap<Int, IntArray>>()
+        val minKeysize = 2
+        val maxKeysize = min(floor(data.size.toDouble() / 20).roundToInt(), 16)
+
+        data.forEachIndexed { i, byte ->
+            val lowerNibble = (byte.toUByte().toInt() and 0x0F)
+            val upperNibble = (byte.toUByte().toInt() and 0xF0) ushr 4
+
+            (minKeysize..maxKeysize).forEach { ks ->
+                val countMap = subgroupCounts.getOrPut(ks){ mutableMapOf() }
+                val count = countMap.getOrPut(i % ks){ IntArray(16){ 0 } }
+                count[lowerNibble] += 1
+                count[upperNibble] += 1
+            }
+        }
+
+        val avgEntropyByKeysize = (minKeysize..maxKeysize).map { ks ->
+            val chunkCounts = subgroupCounts[ks]!!
+            val chunkSize = data.size / ks
+            val entropyValues = (0 until ks).map { i ->
+                chunkCounts[i]!!.map { it.toDouble() / (chunkSize*2) }.filter { it > 0 }.sumOf { - it * log2(it) } / 4
+            }
+            entropyValues.average()
+        }
+
+        val outlierKS = avgEntropyByKeysize.withIndex().firstOrNull{ (i, entropy) ->
+            // detect significant drop in entropy from one keysize to the next, with following increase for the keysize after
+            (i == 0 || entropy < avgEntropyByKeysize[i-1] - 0.07) && (i == avgEntropyByKeysize.lastIndex || avgEntropyByKeysize[i+1] > entropy + 0.07)
+        }
+
+        if(outlierKS != null) {
+            val baselineBoxes = baseline.boxes.toMutableList()
+            baselineBoxes.add(0, "<div class=\"bwvalue\">$alarm Entropy dips when grouping every n-th byte with <b>n=${outlierKS.index + 2}</b> (repeating key xor?)</div>")
+            return RandomnessAnalysis(baselineBoxes, baseline.sourceByteRange)
+        }
+        else
+            return baseline
+    }
 }
 
-class RandomnessAnalysis(private val boxes: List<String>, override val sourceByteRange: Pair<Int, Int>?): ByteWitchResult {
+class RandomnessAnalysis(val boxes: List<String>, override val sourceByteRange: Pair<Int, Int>?): ByteWitchResult {
     override val colour = ByteWitchResult.Colour.NEUTRAL
     override fun renderHTML(): String {
         return "<details class=\"roundbox neutral\" style=\"flex-direction: column;\" $byteRangeDataTags><summary>${boxes.first()}</summary><div class=\"flexy\" style=\"flex-direction: column;\">${boxes.subList(1, boxes.size).joinToString(" ")}</div></details>"
