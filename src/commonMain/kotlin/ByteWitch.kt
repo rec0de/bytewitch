@@ -82,9 +82,9 @@ object ByteWitch {
             isPlain = true
             cleanedData = cleanedData.removePrefix("#plain").trim()
         }
-        else if(cleanedData.startsWith("#decimal")) {
+        else if(cleanedData.startsWith("#decimal") || cleanedData.startsWith("#numeric")) {
             isDecimal = true
-            cleanedData = cleanedData.removePrefix("#decimal").trim()
+            cleanedData = cleanedData.removePrefix("#decimal").removePrefix("#numeric").trim()
         }
 
         // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
@@ -99,6 +99,9 @@ object ByteWitch {
         val decode = when {
             isPlain -> Pair(cleanedData.encodeToByteArray(), Encoding.PLAIN)
             isDecimal -> {
+                if(cleanedData.isBlank())
+                    Logger.showUserVisibleMessage("numeric input: acceptable formats are 1337 0b1001 0xCAFE (and other base notations: 0t2, 0q3, 0Q4, 0s5, 0S6, 0o7, 0n8). whitespace separated numbers are concatenated, format mixing is supported.")
+
                 val parsed = parseDecimals(stripComments(cleanedData, keepWhitespace = true))
                 if(parsed != null)
                     Pair(parsed, Encoding.DECIMAL)
@@ -248,7 +251,7 @@ object ByteWitch {
                     val padded = "0".repeat(padding) + binary
                     padded.chunked(8).map { byte -> byte.toInt(2).toByte() }.toByteArray()
                 }
-                it.startsWith("0") && it[1] in "tqson" -> {
+                it.startsWith("0") && it.length > 2 && it[1] in "tqQsSon" -> {
                     val baseID = it[1]
                     val base = when(baseID){
                         // bit of an arcane shorthand but okay
@@ -262,13 +265,13 @@ object ByteWitch {
                         else -> return null
                     }
                     val digits = it.substring(2)
-                    val value = digits.toLong(base)
+                    val value = try { digits.toLong(base) } catch (e: Exception) { return null }
                     value.toBytes(ByteOrder.BIG).stripLeadingZeros()
                 }
                 it.matches(Regex("\\d+")) -> {
                     it.toLong().toBytes(ByteOrder.BIG).stripLeadingZeros()
                 }
-                else -> return null
+                else -> byteArrayOf()
             }
         }
 

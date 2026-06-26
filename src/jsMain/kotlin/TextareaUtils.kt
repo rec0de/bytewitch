@@ -53,7 +53,7 @@ fun appendTextArea(content: String = "") {
 
     val textarea = document.createElement("textarea") as HTMLTextAreaElement
     textarea.className = "data input_area"
-    textarea.placeholder = "hex, base64, hexdump, or plaintext. use # as line comment in hex mode.\nuse #plain to force plaintext decoding or #decimal to use variable-base encoding (0xCAFE, 0b1001, 1337)"
+    textarea.placeholder = "hex, base64, hexdump, or plaintext. use # as line comment in hex mode.\nuse #plain to force plaintext decoding or #numeric to use variable-base encoding (0xCAFE, 0b1001, 1337)"
     textarea.value = content
 
     val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(content)
