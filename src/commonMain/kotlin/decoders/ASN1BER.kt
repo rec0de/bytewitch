@@ -13,14 +13,14 @@ import htmlEscape
 import looksLikeUtf8String
 import kotlin.math.min
 
-class ASN1BER : ParseCompanion() {
+class ASN1BER(private val allowTLVChaining: Boolean = true) : ParseCompanion() {
 
     companion object : ByteWitchDecoder {
         override val name = "ASN.1"
 
         override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
             val decoder = ASN1BER()
-            val result = decoder.decode(data, sourceOffset)
+            val result = decoder.decodePossiblyChained(data, sourceOffset)
             check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
             return result
         }
@@ -49,7 +49,7 @@ class ASN1BER : ParseCompanion() {
             val decoder = ASN1BER()
 
             try {
-                val result = decoder.decode(data, 0)
+                val result = decoder.decodePossiblyChained(data, 0)
                 val remainder = data.fromIndex(decoder.parseOffset)
 
                 // parsed ASN.1 should represent at least 30% of input data
@@ -71,10 +71,10 @@ class ASN1BER : ParseCompanion() {
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             try {
                 val decoder = ASN1BER()
-                val result = decoder.decode(data, sourceOffset)
+                val result = decoder.decodePossiblyChained(data, sourceOffset)
                 check(decoder.parseOffset >= data.size-1){ "input data not fully consumed" }
 
-                val trivialLengthPenalty = if(result.length <= 1) -0.3 else 0.0
+                val trivialLengthPenalty = if((result is ASN1Result && result.length <= 1) || (result is ASN1InformalChain && result.elements.size < 3)) -0.3 else 0.0
                 val weirdTypePenalty = if(result is GenericASN1Result) -0.15 else 0.0
                 val confidence = min(data.size.toDouble() / 16 + trivialLengthPenalty + weirdTypePenalty, 1.0)
 
@@ -85,13 +85,32 @@ class ASN1BER : ParseCompanion() {
         }
     }
 
+    private fun decodePossiblyChained(bytes: ByteArray, sourceOffset: Int) : ByteWitchResult {
+        if(!allowTLVChaining)
+            return decode(bytes, sourceOffset)
+
+        val startOffset = sourceOffset + parseOffset
+        val containedObjects = mutableListOf<ASN1Result>()
+        while(parseOffset < bytes.size) {
+            containedObjects.add(decode(bytes, sourceOffset))
+        }
+        val endOffset = sourceOffset + parseOffset
+
+        return if(containedObjects.size == 1)
+            containedObjects.first()
+        else
+            ASN1InformalChain(containedObjects, Pair(startOffset, endOffset))
+    }
+
     private fun decode(bytes: ByteArray, sourceOffset: Int) : ASN1Result {
         val start = parseOffset + sourceOffset
         val tag = readIdentifier(bytes)
 
+        //Logger.tag("ASN1BER", "read tag: $tag (len ${tag.encodedLength}, end offset $parseOffset)")
         checkPlausibleTag(tag)
-        
+
         val len = readLength(bytes)
+        //Logger.tag("ASN1BER", "read length: $len endOffset $parseOffset")
         if(len > bytes.size - parseOffset)
             throw Exception("excessive length: $len")
 
@@ -116,9 +135,7 @@ class ASN1BER : ParseCompanion() {
         val payload = readBytes(bytes, len)
         val byteRange = Pair(start, sourceOffset+parseOffset)
 
-
-        //Logger.log("Payload size: $len")
-        //Logger.log("Payload: ${payload.hex()}")
+        //Logger.tag("ASN1BER", "Payload: ${payload.hex()}")
 
         val supportedTypes = setOf(0, 1, 2, 5, 6, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30)
 
@@ -385,5 +402,18 @@ class ASN1Sequence(tag: ASN1BER.ASN1Tag, length: Int, val elements: List<ASN1Res
     override fun renderHtmlValue(): String {
         val renderedElements = if(elements.isEmpty()) "∅" else elements.joinToString("") { it.renderHTML() }
         return "$tagLengthDivs <div class=\"bpvalue asn1sequence\" $asnPayloadByteRangeDataTags>$renderedElements</div>"
+    }
+}
+
+class ASN1InformalChain(val elements: List<ASN1Result>, override var sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+
+    override val colour = ByteWitchResult.Colour.ASN1
+    override fun renderHTML(): String {
+        return "<div class=\"roundbox asn1\" $byteRangeDataTags>${renderHtmlValue()}</div>"
+    }
+
+    fun renderHtmlValue(): String {
+        val renderedElements = if(elements.isEmpty()) "∅" else elements.joinToString("") { it.renderHTML() }
+        return "<div class=\"bpvalue asn1sequence\" >$renderedElements</div>"
     }
 }
