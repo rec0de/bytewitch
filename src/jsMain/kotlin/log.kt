@@ -10,7 +10,9 @@ actual object Logger {
         div.style.display = "block"
     }
     actual fun clearUserVisibleMessage() {
-        (document.getElementById("log") as HTMLDivElement).style.display = "none"
+        val elem = document.getElementById("log")
+        if(elem != null)
+            (elem as HTMLDivElement).style.display = "none"
     }
 }
 
