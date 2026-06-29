@@ -6,6 +6,7 @@ import decoders.OPString
 import decoders.OpackObject
 import decoders.OpackParser
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 class OpackTest {
     @Test
@@ -57,11 +58,11 @@ class OpackTest {
             "E3416102416244746573744163A2"
         )
 
-        val results = samples.map { ByteWitch.analyze(it.fromHex(), tryhard = true) }
-
         samples.forEach {
+            Logger.tag("OpackPyATV", "detection: $it")
             val result = ByteWitch.analyze(it.fromHex(), tryhard = false)
-            check(result.any{ it.second is OpackObject }) { "Payload failed to detect as opack: $it" }
+            Logger.tag("OpackPyATV", "result: $result")
+            assertTrue("failed to detect opack: $it") { result.any{ res -> res.second is OpackObject } }
         }
     }
 

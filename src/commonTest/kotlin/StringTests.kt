@@ -1,5 +1,6 @@
 import bitmage.decodeAsUTF16BE
 import bitmage.fromHex
+import decoders.BWString
 import kotlin.test.Test
 
 class StringTests {
@@ -145,5 +146,15 @@ class StringTests {
         bytes = "d83eddd9".fromHex()
         string = bytes.decodeAsUTF16BE()
         check(string == "\uD83E\uDDD9"){ "utf16 decoded to unexpected value $string (expected \uD83E\uDDD9)" }
+    }
+
+    @Test
+    fun shortStringQuickDecodeDetection() {
+        val plausibleStrings = listOf("dict", "VISA", "map", "deen")
+        val implausibleStrings = listOf("qmXP", "oSiO", "MY2", "GaK")
+
+        check(plausibleStrings.all { ByteWitch.quickDecode(it.encodeToByteArray(), 0) is BWString})
+        check(implausibleStrings.none { ByteWitch.quickDecode(it.encodeToByteArray(), 0) is BWString})
+
     }
 }

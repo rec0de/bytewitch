@@ -3,6 +3,7 @@ import bitmage.fromBytes
 import bitmage.hex
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 
 // replicate required Date functionality from JVM
@@ -17,6 +18,10 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val printableASCII = string.filter { it.code in 32..126 || it.code in setOf(9, 10, 13) }
     val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
     val veryWeird = string.any { it.code == 0xFFFD || it.category in setOf(CharCategory.UNASSIGNED, CharCategory.PRIVATE_USE) }
+
+    // boost score for strings exclusively consisting of uppercase/lowercase latin letters
+    // this helps with detection of very short (~3-4) letter strings
+    val caseConsistentBonus = if(string.all { it.code in 65..90 } || string.all { it.code in 97..122 }) 0.2 else 0.0
 
     val unpairedSurrogates = string.withIndex().any { (i, char) ->
         val isHighSurrogate = char.code in 0xD800..0xDB7F
@@ -38,8 +43,8 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val asciiPercentage = printableASCII.length.toDouble() / string.length
     val biasedAsciiPercentage = printableASCII.length.toDouble() / max(string.length, 7)
     if((biasedAsciiPercentage > 0.8 || asciiPercentage == 1.0) && weirdASCII.isEmpty()) {
-        //Logger.log("mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias}")
-        return max(asciiPercentage - lengthBias, 0.0)
+        //Logger.tag("UTF16", "mostly plausible ascii ($asciiPercentage): $string ${asciiPercentage-lengthBias+caseConsistentBonus}")
+        return max(asciiPercentage - lengthBias + caseConsistentBonus, 0.0)
     }
 
     // at this point, we have no unassigned or private use characters, and any surrogates are in valid pairs
@@ -102,9 +107,9 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     // codepoints spread over many blocks / alphabets are a red flag
     val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
 
-    val score = max(0.0, 1.0 + surrogatesBonus*0.25 + biasedAsciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias)
+    val score = max(0.0, 1.0 + surrogatesBonus*0.25 + biasedAsciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias + caseConsistentBonus)
     //Logger.log(bins.joinToString(", "))
-    // Logger.log("surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, final $score, string $string")
+    //Logger.tag("UTF16", "surrogateBonus ${surrogatesBonus*0.25}, asciiPercentage ${biasedAsciiPercentage/2} rare ${-rareCharactersPenalty*2} mixedCJK ${-mixedCJKnonCJKPenalty*0.5}, mixHan ${-mixedHanHangulPenalty*0.3}, bins ${-binCountPenalty*0.25}, length ${-lengthBias}, caseConsistent $caseConsistentBonus final $score, string $string")
 
     return score
 }
@@ -112,23 +117,25 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
 fun looksLikeUtf8String(data: ByteArray, enableLengthBias: Boolean = true): Double {
     val string = data.decodeToString()
 
-    //Logger.log("looks like utf8 called for $string")
-
     // there are a lot of ways to cause decoding errors
     // random / non-UTF-8 bytes should trigger them reliably
-    if(string.any { it.code == 0xFFFD })
-        return 0.0
+    val score = if(string.any { it.code == 0xFFFD })
+        0.0
+    else {
+        val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
+        //Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
 
-    val weirdASCII = string.filter { it.code in 0..8 || it.code in 14..31 }
-    //Logger.log("$string, ${string.encodeToByteArray().hex()}, weird: $weirdASCII, len: ${string.length} / ${data.size}")
+        // if the string has no decoding errors and contains multi-byte UTF8 sequences
+        // we can be pretty sure this is a valid string
+        if(string.length < min(data.size.toDouble() - 3, data.size * 0.8) && weirdASCII.isEmpty())
+            1.0
+        // otherwise, default to generic UTF16 judgment
+        else
+            looksLikeUtf16String(string, enableLengthBias)
+    }
 
-    // if the string has no decoding errors and contains multi-byte UTF8 sequences
-    // we can be pretty sure this is a valid string
-    if(string.length < min(data.size.toDouble() - 3, data.size * 0.8) && weirdASCII.isEmpty())
-        return 1.0
-
-    // otherwise, default to generic UTF16 judgment
-    return looksLikeUtf16String(string, enableLengthBias)
+    //Logger.tag("UTF8", "score for '$string' is ${(score*100).roundToInt().toDouble()/100}")
+    return score
 }
 
 fun dateFromAppleTimestamp(timestamp: Double): Date {
