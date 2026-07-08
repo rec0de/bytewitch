@@ -102,7 +102,7 @@ class ProtobufParser {
                 }
 
                 // plausible candidate found!
-                if(field < 30 && type != ProtobufField.INVALID)
+                if(field in 1..<30 && type != ProtobufField.INVALID)
                     return offsetCandidate
             }
 
@@ -119,10 +119,11 @@ class ProtobufParser {
 
                 val fieldNumberPenalty = if(parsed.objs.size < 3) -0.4 else 0.0
                 val highFieldPenalty = if(parsed.objs.keys.any { it > 200 }) -0.4 else 0.0
+                val zeroFieldPenalty = if(parsed.objs.keys.any { it == 0 }) -0.5 else 0.0
 
                 // short valid protobuf sequences may well be false positives, the longer the sequence the more sure we are
                 // (might factor in plausible field number ranges here in the future)
-                return Pair(min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty, parsed)
+                return Pair(min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty + zeroFieldPenalty, parsed)
             } catch (e: Exception) {
                 return Pair(0.0, null)
             }
