@@ -28,6 +28,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("com.ionspin.kotlin:bignum:0.3.10")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
         }
         val commonTest by getting {
@@ -40,6 +41,6 @@ kotlin {
 
 afterEvaluate {
     rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension> {
-        versions.webpackCli.version="4.10.0"
+        versions.webpackCli.version="5.0.0"
     }
 }
