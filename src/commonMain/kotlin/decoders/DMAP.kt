@@ -33,9 +33,6 @@ object DMAP : ByteWitchDecoder, ParseCompanion() {
         return payloads
     }
 
-    override fun findDecodableSegments(data: ByteArray): List<Pair<Int, Int>> {
-        return super.findDecodableSegments(data)
-    }
 }
 
 

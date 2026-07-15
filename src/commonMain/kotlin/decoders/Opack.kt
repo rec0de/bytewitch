@@ -9,6 +9,7 @@ import dateFromAppleTimestamp
 import htmlEscape
 import looksLikeUtf8String
 import kotlin.math.absoluteValue
+import kotlin.math.max
 
 
 // doc: https://pyatv.dev/documentation/protocols/#opack
@@ -46,7 +47,18 @@ class OpackParser : ParseCompanion() {
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if(data.size < 3)
                 return Pair(0.0, null)
-            return super.confidence(data, sourceOffset)
+
+            try {
+                val decoded = decode(data, sourceOffset)
+
+                // primitive elements are more likely to generate randomly
+                val primitivePenalty = if(decoded is OPArray || decoded is OPDict) 0.0 else 0.5
+                val lengthPenalty = max((10 - data.size).toDouble() / 10, 0.0) * 0.6
+
+                return Pair(1.0 - primitivePenalty - lengthPenalty, decoded)
+            } catch (e: Exception) {
+                return Pair(0.0, null)
+            }
         }
     }
 

@@ -54,7 +54,9 @@ class CborParser : ParseCompanion() {
                 else if(result is OPTaggedData && result.type > 32)
                     weirdTypePenalty = -0.3
 
-                val confidence = min(data.size.toDouble() / 16 + weirdTypePenalty, 1.0)
+                val primitivePenalty = if(result is OPArray || result is OPDict) 0.0 else -0.3
+
+                val confidence = min(data.size.toDouble() / 16 + weirdTypePenalty + primitivePenalty, 1.0)
 
                 return Pair(confidence, result)
             } catch (e: Exception) {
