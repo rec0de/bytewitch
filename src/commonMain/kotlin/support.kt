@@ -3,6 +3,7 @@ import bitmage.fromBytes
 import bitmage.hex
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 
@@ -105,7 +106,8 @@ fun looksLikeUtf16String(string: String, enableLengthBias: Boolean = true): Doub
     val surrogatesBonus = bins[3]
 
     // codepoints spread over many blocks / alphabets are a red flag
-    val binCountPenalty = max(bins.count { it > 0 } - 3, 0)
+    val freeBins = setOf(14) // ascii bin does not count towards penalty
+    val binCountPenalty = max(bins.withIndex().count { it.value > 0 && it.index !in freeBins} - 2, 0).toDouble().pow(2)
 
     val score = max(0.0, 1.0 + surrogatesBonus*0.25 + biasedAsciiPercentage/2 - rareCharactersPenalty*2 - mixedCJKnonCJKPenalty * 0.5 - mixedHanHangulPenalty*0.3 - binCountPenalty*0.25 - lengthBias + caseConsistentBonus)
     //Logger.log(bins.joinToString(", "))

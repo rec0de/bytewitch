@@ -12,7 +12,7 @@ const val byteLimitSSFContent = 1000 // only show SwiftSegFinder for messages wi
 const val maxLimitSequenceAlignment = 5000 // max total bytes across all eligible messages for auto sequence alignment
 val ssfEligible = mutableSetOf<Int>() // msgIndex for protocol messages that show SwiftSegFinder output
 private val HIGH_END_DECODERS = setOf( // set of confident decoders when SSF is not allowed to show up
-    "bplist17", "bplist15", "bplist", "utf8" // TODO maybe use enum to not write the name of it twice.
+    "bplist17", "bplist15", "bplist", "utf8", "ASN.1", "protobuf", "JWT" // TODO maybe use enum to not write the name of it twice.
 )
 
 // save parsed messages for float view and SwiftSegFinder

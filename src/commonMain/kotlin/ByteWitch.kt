@@ -26,7 +26,7 @@ object ByteWitch {
     )
 
     // Decoders that may be used to segment unknown payloads as SSF preprocessing
-    val segmentFindingDecoders = listOf<ByteWitchDecoder>(Utf16Decoder)
+    val segmentFindingDecoders = listOf<ByteWitchDecoder>(Utf16Decoder, BPListParser, ASN1BER)
 
     enum class Encoding(val label: String) {
         NONE("none"), PLAIN("plain"), HEX("hex"), DECIMAL("decimal"), HEXDUMP("hexdump"), BASE64("base64"), BASE85("ascii85")
@@ -88,7 +88,7 @@ object ByteWitch {
         }
 
         // note: in a bit of a hack, we support both classical base64 and base64url encodings here (-_ being url-only chars)
-        val isBase64 = cleanedData.removePrefix("0x").replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_=~]+[G-Z+/=\\-_~][A-Z0-9+/=\\-_~]*$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
+        val isBase64 = cleanedData.removePrefix("0x").replace("\n", "").matches(Regex("^[A-Z0-9+/\\-_~]+[G-Z+/\\-_~][A-Z0-9+/\\-_~]{4,}={0,2}$", RegexOption.IGNORE_CASE)) // matches b64 charset and at least one char distinguishing from raw hex
         val isHexdump = cleanedData.contains(Regex("^[0-9a-f]+\\s+([0-9a-f]{2}\\s+)+\\s*\\|.*\\|\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)))
         val commentsStripped = stripComments(cleanedData).removePrefix("0x")
         val isHex = Regex("[0-9a-fA-F\\s]+").matches(commentsStripped)
