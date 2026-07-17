@@ -237,7 +237,8 @@ object ByteWitch {
     }
 
     fun parseDecimals(input: String): ByteArray? {
-        val numbers = input.split(" ", "\n").filter { !it.matches(Regex("\\s*")) }.map {
+        val preprocessed = input.replace(',', ' ')
+        val numbers = preprocessed.split(" ", "\n").filter { !it.matches(Regex("\\s*")) }.map {
             when {
                 it.startsWith("0x") -> {
                     val hex = it.removePrefix("0x")
