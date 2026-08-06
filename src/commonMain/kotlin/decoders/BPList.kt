@@ -346,8 +346,8 @@ data class BPReal(val value: Double, override val sourceByteRange: Pair<Int, Int
 
         return when {
             // timestamps in reasonable date ranges are probably dates
-            diffUnixEpoch < 1000L*60*60*24*365*10 -> "<div class=\"bpvalue\">Real(unix time ${asDate(false)})</div>"
-            diffAppleEpoch < 1000L*60*60*24*365*10 -> "<div class=\"bpvalue\">Real(apple time ${asDate(true)})</div>"
+            diffUnixEpoch < 1000L*60*60*24*365*10 -> "<div class=\"bpvalue\" $byteRangeDataTags>Real(unix time ${asDate(false)})</div>"
+            diffAppleEpoch < 1000L*60*60*24*365*10 -> "<div class=\"bpvalue\" $byteRangeDataTags>Real(apple time ${asDate(true)})</div>"
             else -> "<div class=\"bpvalue\" $byteRangeDataTags>$value</div>"
         }
     }
