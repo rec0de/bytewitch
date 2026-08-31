@@ -1,7 +1,10 @@
-package decoders
+package decoders.web
 
 import ParseCompanion
 import bitmage.ByteOrder
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.bwvalue
 
 object HTTP2: ByteWitchDecoder, ParseCompanion() {
     override val name = "HTTP/2"
@@ -40,7 +43,8 @@ object HTTP2: ByteWitchDecoder, ParseCompanion() {
         return HTTPFrameCollection(frames, Pair(sourceOffset, sourceOffset+parseOffset))
     }
 
-    class HTTPFrameCollection(val frames: List<HTTPFrame>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    class HTTPFrameCollection(val frames: List<HTTPFrame>, override val sourceByteRange: Pair<Int, Int>):
+        ByteWitchResult {
         override val colour = ByteWitchResult.Colour.GENERIC
 
         override fun renderHTML(): String {
@@ -48,7 +52,8 @@ object HTTP2: ByteWitchDecoder, ParseCompanion() {
         }
     }
 
-    class HTTPFrame(val len: Int, val type: Int, val flags: Int, val stream: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+    class HTTPFrame(val len: Int, val type: Int, val flags: Int, val stream: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>):
+        ByteWitchResult {
         override val colour = ByteWitchResult.Colour.GENERIC
 
         override fun renderHTML(): String {

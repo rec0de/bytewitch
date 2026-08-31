@@ -28,7 +28,7 @@ interface ByteWitchDecoder {
             val decodableSegments = findDecodableSegments(data).sortedBy { it.first }
 
             return if(decodableSegments.isNotEmpty()) {
-                //Logger.log("[tryhard-$name] decodable segments: ${decodableSegments.joinToString(", ") { "(${it.first}-${it.second})" }}")
+                Logger.log("[tryhard-$name] decodable segments: ${decodableSegments.joinToString(", ") { "(${it.first}-${it.second})" }}")
 
                 val decoded = decodableSegments.mapNotNull {
                     try {
@@ -39,7 +39,7 @@ interface ByteWitchDecoder {
                     }
                 }
 
-                //Logger.log("[tryhard-$name] decoded segments: ${decoded.joinToString(", "){ "(${it.sourceByteRange?.first}-${it.sourceByteRange?.second})" }}")
+                Logger.log("[tryhard-$name] decoded segments: ${decoded.joinToString(", "){ "(${it.sourceByteRange?.first}-${it.sourceByteRange?.second})" }}")
 
                 val totalDecodedBytes = decoded.sumOf {
                     val range = if (it is BPListObject) it.rootByteRange else it.sourceByteRange
@@ -70,7 +70,7 @@ interface ByteWitchDecoder {
                     firstStart ?: it.second?.start
                 }
 
-                return MultiPartialDecode(sorted, Pair(0, data.size))
+                MultiPartialDecode(sorted, Pair(0, data.size))
             }
             else
                 decode(data, 0)

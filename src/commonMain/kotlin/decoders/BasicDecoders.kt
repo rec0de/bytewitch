@@ -6,6 +6,35 @@ import looksLikeUtf16String
 import looksLikeUtf8String
 import kotlin.math.*
 
+object LengthPrefixDecoder : ByteWitchDecoder {
+    override val name = "length-prefix"
+
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        try {
+            val decode = decode(data, sourceOffset)
+            return Pair(max(1.0, data.size.toDouble()/15), decode) // bias against short decodes
+        } catch(e: Exception) {
+            return Pair(0.0, null)
+        }
+    }
+
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        var prefixLen = 1
+
+        while(prefixLen <= 4) {
+            val length = Int.fromBytes(data.untilIndex(prefixLen), ByteOrder.BIG)
+            if(length == data.size - prefixLen)
+                return BWGenericSequence(listOf(
+                    BWString("Length: ${length}B", Pair(sourceOffset, sourceOffset+prefixLen)),
+                    BWGenericData(data.fromIndex(prefixLen), Pair(sourceOffset+prefixLen, sourceOffset+data.size))
+                ), Pair(sourceOffset, sourceOffset+data.size))
+            prefixLen += 1
+        }
+
+        throw Exception("[LengthPrefix] no valid length prefix")
+    }
+}
+
 object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
@@ -242,6 +271,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "62767831" to Pair("LZFSE (compressed, uncompressed tables)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
         "62767832" to Pair("LZFSE (compressed, compressed tables", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
         "6276786e" to Pair("LZFSE (lzvn compressed)", "https://github.com/blacktop/ipsw/blob/5e36f2ad1644f044b969fd580b84490e86594111/hack/extras/LZFSE.bt"),
+        "2112A442" to Pair("STUN magic cookie", "https://www.rfc-editor.org/info/rfc5389/#section-6"),
     )
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

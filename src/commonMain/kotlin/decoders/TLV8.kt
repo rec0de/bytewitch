@@ -4,6 +4,7 @@ import ByteWitch
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
+import bitmage.untilIndex
 
 object TLV8 : ByteWitchDecoder {
     override val name = "tlv8"
@@ -21,11 +22,51 @@ object TLV8 : ByteWitchDecoder {
             val length = remainder[1].toUByte().toInt()
 
             if(length > remainder.size-2)
-                throw Exception("Trying to read TLV8 of length $length with only ${remainder.size} bytes remaining")
+                throw Exception("Trying to read TLV8 of length $length with only ${remainder.size-2} bytes remaining")
             val value = remainder.sliceArray(2 until 2+length)
             remainder = remainder.fromIndex(2+length)
             tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+2+length)))
             internalOffset += 2+length
+        }
+
+        return TlvChainResult(tlvs, Pair(sourceOffset, sourceOffset+data.size))
+    }
+
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        try {
+            val res = decode(data, sourceOffset) as TlvChainResult
+
+            val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
+
+            return Pair(1.0 - zeroLengthPenalty, res)
+        } catch (e: Exception) {
+            return Pair(0.0, null)
+        }
+    }
+}
+
+object TLV816 : ByteWitchDecoder {
+    override val name = "tlv816"
+
+    override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+        val tlvs = mutableListOf<TlvChainEntry>()
+        var remainder = data
+        var internalOffset = 0
+
+        while(remainder.isNotEmpty()) {
+            if(remainder.size < 3)
+                throw Exception("Insufficient TLV816 header bytes remaining")
+
+            val type = remainder[0].toUByte().toInt()
+            val length = Int.fromBytes(remainder.sliceArray(1 ..2), ByteOrder.BIG)
+
+            if(length > remainder.size-3)
+                throw Exception("Trying to read TLV816 of length $length with only ${remainder.size-3} bytes remaining")
+            val value = remainder.sliceArray(3 until 3+length)
+            remainder = remainder.fromIndex(3+length)
+            tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+3+length), lengthLength = 2))
+            internalOffset += 3+length
         }
 
         return TlvChainResult(tlvs, Pair(sourceOffset, sourceOffset+data.size))
@@ -54,18 +95,18 @@ object TLV16 : ByteWitchDecoder {
         var internalOffset = 0
 
         while(remainder.isNotEmpty()) {
-            if(remainder.size < 3)
+            if(remainder.size < 4)
                 throw Exception("Insufficient TLV16 header bytes remaining")
 
-            val type = remainder[0].toUByte().toInt()
-            val length = Int.fromBytes(remainder.sliceArray(1 ..2), ByteOrder.BIG)
+            val type = Int.fromBytes(remainder.untilIndex(2), ByteOrder.BIG, explicitlySigned = false)
+            val length = Int.fromBytes(remainder.sliceArray(2 ..3), ByteOrder.BIG)
 
-            if(length > remainder.size-3)
-                throw Exception("Trying to read TLV16 of length $length with only ${remainder.size} bytes remaining")
-            val value = remainder.sliceArray(3 until 3+length)
-            remainder = remainder.fromIndex(3+length)
-            tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+3+length), lengthLength = 2))
-            internalOffset += 3+length
+            if(length > remainder.size-4)
+                throw Exception("Trying to read TLV16 of length $length with only ${remainder.size-4} bytes remaining")
+            val value = remainder.sliceArray(4 until 4+length)
+            remainder = remainder.fromIndex(4+length)
+            tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+4+length), lengthLength = 2, typeLength = 2))
+            internalOffset += 4+length
         }
 
         return TlvChainResult(tlvs, Pair(sourceOffset, sourceOffset+data.size))
