@@ -4,6 +4,8 @@ import bitmage.fromHex
 import bitmage.stripLeadingZeros
 import bitmage.toBytes
 import decoders.*
+import decoders.web.HTTP2
+import decoders.web.TLS12
 import preprocessing.And
 import preprocessing.BytewiseCalc
 import preprocessing.Preprocessor
@@ -19,9 +21,9 @@ object ByteWitch {
     private val decoders = listOf<ByteWitchDecoder>(
         BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser, JsonDecoder,
-        ProtobufParser, ASN1BER, Sec1Ec, GenericTLV, TLV8, TLV16, IEEE754, MSZIP, Bech32, DMAP,
+        ProtobufParser, ASN1BER, Sec1Ec, TLS12, LengthPrefixDecoder, TLV8, TLV16, TLV816, IEEE754, MSZIP, Bech32, DMAP,
         NotarizedTicket, AppleAuth, HTTP2,
-        EdDSA, ECCurves, Randomness, HeuristicSignatureDetector,
+        GenericTLV, EdDSA, ECCurves, Randomness, HeuristicSignatureDetector,
         /* PGP, ModernPGP */
     )
 

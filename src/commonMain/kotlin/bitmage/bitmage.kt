@@ -173,6 +173,14 @@ fun ByteArray.readDouble(byteOrder: ByteOrder): Double {
     return Double.fromBytes(this.sliceArray(0 until 8), byteOrder)
 }
 
+fun ByteArray.readShortAtOffset(offset: Int, byteOrder: ByteOrder): Int {
+    return Int.fromBytes(this.sliceArray(offset until offset+2), byteOrder)
+}
+
+fun ByteArray.readIntAtOffset(offset: Int, byteOrder: ByteOrder): Int {
+    return Int.fromBytes(this.sliceArray(offset until offset+4), byteOrder)
+}
+
 fun String.fromHex(): ByteArray {
     check(length % 2 == 0) { "trying to parse hex string of uneven length" }
     return chunked(2)
@@ -182,95 +190,6 @@ fun String.fromHex(): ByteArray {
 
 fun Byte.toHex(): String = this.toUByte().toString(16).padStart(2, '0')
 
-
-
-// by ephemient from https://slack-chats.kotlinlang.org/t/527242/i-have-a-bytearray-of-utf-16-encoded-bytes-read-from-a-cinte
-@OptIn(ExperimentalUnsignedTypes::class)
-fun UShortArray.utf16BEToUtf8(): UByteArray {
-    var i = if (this.firstOrNull() == 0xFFEF.toUShort()) 1 else 0 // skip BOM
-    val bytes = UByteArray((this.size - i) * 3)
-    var j = 0
-    while (i < this.size) {
-        val codepoint = when (val unit = this[i++].toInt()) {
-            in Char.MIN_HIGH_SURROGATE.code..Char.MAX_HIGH_SURROGATE.code -> {
-                if (i !in this.indices) throw CharacterCodingException() // unpaired high surrogate
-                val lowSurrogate = this[i++].toInt()
-                val highSurrogate = unit
-                if (lowSurrogate !in Char.MIN_LOW_SURROGATE.code..Char.MAX_LOW_SURROGATE.code) {
-                    throw CharacterCodingException() // unpaired high surrogate
-                }
-
-                val code = ((highSurrogate - 0xd800) shl 10) or (lowSurrogate - 0xdc00) + 0x10000
-
-                if (code !in 0x010000..0x10FFFF) {
-                    throw CharacterCodingException() // non-canonical encoding
-                }
-                code
-            }
-
-            in Char.MIN_LOW_SURROGATE.code..Char.MAX_LOW_SURROGATE.code -> {
-                throw CharacterCodingException() // unpaired low surrogate
-            }
-
-            else -> unit
-        }
-        when (codepoint) {
-            in 0x00..0x7F -> bytes[j++] = codepoint.toUByte()
-            in 0x80..0x07FF -> {
-                bytes[j++] = 0xC0.or(codepoint and 0x07C0 shr 6).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x003F).toUByte()
-            }
-
-            in 0x0800..0xFFFF -> {
-                bytes[j++] = 0xE0.or(codepoint and 0xF000 shr 12).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x0FC0 shr 6).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x003F).toUByte()
-            }
-
-            in 0x10000..0x10FFFF -> {
-                bytes[j++] = 0xF0.or(codepoint and 0x3C0000 shr 18).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x03F000 shr 12).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x000FC0 shr 6).toUByte()
-                bytes[j++] = 0x80.or(codepoint and 0x00003F).toUByte()
-            }
-
-            else -> throw IllegalStateException()
-        }
-    }
-    return bytes.sliceArray(0 until j)
-}
-
-fun String.toUnicodeCodepoints(): List<Int> {
-    var i = 0
-    val codepoints = mutableListOf<Int>()
-    while (i < this.length) {
-        val codepoint = when (val unit = this[i++].code) {
-            in Char.MIN_HIGH_SURROGATE.code..Char.MAX_HIGH_SURROGATE.code -> {
-                if (i !in this.indices) throw CharacterCodingException() // unpaired high surrogate
-                val lowSurrogate = this[i++].code
-                val highSurrogate = unit
-                if (lowSurrogate !in Char.MIN_LOW_SURROGATE.code..Char.MAX_LOW_SURROGATE.code) {
-                    throw CharacterCodingException() // unpaired high surrogate
-                }
-
-                val code = ((highSurrogate - 0xd800) shl 10) or (lowSurrogate - 0xdc00) + 0x10000
-
-                if (code !in 0x010000..0x10FFFF) {
-                    throw CharacterCodingException() // non-canonical encoding
-                }
-                code
-            }
-
-            in Char.MIN_LOW_SURROGATE.code..Char.MAX_LOW_SURROGATE.code -> {
-                throw CharacterCodingException() // unpaired low surrogate
-            }
-
-            else -> unit
-        }
-        codepoints.add(codepoint)
-    }
-    return codepoints
-}
 
 fun decodeBase32(values: List<Int>): ByteArray {
     var currentByte = 0
