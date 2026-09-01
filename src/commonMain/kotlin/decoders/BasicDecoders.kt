@@ -12,7 +12,7 @@ object LengthPrefixDecoder : ByteWitchDecoder {
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         try {
             val decode = decode(data, sourceOffset)
-            return Pair(max(1.0, data.size.toDouble()/15), decode) // bias against short decodes
+            return Pair(min(1.0, data.size.toDouble()/15), decode) // bias against short decodes
         } catch(e: Exception) {
             return Pair(0.0, null)
         }
