@@ -142,8 +142,11 @@ class ASN1BER(private val allowTLVChaining: Boolean = true) : ParseCompanion() {
         return if(tag.tagClass == ASN1Class.Universal && tag.type in supportedTypes) {
             when(tag.type) {
                 0 -> {
+                    // end of content should only appear in indefinite length encodings, where we parse it explicitly
+                    // -> if we see it here, we're most likely not parsing ASN.1
                     check(len == 0){"end-of-contents with unexpected payload length $len"}
-                    ASN1Null(tag, len, byteRange) // naja, todo
+                    throw Exception("ASN1: unexpected end-of-content marker")
+                    //ASN1Null(tag, len, byteRange) // naja, todo
                 }
                 // Boolean
                 1 -> {

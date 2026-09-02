@@ -37,6 +37,10 @@ object HTTP2: ByteWitchDecoder, ParseCompanion() {
             val flags = readInt(data, 1)
             val stream = readInt(data, 4)
             val payload = readBytes(data, len)
+
+            if(flags == 0 && stream == 0 && type == 0 && len == 0)
+                throw Exception("HTTP2: all-zero frame is most likely not actually http")
+
             frames.add(HTTPFrame(len, type, flags, stream, payload, Pair(start, sourceOffset+parseOffset)))
         }
 
