@@ -58,13 +58,18 @@ class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedDat
     }
 }
 
-class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+open class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
-    override fun renderHTML() = "<div class=\"roundbox generic\">" + elements.joinToString(" ") { it.renderHTML() } + "</div>"
+    override fun renderHTML(): String {
+        return if(elements.size == 1)
+            elements.first().renderHTML()
+        else
+            "<div class=\"generic roundbox\" $byteRangeDataTags>${elements.joinToString("") { wrapIfSameColour(it, "", rangeTagsFor(it.sourceByteRange!!.first, it.sourceByteRange!!.second)) }}</div>"
+    }
 }
 
 class BWGenericData(val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
-    override val colour = ByteWitchResult.Colour.GENERIC
+    override val colour = ByteWitchResult.Colour.PLAIN
     override fun renderHTML(): String {
         val quickDecode = ByteWitch.quickDecode(data, sourceByteRange.first)
         return wrapIfSameColour(quickDecode, data, rangeTagsFor(sourceByteRange.first, sourceByteRange.second))

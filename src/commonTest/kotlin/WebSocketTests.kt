@@ -1,0 +1,24 @@
+import bitmage.fromHex
+import decoders.web.WebSocket
+import kotlin.test.Test
+
+class WebSocketTests {
+
+    @Test
+    fun detection() {
+        val s1 = "81850102030469676f686e".fromHex()
+        val s2 = "80026c6f".fromHex()
+        val s3 = "8a8537fa213d7f9f4d5158".fromHex()
+        val s4 = "827e010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".fromHex()
+
+        val r1 = ByteWitch.analyze(s1, tryhard = false)
+        val r2 = ByteWitch.analyze(s2, tryhard = false)
+        val r3 = ByteWitch.analyze(s3, tryhard = false)
+        val r4 = ByteWitch.analyze(s4, tryhard = false)
+
+        check(r1.any { it.first == WebSocket.name })
+        check(r2.any { it.first == WebSocket.name })
+        check(r3.any { it.first == WebSocket.name })
+        check(r4.any { it.first == WebSocket.name })
+    }
+}

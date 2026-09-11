@@ -36,8 +36,8 @@ object TLV8 : ByteWitchDecoder {
         try {
             val res = decode(data, sourceOffset) as TlvChainResult
 
-            val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
-            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
+            val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
 
             return Pair(1.0 - zeroLengthPenalty, res)
         } catch (e: Exception) {
@@ -76,8 +76,8 @@ object TLV816 : ByteWitchDecoder {
         try {
             val res = decode(data, sourceOffset) as TlvChainResult
 
-            val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
-            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
+            val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
 
             return Pair(1.0 - zeroLengthPenalty, res)
         } catch (e: Exception) {
@@ -116,8 +116,8 @@ object TLV16 : ByteWitchDecoder {
         try {
             val res = decode(data, sourceOffset) as TlvChainResult
 
-            val zeroLengthTLVs = res.tlvs.count { it.length == 0 }
-            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.tlvs.size) * 0.8
+            val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
 
             return Pair(1.0 - zeroLengthPenalty, res)
         } catch (e: Exception) {
@@ -126,15 +126,7 @@ object TLV16 : ByteWitchDecoder {
     }
 }
 
-class TlvChainResult(val tlvs: List<TlvChainEntry>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
-    override val colour = ByteWitchResult.Colour.GENERIC
-    override fun renderHTML(): String {
-        return if(tlvs.size == 1)
-            tlvs.first().renderHTML()
-        else
-            "<div class=\"generic roundbox\" $byteRangeDataTags>${tlvs.joinToString("") { wrapIfSameColour(it, "", rangeTagsFor(it.sourceByteRange.first, it.sourceByteRange.second)) }}</div>"
-    }
-}
+class TlvChainResult(tlvs: List<TlvChainEntry>, sourceByteRange: Pair<Int, Int>): BWGenericSequence(tlvs, sourceByteRange)
 
 class TlvChainEntry(val type: Int, val length: Int, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>, private val typeLength: Int = 1, private val lengthLength: Int = 1) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
