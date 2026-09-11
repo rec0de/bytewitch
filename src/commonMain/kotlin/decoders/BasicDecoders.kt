@@ -155,9 +155,9 @@ object IEEE754 : ByteWitchDecoder {
         // 12 and 41 are the bits that are in the mantissa Long (64b) but not in the actual binary data for float and double respectively
         val mantissaComplexity = if(isDouble) (mantissa.countTrailingZeroBits().toDouble() - 12) / 52 else (mantissa.countTrailingZeroBits().toDouble() - 41) / 23
         val magnitudeScore = (12 - abs(exponent)).toDouble() / 18
-        val stringLength = (7.0 - value.toString().length) / 7
+        val stringLength = (7.0 - (value.toString().length - 1)) / 7
 
-        val score = positiveBonus + (mantissaComplexity + magnitudeScore + stringLength) / 2
+        val score = positiveBonus + (mantissaComplexity + magnitudeScore) / 2 + stringLength
         //Logger.log("number plausibility: positive $positiveBonus exponent $exponent / $magnitudeScore roundness $mantissaComplexity stringLength $stringLength total $score")
         return score
     }
@@ -177,7 +177,7 @@ object IEEE754 : ByteWitchDecoder {
                 val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third.toLong(), valueLE, isDouble = false) + zeroBytePenalty
                 if(scoreLE > 0.75)
                     return BWString("Float LE: $valueLE", Pair(sourceOffset, sourceOffset+4))
-                throw Exception("not a reasonable float / double")
+                throw Exception("not a reasonable float / double ($valueBE / $valueLE)")
             }
             8 -> {
                 val zeroBytePenalty = - (data.count { it.toInt() == 0 }.toDouble() / data.size) * 0.5
@@ -192,7 +192,7 @@ object IEEE754 : ByteWitchDecoder {
                 val scoreLE = looksReasonable(partsLE.first, partsLE.second, partsLE.third, valueLE, isDouble = true) + zeroBytePenalty
                 if(scoreLE > 0.75)
                     return BWString("Double LE: $valueLE", Pair(sourceOffset, sourceOffset+8))
-                throw Exception("not a reasonable float / double")
+                throw Exception("not a reasonable float / double ($valueBE / $valueLE)")
             }
             else -> throw Exception("not a reasonable float / double size")
         }
