@@ -240,6 +240,7 @@ object HeuristicSignatureDetector : ByteWitchDecoder {
         "0000000C4A584C200D0A870A" to Pair("JPEG XL header", null),
         "424f4d53746f7265" to Pair("BOMStore (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
         "70627a78" to Pair("pbzx (Apple OTA)", "https://newosxbook.com/articles/OTA.html"),
+        "70627a6d" to Pair("pbzm (Apple OTA >=27)", "https://github.com/anat0m1a/liblzraven/blob/main/SPEC.md"),
         "59414131" to Pair("YAA (Apple OTA archive)", "https://newosxbook.com/articles/OTA9.html"),
         "dec07eab" to Pair("Apple Remote Invocation (ARI) magic bytes", "https://github.com/seemoo-lab/aristoteles"),
         "4157444d" to Pair("Apple Wireless Debug Metadata", "https://github.com/hack-different/apple-diagnostics-format"),

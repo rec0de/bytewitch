@@ -58,13 +58,14 @@ class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedDat
     }
 }
 
-open class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+open class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>, val vertical: Boolean = false) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
+        val large = if(vertical) " largecollection" else ""
         return if(elements.size == 1)
             elements.first().renderHTML()
         else
-            "<div class=\"generic roundbox\" $byteRangeDataTags>${elements.joinToString("") { wrapIfSameColour(it, "", rangeTagsFor(it.sourceByteRange!!.first, it.sourceByteRange!!.second)) }}</div>"
+            "<div class=\"generic roundbox$large\" $byteRangeDataTags>${elements.joinToString("") { wrapIfSameColour(it, "", rangeTagsFor(it.sourceByteRange!!.first, it.sourceByteRange!!.second)) }}</div>"
     }
 }
 

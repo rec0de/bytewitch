@@ -100,6 +100,10 @@ object Randomness : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
+
+        if(data.size > 50000)
+            throw Exception("Randomness: Payload too large, skipping analysis (${data.size}B)")
+
         val twoGramCounts = IntArray(4) { 0 }
         val fourGramCounts = IntArray(16) { 0 }
         val byteCounts = IntArray(256) { 0 }

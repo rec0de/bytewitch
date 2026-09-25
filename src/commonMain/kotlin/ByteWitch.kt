@@ -14,13 +14,14 @@ import preprocessing.Xor
 import preprocessing.Reverse
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.measureTime
 
 object ByteWitch {
     private val preprocessors = listOf<Preprocessor>(Reverse, Xor, And, BytewiseCalc)
     private val preprocCommands = preprocessors.associateBy { it.command }
 
     private val decoders = listOf<ByteWitchDecoder>(
-        BPList17, BPList15, BPListParser, Utf8Decoder, Utf16Decoder, JWT,
+        BPList17, BPList15, BPListParser, AppleArchive, Utf8Decoder, Utf16Decoder, JWT,
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser, JsonDecoder,
         ProtobufParser, ASN1BER, Sec1Ec, TLS12, LengthPrefixDecoder, TLV8, TLV16, TLV816, IEEE754, MSZIP, Bech32, DMAP,
         NotarizedTicket, AppleAuth, HTTP2, Argo, WebSocket,
@@ -148,8 +149,11 @@ object ByteWitch {
         if(tryhard) {
             Logger.log("tryhard decode attempt...")
             return allDecoders.mapNotNull {
-                val decode = it.tryhardDecode(data)
-                Logger.log("decode with ${it.name} yielded $decode")
+                val decode: ByteWitchResult?
+                val elapsed = measureTime {
+                    decode = it.tryhardDecode(data)
+                }
+                Logger.log("decode with ${it.name} (${elapsed}) yielded $decode")
                 if (decode != null) Pair(it.name, decode) else null
             }
         }
