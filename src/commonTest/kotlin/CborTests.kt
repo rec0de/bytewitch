@@ -63,8 +63,8 @@ class CborTests {
     fun detection() {
         val s1 = "9f01820203ff".fromHex()
         val s2 = "8201820203".fromHex()
-        val r1 = ByteWitch.analyze(s1, tryhard = false)
-        val r2 = ByteWitch.analyze(s2, tryhard = false)
+        val r1 = ByteWitch.analyze(s1, tryhard = true)
+        val r2 = ByteWitch.analyze(s2, tryhard = true)
         check(r1.any { it.second is OPArray })
         check(r2.any { it.second is OPArray })
     }

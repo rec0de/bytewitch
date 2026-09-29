@@ -60,7 +60,7 @@ class OpackTest {
 
         samples.forEach {
             Logger.tag("OpackPyATV", "detection: $it")
-            val result = ByteWitch.analyze(it.fromHex(), tryhard = false)
+            val result = ByteWitch.analyze(it.fromHex(), tryhard = true) // some of these art too short to be detected in normal mode
             Logger.tag("OpackPyATV", "result: $result")
             assertTrue("failed to detect opack: $it") { result.any{ res -> res.second is OpackObject } }
         }
