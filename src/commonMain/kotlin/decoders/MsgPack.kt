@@ -3,6 +3,19 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import decoders.apple.OPArray
+import decoders.apple.OPData
+import decoders.apple.OPDate
+import decoders.apple.OPDict
+import decoders.apple.OPFalse
+import decoders.apple.OPInt
+import decoders.apple.OPNull
+import decoders.apple.OPReal
+import decoders.apple.OPString
+import decoders.apple.OPTaggedData
+import decoders.apple.OPTrue
+import decoders.apple.OPUInt
+import decoders.apple.OpackObject
 import looksLikeUtf8String
 
 
@@ -99,15 +112,15 @@ class MsgPackParser : ParseCompanion() {
     private fun parseAsBool(bytes: ByteArray): OpackObject {
         val byte = readInt(bytes, 1)
         return when (byte) {
-            0xc3 -> OPTrue(sourceOffset+parseOffset-1) // we already incremented parse offset here
-            0xc2 -> OPFalse(sourceOffset+parseOffset-1)
+            0xc3 -> OPTrue(sourceOffset + parseOffset - 1) // we already incremented parse offset here
+            0xc2 -> OPFalse(sourceOffset + parseOffset - 1)
             else -> throw Exception("Unexpected OPACK boolean ${bytes.hex()}")
         }
     }
 
     private fun parseAsNull(bytes: ByteArray): OpackObject {
         parseOffset += 1
-        return OPNull(sourceOffset+parseOffset-1) // we already incremented parse offset here
+        return OPNull(sourceOffset + parseOffset - 1) // we already incremented parse offset here
     }
 
     private fun parseAsInt(bytes: ByteArray): OpackObject {
@@ -116,7 +129,13 @@ class MsgPackParser : ParseCompanion() {
         
         return when(type) {
             in 0x00..0x7f -> OPInt(type, Pair(start, lastConsumedBytePosition))
-            in 0xe0..0xff -> OPInt(Int.fromBytes(byteArrayOf(bytes[parseOffset-1]), ByteOrder.BIG, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
+            in 0xe0..0xff -> OPInt(
+                Int.fromBytes(
+                    byteArrayOf(bytes[parseOffset - 1]),
+                    ByteOrder.BIG,
+                    explicitlySigned = true
+                ), Pair(start, lastConsumedBytePosition)
+            )
             // uints
             0xcc -> OPUInt(readUInt(bytes, 1), Pair(start, lastConsumedBytePosition))
             0xcd -> OPUInt(readUInt(bytes, 2), Pair(start, lastConsumedBytePosition))
@@ -135,7 +154,10 @@ class MsgPackParser : ParseCompanion() {
         val start = sourceOffset + parseOffset
         val type = readInt(bytes, 1)
         return when(type) {
-            0xca -> OPReal(readBytes(bytes, 4).readFloat(ByteOrder.BIG).toDouble(), Pair(start, lastConsumedBytePosition))
+            0xca -> OPReal(
+                readBytes(bytes, 4).readFloat(ByteOrder.BIG).toDouble(),
+                Pair(start, lastConsumedBytePosition)
+            )
             0xcb -> OPReal(readBytes(bytes, 8).readDouble(ByteOrder.BIG), Pair(start, lastConsumedBytePosition))
             else -> throw Exception("Unexpected MsgPack float type $type in ${bytes.hex()}")
         }
@@ -227,17 +249,29 @@ class MsgPackParser : ParseCompanion() {
             when(length) {
                 4 -> {
                     val seconds = readInt(bytes, 4)
-                    return OPDate(seconds.toDouble(), isAppleEpoch = false, sourceByteRange = Pair(start, lastConsumedBytePosition))
+                    return OPDate(
+                        seconds.toDouble(),
+                        isAppleEpoch = false,
+                        sourceByteRange = Pair(start, lastConsumedBytePosition)
+                    )
                 }
                 8 -> {
                     val nano = readInt(bytes, 4)
                     val seconds = readInt(bytes, 4)
-                    return OPDate(seconds.toDouble() + nano.toDouble()/1000000, isAppleEpoch = false, sourceByteRange = Pair(start, lastConsumedBytePosition))
+                    return OPDate(
+                        seconds.toDouble() + nano.toDouble() / 1000000,
+                        isAppleEpoch = false,
+                        sourceByteRange = Pair(start, lastConsumedBytePosition)
+                    )
                 }
                 12 -> {
                     val nano = readInt(bytes, 4)
                     val seconds = readLong(bytes, 8)
-                    return OPDate(seconds.toDouble() + nano.toDouble()/1000000, isAppleEpoch = false, sourceByteRange = Pair(start, lastConsumedBytePosition))
+                    return OPDate(
+                        seconds.toDouble() + nano.toDouble() / 1000000,
+                        isAppleEpoch = false,
+                        sourceByteRange = Pair(start, lastConsumedBytePosition)
+                    )
                 }
                 else -> throw Exception("Unexpected data length for date extension type: $length in ${bytes.hex()}")
             }

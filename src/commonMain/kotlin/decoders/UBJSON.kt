@@ -3,6 +3,17 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import decoders.apple.OPArray
+import decoders.apple.OPData
+import decoders.apple.OPDict
+import decoders.apple.OPFalse
+import decoders.apple.OPInt
+import decoders.apple.OPNull
+import decoders.apple.OPReal
+import decoders.apple.OPString
+import decoders.apple.OPTrue
+import decoders.apple.OPUInt
+import decoders.apple.OpackObject
 import looksLikeUtf8String
 
 
@@ -84,14 +95,26 @@ class UbjsonParser : ParseCompanion() {
             'N' -> parse(bytes) // nop, parse next
             'T' -> OPTrue(start)
             'F' -> OPFalse(start)
-            'i' -> OPInt(if(looksDeprecated) readInt(bytes, 2, explicitlySigned = true) else readInt(bytes, 1, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
+            'i' -> OPInt(
+                if (looksDeprecated) readInt(bytes, 2, explicitlySigned = true) else readInt(
+                    bytes,
+                    1,
+                    explicitlySigned = true
+                ), Pair(start, lastConsumedBytePosition)
+            )
             'U', 'B' -> OPUInt(readUInt(bytes, 1), Pair(start, lastConsumedBytePosition))
-            'I' -> OPInt(if(looksDeprecated) readInt(bytes, 4) else readInt(bytes, 2, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
+            'I' -> OPInt(
+                if (looksDeprecated) readInt(bytes, 4) else readInt(bytes, 2, explicitlySigned = true),
+                Pair(start, lastConsumedBytePosition)
+            )
             'l' -> OPInt(readInt(bytes, 4, explicitlySigned = true), Pair(start, lastConsumedBytePosition))
             'L' -> OPInt(readLong(bytes, 8), Pair(start, lastConsumedBytePosition))
             'd' -> OPReal(readFloat(bytes).toDouble(), Pair(start, lastConsumedBytePosition))
             'D' -> OPReal(readDouble(bytes), Pair(start, lastConsumedBytePosition))
-            'C' -> OPString(readInt(bytes, 1, explicitlySigned = false).toChar().toString(), Pair(start, lastConsumedBytePosition))
+            'C' -> OPString(
+                readInt(bytes, 1, explicitlySigned = false).toChar().toString(),
+                Pair(start, lastConsumedBytePosition)
+            )
             'S' -> {
                 val byteLength = if(looksDeprecated) {
                     val length = parse(bytes)
@@ -145,7 +168,7 @@ class UbjsonParser : ParseCompanion() {
                 OPArray(values, Pair(start, lastConsumedBytePosition))
             }
             '{' -> {
-                val values = mutableMapOf<OpackObject,OpackObject>()
+                val values = mutableMapOf<OpackObject, OpackObject>()
                 var compactType: Char? = null
 
                 if(bytes[parseOffset].toInt().toChar() == '$') {
@@ -181,7 +204,7 @@ class UbjsonParser : ParseCompanion() {
                 OPDict(values, Pair(start, lastConsumedBytePosition))
             }
             // deprecated string type
-            's' -> OPString( readLengthPrefixedString(bytes, 1) ?: "", Pair(start, lastConsumedBytePosition))
+            's' -> OPString(readLengthPrefixedString(bytes, 1) ?: "", Pair(start, lastConsumedBytePosition))
             // deprecated container types
             'A', 'a' -> {
                 looksDeprecated = true

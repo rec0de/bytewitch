@@ -44,6 +44,9 @@ object HTTP2: ByteWitchDecoder, ParseCompanion() {
             frames.add(HTTPFrame(len, type, flags, stream, payload, Pair(start, sourceOffset+parseOffset)))
         }
 
+        if(frames.isEmpty())
+            throw Exception("HTTP2: no valid frame")
+
         return HTTPFrameCollection(frames, Pair(sourceOffset, sourceOffset+parseOffset))
     }
 

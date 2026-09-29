@@ -1,9 +1,11 @@
-package decoders
+package decoders.apple
 
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.hex
 import bitmage.readInt
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
 
 object DMAP : ByteWitchDecoder, ParseCompanion() {
     override val name = "DMAP / KeyBag"
@@ -29,6 +31,9 @@ object DMAP : ByteWitchDecoder, ParseCompanion() {
             val value = readBytes(data, length.toInt())
             payloads.add(DmapTlv(key.decodeToString(), length.toInt(), value, Pair(start, parseOffset+sourceOffset)))
         }
+
+        if(payloads.isEmpty())
+            throw Exception("DMAP: no valid TLV")
 
         return payloads
     }

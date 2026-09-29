@@ -1,7 +1,11 @@
-package decoders
+package decoders.apple
 
 
 import bitmage.*
+import decoders.BWRangeTaggedData
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.MultiPartialDecode
 
 class BPList17 {
     private val objectMap = mutableMapOf<Int, BPListObject>()
@@ -11,7 +15,7 @@ class BPList17 {
     companion object : ByteWitchDecoder {
         override val name = "bplist17"
 
-        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             if (data.size < 9) {
                 return Pair(0.0, null)
             }
@@ -104,29 +108,38 @@ class BPList17 {
                     }
                     // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
                     lastObjectEndOffset = offset+1+byteLen
-                    BPInt(lower, Pair(sourceOffset+offset, lastObjectEndOffset))
+                    BPInt(lower, Pair(sourceOffset + offset, lastObjectEndOffset))
                 }
                 else {
                     // TODO: does this mess with signs? how does bigint do it?
                     lastObjectEndOffset = offset+1+byteLen
-                    BPInt(Long.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.LITTLE), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    BPInt(
+                        Long.fromBytes(bytes.sliceArray(offset + 1 until lastObjectEndOffset), ByteOrder.LITTLE),
+                        Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset)
+                    )
                 }
             }
             // Real float
             0x22 -> {
                 lastObjectEndOffset = offset+1+4
-                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readFloat(ByteOrder.LITTLE).toDouble(), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPReal(
+                    bytes.sliceArray(offset + 1 until lastObjectEndOffset).readFloat(ByteOrder.LITTLE).toDouble(),
+                    Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset)
+                )
             }
             // Real double
             0x23 -> {
                 lastObjectEndOffset = offset+1+8
-                BPReal(bytes.sliceArray(offset+1 until lastObjectEndOffset).readDouble(ByteOrder.LITTLE), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPReal(
+                    bytes.sliceArray(offset + 1 until lastObjectEndOffset).readDouble(ByteOrder.LITTLE),
+                    Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset)
+                )
             }
             // Date, always 8 bytes long
             0x33 -> {
                 val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.LITTLE) // don't have evidence of this being LE but guessing it should match the others
                 lastObjectEndOffset = offset+1+8
-                BPDate(timestamp, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPDate(timestamp, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Data
             in 0x40 until 0x50 -> {
@@ -137,7 +150,7 @@ class BPList17 {
 
                 lastObjectEndOffset = effectiveOffset+byteLen
                 val data = bytes.sliceArray(effectiveOffset until lastObjectEndOffset)
-                return BPData(data, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                return BPData(data, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Unicode string
             in 0x60 until 0x70 -> {
@@ -149,7 +162,7 @@ class BPList17 {
                 lastObjectEndOffset = effectiveOffset+charLen*2
                 val stringBytes = bytes.sliceArray(effectiveOffset until lastObjectEndOffset)
                 val string = stringBytes.decodeAsUTF16LE()
-                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPUnicodeString(string, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Ascii string
             in 0x70 until 0x80 -> {
@@ -160,7 +173,7 @@ class BPList17 {
                 lastObjectEndOffset = effectiveOffset+charLen
                 val stringBytes = bytes.sliceArray(effectiveOffset until effectiveOffset+charLen)
                 val string = stringBytes.decodeToString()
-                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPUnicodeString(string, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // reference object
             in 0x80 until 0x90 -> {
@@ -187,7 +200,7 @@ class BPList17 {
                 }
 
                 lastObjectEndOffset = currentOffset
-                BPArray(values, Pair(sourceOffset+offset, sourceOffset+currentOffset))
+                BPArray(values, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             // Set (this is not based on any documentation, but we assume it to work like an array, if it exists)
             in 0xc0 until 0xd0 -> {
@@ -205,7 +218,7 @@ class BPList17 {
 
                 lastObjectEndOffset = currentOffset
 
-                BPSet(values.size, values, Pair(sourceOffset+offset, sourceOffset+currentOffset))
+                BPSet(values.size, values, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             // Dict
             in 0xd0 until 0xe0 -> {
@@ -223,7 +236,7 @@ class BPList17 {
                 }
 
                 lastObjectEndOffset = currentOffset
-                BPDict(map, Pair(sourceOffset+offset, sourceOffset+currentOffset))
+                BPDict(map, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             // UInt
             in 0xf0 until 0x100 -> {
@@ -241,12 +254,15 @@ class BPList17 {
                     }
                     // Bug here that I'm too lazy to fix: We're potentially interpreting unsigned data as signed here
                     lastObjectEndOffset = offset+1+byteLen
-                    BPUInt(lower, Pair(sourceOffset+offset, lastObjectEndOffset))
+                    BPUInt(lower, Pair(sourceOffset + offset, lastObjectEndOffset))
                 }
                 else {
                     // TODO: does this mess with signs? how does bigint do it?
                     lastObjectEndOffset = offset+1+byteLen
-                    BPUInt(ULong.fromBytes(bytes.sliceArray(offset+1 until lastObjectEndOffset), ByteOrder.BIG), Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    BPUInt(
+                        ULong.fromBytes(bytes.sliceArray(offset + 1 until lastObjectEndOffset), ByteOrder.BIG),
+                        Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset)
+                    )
                 }
             }
 

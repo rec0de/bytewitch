@@ -3,6 +3,18 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import decoders.apple.OPArray
+import decoders.apple.OPData
+import decoders.apple.OPDict
+import decoders.apple.OPFalse
+import decoders.apple.OPInt
+import decoders.apple.OPNull
+import decoders.apple.OPReal
+import decoders.apple.OPString
+import decoders.apple.OPTaggedData
+import decoders.apple.OPTrue
+import decoders.apple.OPUndefined
+import decoders.apple.OpackObject
 
 
 // once again reusing Opack classes
@@ -81,7 +93,10 @@ class BsonParser : ParseCompanion() {
 
             val value = when(typeByte.toInt()) {
                 1 -> OPReal(readDouble(bytes, ByteOrder.LITTLE), Pair(valueStart, lastConsumedBytePosition))
-                2, 13, 14 -> OPString(readLengthPrefixedString(bytes, 4, ByteOrder.LITTLE) ?: "", Pair(valueStart, lastConsumedBytePosition))
+                2, 13, 14 -> OPString(
+                    readLengthPrefixedString(bytes, 4, ByteOrder.LITTLE) ?: "",
+                    Pair(valueStart, lastConsumedBytePosition)
+                )
                 3, 4 -> parseDocument(bytes)
                 5 -> {
                     val size = readInt(bytes, 4, explicitlySigned = false, ByteOrder.LITTLE)
@@ -94,13 +109,25 @@ class BsonParser : ParseCompanion() {
                 8 -> {
                     val boolean = bytes[parseOffset]
                     parseOffset += 1
-                    if(boolean == (0).toByte()) OPFalse(parseOffset-1) else OPTrue(parseOffset-1)
+                    if(boolean == (0).toByte()) OPFalse(parseOffset - 1) else OPTrue(parseOffset - 1)
                 }
                 10 -> OPNull(parseOffset)
-                11 -> OPArray(listOf(readCString(bytes), readCString(bytes)), Pair(valueStart, lastConsumedBytePosition))
-                16 -> OPInt(readInt(bytes, 4, explicitlySigned = true, byteOrder = ByteOrder.LITTLE), Pair(valueStart, lastConsumedBytePosition))
-                17, 9 -> OPInt(readLong(bytes, 8, byteOrder = ByteOrder.LITTLE), Pair(valueStart, lastConsumedBytePosition))
-                18 -> OPInt(readULong(bytes, 8, byteOrder = ByteOrder.LITTLE).toLong(), Pair(valueStart, lastConsumedBytePosition))
+                11 -> OPArray(
+                    listOf(readCString(bytes), readCString(bytes)),
+                    Pair(valueStart, lastConsumedBytePosition)
+                )
+                16 -> OPInt(
+                    readInt(bytes, 4, explicitlySigned = true, byteOrder = ByteOrder.LITTLE),
+                    Pair(valueStart, lastConsumedBytePosition)
+                )
+                17, 9 -> OPInt(
+                    readLong(bytes, 8, byteOrder = ByteOrder.LITTLE),
+                    Pair(valueStart, lastConsumedBytePosition)
+                )
+                18 -> OPInt(
+                    readULong(bytes, 8, byteOrder = ByteOrder.LITTLE).toLong(),
+                    Pair(valueStart, lastConsumedBytePosition)
+                )
                 19 -> OPData(readBytes(bytes, 16), Pair(valueStart, lastConsumedBytePosition)) // 128bit floating point
                 else -> throw Exception("Unsupported type $typeByte")
             }
@@ -121,6 +148,6 @@ class BsonParser : ParseCompanion() {
         val end = bytes.fromIndex(start).indexOf(0)
         val string = bytes.sliceArray(parseOffset..<parseOffset+end).decodeToString()
         parseOffset += end + 1
-        return OPString(string, Pair(start+sourceOffset, lastConsumedBytePosition))
+        return OPString(string, Pair(start + sourceOffset, lastConsumedBytePosition))
     }
 }

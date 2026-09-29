@@ -1,4 +1,4 @@
-package decoders
+package decoders.apple
 
 import ByteWitch
 import Date
@@ -6,6 +6,11 @@ import ParseCompanion
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
+import decoders.BWRangeTaggedData
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.MultiPartialDecode
+import decoders.bwvalue
 import htmlEscape
 import looksLikeUtf8String
 import kotlin.math.absoluteValue
@@ -35,7 +40,12 @@ class OpackParser : ParseCompanion() {
                 return if(remainder.isEmpty())
                     result
                 else
-                    MultiPartialDecode(listOf(Pair(result, null), Pair(null, BWRangeTaggedData(remainder, parser.parseOffset))), Pair(0, data.size))
+                    MultiPartialDecode(
+                        listOf(
+                            Pair(result, null),
+                            Pair(null, BWRangeTaggedData(remainder, parser.parseOffset))
+                        ), Pair(0, data.size)
+                    )
 
             } catch (e: Exception) {
                 Logger.log(e.toString())
@@ -446,7 +456,7 @@ class OPTaggedData(val value: ByteArray, val type: Int, override val sourceByteR
         val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
 
         val payloadHTML = wrapIfSameColour(decode, value, rangeTagsFor(sourceByteRange.second-value.size, sourceByteRange.second))
-        val tagHTML = bwvalue("type $type", rangeTagsFor(sourceByteRange.first, sourceByteRange.second-value.size))
+        val tagHTML = bwvalue("type $type", rangeTagsFor(sourceByteRange.first, sourceByteRange.second - value.size))
         return "<div class=\"roundbox opack\" $byteRangeDataTags>$tagHTML$payloadHTML</div>"
     }
 }

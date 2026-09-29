@@ -1,8 +1,13 @@
-package decoders
+package decoders.apple
 
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromBytes
+import decoders.BWString
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.ProtoBuf
+import decoders.ProtobufParser
 import looksLikeUtf8String
 
 class AppleProtobuf : ParseCompanion() {

@@ -36,6 +36,18 @@ interface ByteWitchResult {
         return rangeTagsFor(sourceByteRange!!.first+start, sourceByteRange!!.first+start+length)
     }
 
+    fun humanReadableByteCount(len: ULong): String {
+        val kb = 1024UL
+        val mb = kb * 1024UL
+
+        return when(len) {
+            in 0UL..(5U*kb) -> "$len B"
+            in 5U*kb..5U*mb -> "<span title=\"$len B\">${len/kb} KiB</span>"
+            else -> "<span title=\"$len B\">${len/mb} MiB</span>"
+        }
+    }
+    fun humanReadableByteCount(len: Int) = humanReadableByteCount(len.toULong())
+
     val sourceByteRange: Pair<Int,Int>?
 
     val byteRangeDataTags: String

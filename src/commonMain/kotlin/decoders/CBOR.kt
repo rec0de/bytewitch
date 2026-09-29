@@ -3,6 +3,20 @@ package decoders
 import Logger
 import ParseCompanion
 import bitmage.*
+import decoders.apple.CborEndMarker
+import decoders.apple.OPArray
+import decoders.apple.OPData
+import decoders.apple.OPDate
+import decoders.apple.OPDict
+import decoders.apple.OPFalse
+import decoders.apple.OPInt
+import decoders.apple.OPNull
+import decoders.apple.OPReal
+import decoders.apple.OPString
+import decoders.apple.OPTaggedData
+import decoders.apple.OPTaggedParsedData
+import decoders.apple.OPTrue
+import decoders.apple.OpackObject
 import looksLikeUtf8String
 import kotlin.math.min
 
@@ -96,7 +110,7 @@ class CborParser : ParseCompanion() {
             }
             1 -> {
                 val value = readCount(bytes, count)
-                OPInt(-1-value.toLong(), Pair(start, lastConsumedBytePosition))
+                OPInt(-1 - value.toLong(), Pair(start, lastConsumedBytePosition))
             }
             2 -> {
                 val length = readCount(bytes, count)
@@ -149,7 +163,7 @@ class CborParser : ParseCompanion() {
                 val length = readCount(bytes, count)
                 val indefinite = length == ULong.MAX_VALUE
                 var i = 0u
-                val elements = mutableMapOf<OpackObject,OpackObject>()
+                val elements = mutableMapOf<OpackObject, OpackObject>()
                 while (i < length) {
                     val key = parse(bytes)
 
@@ -188,7 +202,10 @@ class CborParser : ParseCompanion() {
                     22,23 -> OPNull(start) // we conflate undefined and null here
                     25 -> {
                         val fp16bytes = readBytes(bytes, 2)
-                        OPReal(Float.fromFP16Bytes(fp16bytes, ByteOrder.BIG).toDouble(), Pair(start, lastConsumedBytePosition))
+                        OPReal(
+                            Float.fromFP16Bytes(fp16bytes, ByteOrder.BIG).toDouble(),
+                            Pair(start, lastConsumedBytePosition)
+                        )
                     }
                     26 -> OPReal(readFloat(bytes).toDouble(), Pair(start, lastConsumedBytePosition))
                     27 -> OPReal(readDouble(bytes), Pair(start, lastConsumedBytePosition))

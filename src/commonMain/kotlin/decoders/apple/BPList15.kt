@@ -1,7 +1,11 @@
-package decoders
+package decoders.apple
 
 
 import bitmage.*
+import decoders.BWRangeTaggedData
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.MultiPartialDecode
 
 class BPList15 {
     private val objectMap = mutableMapOf<Int, BPListObject>()
@@ -11,7 +15,7 @@ class BPList15 {
     companion object : ByteWitchDecoder {
         override val name = "bplist15"
 
-        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             val confidence = if(data.size > 22 && data.sliceArray(0 until 8).decodeToString() == "bplist15") 1.0 else 0.0
             return Pair(confidence, null)
         }
@@ -111,7 +115,7 @@ class BPList15 {
                     val unsignedValue = (intValue and mask.toLong())
 
                     val sign = if((intValue shr (byteLen * 8 - 1)) == 0L) -1 else 1
-                    BPInt(sign*unsignedValue, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                    BPInt(sign * unsignedValue, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
                 }
             }
             // Real
@@ -129,13 +133,13 @@ class BPList15 {
                     }
                     else -> throw Exception("Got unexpected byte length for real: $byteLen in ${bytes.hex()}")
                 }
-                BPReal(value, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPReal(value, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Date, always 8 bytes long
             0x33 -> {
                 lastObjectEndOffset = offset+1+8
                 val timestamp = bytes.sliceArray(offset+1 until offset+1+8).readDouble(ByteOrder.BIG)
-                BPDate(timestamp, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPDate(timestamp, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Data
             in 0x40 until 0x50 -> {
@@ -146,7 +150,7 @@ class BPList15 {
 
                 val data = bytes.sliceArray(effectiveOffset until effectiveOffset+byteLen)
                 lastObjectEndOffset = effectiveOffset+byteLen
-                BPData(data, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPData(data, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // ASCII string
             in 0x50 until 0x60 -> {
@@ -157,7 +161,7 @@ class BPList15 {
                 // ascii encodes at one char per byte, we can use default UTF8 decoding as ascii is cross compatible with everything
                 val string = bytes.decodeToString(effectiveOffset, effectiveOffset+charLen)
                 lastObjectEndOffset = effectiveOffset+charLen
-                BPAsciiString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPAsciiString(string, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // Unicode string
             in 0x60 until 0x70 -> {
@@ -169,7 +173,7 @@ class BPList15 {
                 val stringBytes = bytes.sliceArray(effectiveOffset until effectiveOffset+charLen*2)
                 val string = stringBytes.decodeAsUTF16LE()
                 lastObjectEndOffset = effectiveOffset+charLen*2
-                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPUnicodeString(string, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // UTF8 string
             in 0x70 until 0x80 -> {
@@ -181,10 +185,13 @@ class BPList15 {
                 val stringBytes = bytes.sliceArray(effectiveOffset until effectiveOffset+charLen)
                 val string = stringBytes.decodeToString()
                 lastObjectEndOffset = effectiveOffset+charLen
-                BPUnicodeString(string, Pair(sourceOffset+offset, sourceOffset+lastObjectEndOffset))
+                BPUnicodeString(string, Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
             }
             // UID, byte length is lengthBits+1
-            in 0x80 until 0x90 -> BPUid(bytes.sliceArray(offset+1 until offset+2+lengthBits), Pair(sourceOffset+offset, sourceOffset+offset+2+lengthBits))
+            in 0x80 until 0x90 -> BPUid(
+                bytes.sliceArray(offset + 1 until offset + 2 + lengthBits),
+                Pair(sourceOffset + offset, sourceOffset + offset + 2 + lengthBits)
+            )
             // Array
             in 0xa0 until 0xb0 -> {
                 val tmp = getFillAwareLengthAndOffset(bytes, offset)
@@ -201,7 +208,7 @@ class BPList15 {
                 }
 
                 lastObjectEndOffset = currentOffset
-                BPArray(values, Pair(sourceOffset + offset, sourceOffset+currentOffset))
+                BPArray(values, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             // Set
             in 0xc0 until 0xd0 -> {
@@ -219,7 +226,7 @@ class BPList15 {
                 }
 
                 lastObjectEndOffset = currentOffset
-                BPSet(values.size, values, Pair(sourceOffset+offset, sourceOffset+currentOffset))
+                BPSet(values.size, values, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             // Dict
             in 0xd0 until 0xf0 -> {
@@ -247,7 +254,7 @@ class BPList15 {
                 val map = keys.zip(values).toMap()
 
                 lastObjectEndOffset = currentOffset
-                BPDict(map, Pair(sourceOffset + offset, sourceOffset+currentOffset))
+                BPDict(map, Pair(sourceOffset + offset, sourceOffset + currentOffset))
             }
             else -> throw Exception("Unknown object type byte 0b${objectByte.toString(2)}")
         }

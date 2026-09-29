@@ -1,10 +1,8 @@
 import bitmage.fromHex
-import bitmage.hex
-import decoders.ECCurves
-import decoders.OPDict
-import decoders.OPString
-import decoders.OpackObject
-import decoders.OpackParser
+import decoders.apple.OPDict
+import decoders.apple.OPString
+import decoders.apple.OpackObject
+import decoders.apple.OpackParser
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

@@ -1,9 +1,13 @@
-package decoders
+package decoders.apple
 
 import Date
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.hex
+import decoders.ASN1BER
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
+import decoders.bwvalue
 
 object NotarizedTicket: ByteWitchDecoder, ParseCompanion() {
     override val name = "NotarizedTicket"
@@ -92,7 +96,10 @@ class NTContentBlock(val type: Int, val hashLen: Int, val hashCount: Int, val fl
         val hashesTag = if(hashes.isEmpty())
                 ""
             else
-                bwvalue(hashes.joinToString(" ") { it.renderHTML() }, rangeTagsFor(sourceByteRange.first+24, sourceByteRange.second))
+            bwvalue(
+                hashes.joinToString(" ") { it.renderHTML() },
+                rangeTagsFor(sourceByteRange.first + 24, sourceByteRange.second)
+            )
 
         return "<div class=\"roundbox generic flexy\" $byteRangeDataTags>$typeTag $lenTag $countTag $flagTag $dateTag $hashesTag</div>"
     }

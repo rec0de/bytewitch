@@ -1,8 +1,7 @@
 package decoders
 
-import bitmage.fromIndex
 import bitmage.hex
-import bitmage.untilIndex
+import decoders.apple.BPListObject
 import kotlin.math.max
 
 interface ByteWitchDecoder {

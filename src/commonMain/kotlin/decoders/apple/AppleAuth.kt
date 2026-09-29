@@ -1,10 +1,12 @@
-package decoders
+package decoders.apple
 
 import Date
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromIndex
 import bitmage.hex
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
 
 object AppleAuth : ByteWitchDecoder, ParseCompanion() {
     override val name = "Apple Auth"
@@ -80,7 +82,8 @@ object AppleAuth : ByteWitchDecoder, ParseCompanion() {
 
 }
 
-class Anisette(val version: Int, val platform: Int?, val authData: ByteArray, override val sourceByteRange: Pair<Int, Int>?) : ByteWitchResult {
+class Anisette(val version: Int, val platform: Int?, val authData: ByteArray, override val sourceByteRange: Pair<Int, Int>?) :
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     private val platformLookup = mapOf<Int, String>(1 to "MacOS?", 3 to "iOS/watchOS?", 4 to "Android/AppleMusic?")
 
@@ -90,7 +93,8 @@ class Anisette(val version: Int, val platform: Int?, val authData: ByteArray, ov
     }
 }
 
-class GSToken(val u1: Int, val u2: Int, val u3: Int, val timestamp: Date, val name: String, val u4: ByteArray, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+class GSToken(val u1: Int, val u2: Int, val u3: Int, val timestamp: Date, val name: String, val u4: ByteArray, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) :
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
 
     override fun renderHTML(): String {

@@ -1,6 +1,7 @@
 import bitmage.fromHex
-import bitmage.hex
 import decoders.*
+import decoders.apple.OPArray
+import decoders.apple.OPString
 import kotlin.test.Test
 
 class UbjsonTests {

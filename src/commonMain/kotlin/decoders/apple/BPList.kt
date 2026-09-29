@@ -1,10 +1,12 @@
-package decoders
+package decoders.apple
 
 import ByteWitch
 import Date
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
 import htmlEscape
 import kotlin.math.absoluteValue
 
@@ -22,7 +24,7 @@ class BPListParser() {
     companion object : ByteWitchDecoder {
         override val name = "bplist"
 
-        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+        override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             val confidence = if(data.size > 40 && data.sliceArray(0 until 7).decodeToString() == "bplist0") 1.0 else 0.0
             return Pair(confidence, null)
         }

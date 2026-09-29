@@ -1,8 +1,10 @@
-package decoders
+package decoders.apple
 
 import Date
 import bitmage.ByteOrder
 import bitmage.fromBytes
+import decoders.ByteWitchDecoder
+import decoders.ByteWitchResult
 
 object KeyedArchiveDecoder : ByteWitchDecoder {
 
@@ -71,8 +73,18 @@ object KeyedArchiveDecoder : ByteWitchDecoder {
                     optionallyResolveObjectReference(objects.values[id], objects, currentlyResolving + id)
             }
 
-            is BPArray -> BPArray(thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) }, null)
-            is BPSet -> BPSet(thing.entries, thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) }, null)
+            is BPArray -> BPArray(thing.values.map {
+                optionallyResolveObjectReference(
+                    it,
+                    objects,
+                    currentlyResolving
+                )
+            }, null)
+            is BPSet -> BPSet(
+                thing.entries,
+                thing.values.map { optionallyResolveObjectReference(it, objects, currentlyResolving) },
+                null
+            )
             is BPDict -> {
                 // nested keyed archives will be decoded separately
                 if (isKeyedArchive(thing))
