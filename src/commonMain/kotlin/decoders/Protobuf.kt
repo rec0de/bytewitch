@@ -112,6 +112,7 @@ class ProtobufParser {
 
         override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
             try {
+                //Logger.tag("ProtoBuf", "analyzing confidence for ${data.size} B payload")
                 val parser = ProtobufParser()
                 val parsed = parser.parse(data, sourceOffset)
 
@@ -120,13 +121,12 @@ class ProtobufParser {
 
                 val fieldNumberPenalty = if(parsed.objs.size < 3) -0.4 else 0.0
                 val highFieldPenalty = if(parsed.objs.keys.any { it > 200 }) -0.4 else 0.0
-                val zeroFieldPenalty = if(parsed.objs.keys.any { it == 0 }) -0.5 else 0.0
 
                 val mismatchedTypePenalty = -2 * parsed.objs.values.sumOf { it.map { it.wireType }.toSet().size - 1 }.toDouble() / parsed.objs.size
 
                 // short valid protobuf sequences may well be false positives, the longer the sequence the more sure we are
                 // (might factor in plausible field number ranges here in the future)
-                return Pair(min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty + zeroFieldPenalty + mismatchedTypePenalty, parsed)
+                return Pair(min(data.size.toDouble() / 10, 1.0) + fieldNumberPenalty + highFieldPenalty + mismatchedTypePenalty, parsed)
             } catch (e: Exception) {
                 return Pair(0.0, null)
             }
@@ -153,6 +153,11 @@ class ProtobufParser {
             val info = readTag()
             val type = info.second
             val fieldNo = info.first
+
+            //Logger.tag("ProtoBuf", "reading tag type $type fieldNo $fieldNo")
+
+            if(fieldNo == 0)
+                throw Exception("ProtoBuf: invalid field number zero")
 
             val value = when(type) {
                 ProtobufField.I32 -> readI32(start)

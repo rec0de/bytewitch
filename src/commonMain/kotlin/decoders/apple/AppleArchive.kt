@@ -260,7 +260,7 @@ class AARHeader(val magic: String, val length: Int, override val sourceByteRange
 
     override fun renderHTML(): String {
         val header = bwvalue("Archive Header: $magic", relativeRangeTags(0, 4))
-        val len = bwvalue("Length: $length", relativeRangeTags(4, 2))
+        val len = bwvalue("Length: ${humanReadableByteCount(length)}", relativeRangeTags(4, 2))
         return "<div class=\"roundbox generic\" $byteRangeDataTags>$header $len</div>"
     }
 }
@@ -282,7 +282,7 @@ class AARBlob(val label: String, val sizeSize: Int, val size: Int, val data: BWR
 
     override fun renderHTML(): String {
         val tag = bwvalue(label, relativeRangeTags(0, 3))
-        val len = bwvalue("Length: $size", relativeRangeTags(4, sizeSize))
+        val len = bwvalue("Length: ${humanReadableByteCount(size)}", relativeRangeTags(4, sizeSize))
 
         val quickDecode = ByteWitch.quickDecode(data.data, data.start)
         val subresult = wrapIfSameColour(quickDecode, data.data, rangeTagsFor(data.start, data.start+data.data.size))
@@ -297,7 +297,7 @@ class AARBlobPlaceholder(val label: String, val sizeSize: Int, val size: Int, ov
 
     override fun renderHTML(): String {
         val tag = bwvalue(label, relativeRangeTags(0, 3))
-        val len = bwvalue("Length: $size", relativeRangeTags(4, sizeSize))
+        val len = bwvalue("Length: ${humanReadableByteCount(size)}", relativeRangeTags(4, sizeSize))
         val content = bwvalue("⚠\uFE0F missing blob", rangeTagsFor(-1, -1))
         return "<div class=\"roundbox generic\" $byteRangeDataTags>$tag $len $content</div>"
     }

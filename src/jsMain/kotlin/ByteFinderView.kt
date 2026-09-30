@@ -10,14 +10,21 @@ fun setByteFinderContent(msgIndex: Int) {
     val textview = document.getElementById("textview") as HTMLDivElement
     val bytefinder = document.getElementById("bytefinder") as HTMLDivElement
 
-    hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
-    textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
-    bytefinder.style.display = "flex"
+    if(bytes.size > veryLargeMessageThreshold) {
+        bytefinder.style.display = "none"
+        byteFinderDisabledForLargePayload = true
+    }
+    else {
+        hexview.innerText = bytes.hex().chunked(16).joinToString(" ")
+        textview.innerHTML = bytes.map { it.toInt().toChar() }.map { if(it.code in 32..59 || it.code in 64..90 || it.code in 97..122) it else '.' }.joinToString("")
+        bytefinder.style.display = "flex"
+        byteFinderDisabledForLargePayload = false
+    }
 }
 
 // set bytes in hexview and textview and highlight segment
 fun setByteFinderHighlight(start: Int, end: Int, msgIndex: Int) {
-    if(start < 0 || end < 0)
+    if(start < 0 || end < 0 || byteFinderDisabledForLargePayload)
         return
 
     val hexview = document.getElementById("hexview")!!

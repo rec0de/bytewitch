@@ -2,12 +2,17 @@ package decoders
 
 import bitmage.hex
 import htmlEscape
+import veryLargeDataFieldThreshold
 
 object JWT: ByteWitchDecoder {
     override val name = "JWT"
     private val validator = Regex("^[A-Z0-9\\-_=]+\\.[A-Z0-9\\-_=]+\\.[A-Z0-9\\-_=]+$", RegexOption.IGNORE_CASE)
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        // JWTs should be reasonably sized
+        if(data.size > veryLargeDataFieldThreshold)
+            return Pair(0.0, null)
+
         val string = data.decodeToString()
         if(string matches validator) {
             return Pair(1.0, null)

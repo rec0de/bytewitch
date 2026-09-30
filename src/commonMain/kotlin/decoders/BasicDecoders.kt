@@ -4,6 +4,7 @@ import bitmage.*
 import htmlEscape
 import looksLikeUtf16String
 import looksLikeUtf8String
+import veryLargeDataFieldThreshold
 import kotlin.math.*
 
 object LengthPrefixDecoder : ByteWitchDecoder {
@@ -39,6 +40,9 @@ object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+        if(data.size > veryLargeDataFieldThreshold)
+            return confidence(data.untilIndex(veryLargeDataFieldThreshold), 0)
+
         val effectiveData = stripNullTerminator(data)
 
         val nullTerminatorBonus = if(effectiveData.size == data.size-1) 0.2 else 0.0
@@ -79,6 +83,9 @@ object Utf16Decoder : ByteWitchDecoder {
         // utf16 should be even byte length
         if(data.size % 2 == 1)
             return Pair(0.0, null)
+
+        if(data.size > veryLargeDataFieldThreshold)
+            return confidence(data.untilIndex(veryLargeDataFieldThreshold), 0)
 
         try {
             val string = Utf8Decoder.stripNullTerminator(data).decodeAsUTF16BE()

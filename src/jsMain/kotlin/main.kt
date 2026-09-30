@@ -7,6 +7,7 @@ import kotlinx.browser.window
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
 import kotlin.js.Date
+import kotlin.time.measureTime
 
 const val byteLimitSSFContent = 1000 // only show SwiftSegFinder for messages with a length below the defined threshold
 const val maxLimitSequenceAlignment = 5000 // max total bytes across all eligible messages for auto sequence alignment
@@ -21,6 +22,7 @@ var parsedMessages = mutableMapOf<Int, SSFParsedMessage>()
 var showSegmentWiseAlignment = true
 
 var liveDecodeEnabled = true
+var byteFinderDisabledForLargePayload = false
 var currentHighlight: Element? = null
 var lastSelectionEvent: Double? = null
 
@@ -111,7 +113,16 @@ fun mainDecode(isLiveDecoding: Boolean, tryhard: Boolean) {
         // get bytes from textarea
         val textarea = textareas[i] as HTMLTextAreaElement
         val inputText = textarea.value.trim()
-        val (bytes, encoding) = ByteWitch.getBytesFromInputEncoding(inputText)
+
+        val bytes: ByteArray
+        val encoding: ByteWitch.Encoding
+        val elapsed = measureTime {
+            val pair = ByteWitch.getBytesFromInputEncoding(inputText)
+            bytes = pair.first
+            encoding = pair.second
+        }
+        Logger.tag("Performance", "parsing data from input encoding took $elapsed")
+
 
         // set size label to payload size
         val sizeLabel = textarea.nextElementSibling as HTMLDivElement

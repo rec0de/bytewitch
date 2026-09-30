@@ -1,12 +1,17 @@
 package decoders
 
 import bitmage.decodeBase32
+import veryLargeDataFieldThreshold
 
 object Bech32: ByteWitchDecoder {
     override val name = "bech32"
     private val validator = Regex("^.{1,83}1[02-9ac-hj-np-zAC-HJ-NP-Z]{6,}$")
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        // Bech32 should be reasonably sized
+        if(data.size > veryLargeDataFieldThreshold)
+            return Pair(0.0, null)
+
         val string = data.decodeToString()
         if(string matches validator) {
             return Pair(1.0, null)

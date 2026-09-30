@@ -5,6 +5,7 @@ import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
 import bitmage.untilIndex
+import veryLargeDataFieldThreshold
 
 object TLV8 : ByteWitchDecoder {
     override val name = "tlv8"
@@ -13,6 +14,7 @@ object TLV8 : ByteWitchDecoder {
         val tlvs = mutableListOf<TlvChainEntry>()
         var remainder = data
         var internalOffset = 0
+        val strict = data.size > veryLargeDataFieldThreshold
 
         while(remainder.isNotEmpty()) {
             if(remainder.size < 2)
@@ -20,6 +22,9 @@ object TLV8 : ByteWitchDecoder {
 
             val type = remainder[0].toUByte().toInt()
             val length = remainder[1].toUByte().toInt()
+
+            check(length <= remainder.size-2) { "Trying to read TLV8 of length $length with only ${remainder.size-2} bytes remaining" }
+            check(!strict || (type < 128 && length > 0)) // reject likely incorrect parses earlier for very large payloads
 
             if(length > remainder.size-2)
                 throw Exception("Trying to read TLV8 of length $length with only ${remainder.size-2} bytes remaining")
@@ -53,16 +58,17 @@ object TLV816 : ByteWitchDecoder {
         val tlvs = mutableListOf<TlvChainEntry>()
         var remainder = data
         var internalOffset = 0
+        val strict = data.size > veryLargeDataFieldThreshold
 
         while(remainder.isNotEmpty()) {
-            if(remainder.size < 3)
-                throw Exception("Insufficient TLV816 header bytes remaining")
+            check(remainder.size >= 3) { "TLV816: insufficient header bytes remaining" }
 
             val type = remainder[0].toUByte().toInt()
             val length = Int.fromBytes(remainder.sliceArray(1 ..2), ByteOrder.BIG)
 
-            if(length > remainder.size-3)
-                throw Exception("Trying to read TLV816 of length $length with only ${remainder.size-3} bytes remaining")
+            check(length <= remainder.size-3) { "Trying to read TLV816 of length $length with only ${remainder.size-3} bytes remaining" }
+            check(!strict || (type < 128 && length > 0)) // reject likely incorrect parses earlier for very large payloads
+
             val value = remainder.sliceArray(3 until 3+length)
             remainder = remainder.fromIndex(3+length)
             tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+3+length), lengthLength = 2))
@@ -93,6 +99,7 @@ object TLV16 : ByteWitchDecoder {
         val tlvs = mutableListOf<TlvChainEntry>()
         var remainder = data
         var internalOffset = 0
+        val strict = data.size > veryLargeDataFieldThreshold
 
         while(remainder.isNotEmpty()) {
             if(remainder.size < 4)
@@ -101,8 +108,9 @@ object TLV16 : ByteWitchDecoder {
             val type = Int.fromBytes(remainder.untilIndex(2), ByteOrder.BIG, explicitlySigned = false)
             val length = Int.fromBytes(remainder.sliceArray(2 ..3), ByteOrder.BIG)
 
-            if(length > remainder.size-4)
-                throw Exception("Trying to read TLV16 of length $length with only ${remainder.size-4} bytes remaining")
+            check(length <= remainder.size-4) { "Trying to read TLV16 of length $length with only ${remainder.size-4} bytes remaining" }
+            check(!strict || (type < 200 && length > 0)) // reject likely incorrect parses earlier for very large payloads
+
             val value = remainder.sliceArray(4 until 4+length)
             remainder = remainder.fromIndex(4+length)
             tlvs.add(TlvChainEntry(type, length, value, Pair(sourceOffset+internalOffset, sourceOffset+internalOffset+4+length), lengthLength = 2, typeLength = 2))
@@ -133,6 +141,6 @@ class TlvChainEntry(val type: Int, val length: Int, val value: ByteArray, overri
     override fun renderHTML(): String {
         val parseAttempt = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
         val valueHTML = wrapIfSameColour(parseAttempt, value, relativeRangeTags(typeLength+lengthLength, value.size))
-        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bwvalue\" ${relativeRangeTags(0, typeLength)}>Type 0x${type.toString(16)}</div><div class=\"bpvalue\" ${relativeRangeTags(typeLength, lengthLength)}>Len: $length</div>$valueHTML</div>"
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bwvalue\" ${relativeRangeTags(0, typeLength)}>Type 0x${type.toString(16)}</div><div class=\"bpvalue\" ${relativeRangeTags(typeLength, lengthLength)}>Len: ${humanReadableByteCount(length)}</div>$valueHTML</div>"
     }
 }

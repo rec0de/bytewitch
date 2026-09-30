@@ -107,7 +107,7 @@ class GenericTLVResult(
         val decode = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)
 
         val payloadHTML = wrapIfSameColour(decode, value, relativeRangeTags(type.size+length.size, value.size))
-        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, type.size)}>Type 0x${type.hex()}</div><div class=\"bpvalue\" ${relativeRangeTags(type.size, length.size)}>Len: $encodedLength (${length.size} B, $endian endian)</div>$payloadHTML</div>"
+        return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, type.size)}>Type 0x${type.hex()}</div><div class=\"bpvalue\" ${relativeRangeTags(type.size, length.size)}>Len: ${humanReadableByteCount(encodedLength)} (${length.size} B, $endian endian)</div>$payloadHTML</div>"
     }
 
 }

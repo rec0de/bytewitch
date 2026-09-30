@@ -1,12 +1,13 @@
 package decoders
 
+import veryLargeMessageThreshold
 import kotlin.math.*
 import kotlin.random.Random
 
 object Randomness : ByteWitchDecoder {
     override val name = "randomness"
 
-    override fun confidence(data: ByteArray, sourceOffset: Int) = if(data.size >= 16) Pair(0.76, null) else Pair(0.00, null)
+    override fun confidence(data: ByteArray, sourceOffset: Int) = if(data.size in 16 until veryLargeMessageThreshold) Pair(0.76, null) else Pair(0.00, null)
 
     private const val die = "\uD83C\uDFB2"
     private const val warning = "⚠\uFE0F"
@@ -101,7 +102,7 @@ object Randomness : ByteWitchDecoder {
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
 
-        if(data.size > 50000)
+        if(data.size > veryLargeMessageThreshold)
             throw Exception("Randomness: Payload too large, skipping analysis (${data.size}B)")
 
         val twoGramCounts = IntArray(4) { 0 }

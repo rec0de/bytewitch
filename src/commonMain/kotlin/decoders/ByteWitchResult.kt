@@ -1,7 +1,9 @@
 package decoders
 
 import bitmage.hex
+import bitmage.untilIndex
 import htmlEscape
+import veryLargeDataFieldThreshold
 
 interface ByteWitchResult {
 
@@ -28,7 +30,10 @@ interface ByteWitchResult {
             wrapIfSameColour(subresult)
     }
 
-    fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String) = wrapIfSameColour(subresult, "0x${data.hex()}", rangeTags)
+    fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String): String {
+        val fallback = if(data.size < veryLargeDataFieldThreshold) "0x${data.hex()}" else "long data (${humanReadableByteCount(data.size)}), first 32B: 0x${data.untilIndex(32).hex()}"
+        return wrapIfSameColour(subresult, fallback, rangeTags)
+    }
 
     fun rangeTagsFor(start: Int, end: Int) = "data-start=\"$start\" data-end=\"$end\""
     fun relativeRangeTags(start: Int, length: Int) : String {
@@ -106,7 +111,13 @@ class BWLinkedString(string: String, private val url: String, sourceByteRange: P
 
 class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
     override val colour = ByteWitchResult.Colour.PLAIN
-    override fun renderHTML() = "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML 0x${data.hex()}</div>"
+    override fun renderHTML(): String {
+        val dataRendering = if(data.size > veryLargeDataFieldThreshold)
+            "long data (${humanReadableByteCount(data.size)}), first 32B: 0x${data.untilIndex(32).hex()}"
+        else
+            "0x${data.hex()}"
+        return "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML $dataRendering}</div>"
+    }
 }
 
 class BWRangeTaggedData(val data: ByteArray, val start: Int)

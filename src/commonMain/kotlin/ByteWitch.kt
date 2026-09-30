@@ -159,16 +159,33 @@ object ByteWitch {
         else {
             // decodes as valid gives a quick estimate of which decoders could decode a payload
             // this is not necessarily true, so we catch failed parses later on also and remove them from the results
-            val possibleDecoders = decoders.map { Pair(it, it.confidence(data, 0)) }.filter { it.second.first > 0.45 }
+            val possibleDecoders: List<Pair<ByteWitchDecoder, Pair<Double, ByteWitchResult?>>>
+            var elapsed = measureTime {
+                possibleDecoders = decoders.map {
+                    val result: Pair<ByteWitchDecoder, Pair<Double, ByteWitchResult?>>
+                    val elapsed = measureTime {
+                        result = Pair(it, it.confidence(data, 0))
+                    }
+                    Logger.tag("Performance", "confidence check of ${it.name} took $elapsed")
+                    result
+                }.filter { it.second.first > 0.45 }
+            }
+            Logger.tag("Performance", "got ${possibleDecoders.size} plausible decoders in $elapsed")
 
-            return possibleDecoders.mapNotNull {
-                try {
-                    Pair(it.first.name, it.second.second ?: it.first.decode(data, 0))
-                } catch (e: Exception) {
-                    //Logger.log(e.toString())
-                    null
+            val successfulDecodes: List<Pair<String, ByteWitchResult>>
+            elapsed = measureTime {
+                successfulDecodes = possibleDecoders.mapNotNull {
+                    try {
+                        Pair(it.first.name, it.second.second ?: it.first.decode(data, 0))
+                    } catch (e: Exception) {
+                        //Logger.log(e.toString())
+                        null
+                    }
                 }
             }
+            Logger.tag("Performance", "full decoding (${successfulDecodes.size} results) took $elapsed")
+
+            return successfulDecodes
         }
     }
 

@@ -296,7 +296,7 @@ abstract class ASN1Result(val tag: ASN1BER.ASN1Tag, val length: Int, override va
         get() = rangeTagsFor(sourceByteRange.second-length, sourceByteRange.second)
 
     val tagLengthDivs: String
-        get() = "${bwvalue(tag.toString(), asnTagByteRangeDataTags)} ${bwvalue("length $length", asnLengthByteRangeDataTags)}"
+        get() = "${bwvalue(tag.toString(), asnTagByteRangeDataTags)} ${bwvalue("length ${humanReadableByteCount(length)}", asnLengthByteRangeDataTags)}"
 }
 
 class GenericASN1Result(tag: ASN1BER.ASN1Tag, length: Int, val payload: ByteArray, sourceByteRange: Pair<Int, Int>) : ASN1Result(tag, length, sourceByteRange) {
