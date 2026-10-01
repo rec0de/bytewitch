@@ -173,7 +173,7 @@ class ASN1BER(private val allowTLVChaining: Boolean = true) : ParseCompanion() {
                 }
                 // Strings
                 12, in 18..22, in 25..30 -> {
-                    check(looksLikeUtf8String(payload, false) > 0.5) { "ASN.1 string with implausible content: ${payload.hex()}" }
+                    check(len < 4 || looksLikeUtf8String(payload, false) > 0.5) { "ASN.1 string with implausible content: ${payload.hex()}" }
                     ASN1String(tag, len, payload.decodeToString(), byteRange)
                 }
                 // Time

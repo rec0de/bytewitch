@@ -262,7 +262,12 @@ object Randomness : ByteWitchDecoder {
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-        val baseline = decode(data, 0, inlineDisplay = false) as RandomnessAnalysis
+
+        val baseline = try {
+            decode(data, 0, inlineDisplay = false) as RandomnessAnalysis
+        } catch (e: Exception) {
+            return null
+        }
 
         // on top of the basic randomness tests, let's try finding patterns by splitting input into groups
         // this spots repeating xor patterns, for example

@@ -6,6 +6,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
+import org.w3c.dom.events.Event
 import kotlin.js.Date
 import kotlin.time.measureTime
 
@@ -103,6 +104,29 @@ fun main() {
         }
 
     })
+
+    window.addEventListener("dragover", { evt ->
+        evt.preventDefault()
+    })
+
+    window.addEventListener("drop", { evt ->
+        val dataTransfer = js("evt.dataTransfer") as DataTransfer
+
+        val itemCount = dataTransfer.items.length
+        val items = (0 until itemCount).map { i -> dataTransfer.items[i] }
+
+        if(items.any { it!!.kind == "file" }) {
+            evt.preventDefault()
+            items.filter { it != null && it.kind == "file" }.forEach { item ->
+                val file = item!!.getAsFile()!!
+                if (file.type == "text/plain")
+                    readTextFile(file)
+                else
+                    readBinaryFile(file)
+            }
+        }
+    })
+
 }
 
 // decode all text areas

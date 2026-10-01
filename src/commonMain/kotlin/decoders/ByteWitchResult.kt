@@ -116,7 +116,7 @@ class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override 
             "long data (${humanReadableByteCount(data.size)}), first 32B: 0x${data.untilIndex(32).hex()}"
         else
             "0x${data.hex()}"
-        return "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML $dataRendering}</div>"
+        return "<div class=\"bwvalue data\" $byteRangeDataTags>$annotationHTML $dataRendering</div>"
     }
 }
 
