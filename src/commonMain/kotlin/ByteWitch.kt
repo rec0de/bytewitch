@@ -5,7 +5,9 @@ import bitmage.stripLeadingZeros
 import bitmage.toBytes
 import decoders.*
 import decoders.apple.*
-import decoders.web.*
+import decoders.web.HTTP2
+import decoders.web.TLS12
+import decoders.web.WebSocket
 import preprocessing.And
 import preprocessing.BytewiseCalc
 import preprocessing.Preprocessor

@@ -11,6 +11,8 @@ class BPList15 {
     private val objectMap = mutableMapOf<Int, BPListObject>()
     private var sourceOffset = 0
     private var lastObjectEndOffset = 0
+    private val decodeKeyedArchives = true
+
 
     companion object : ByteWitchDecoder {
         override val name = "bplist15"
@@ -25,23 +27,27 @@ class BPList15 {
         }
 
         override fun tryhardDecode(data: ByteArray): ByteWitchResult? {
-            val headerPos = data.indexOfSubsequence("bplist15".encodeToByteArray())
+            try {
+                val headerPos = data.indexOfSubsequence("bplist15".encodeToByteArray())
 
-            return if(headerPos >= 0) {
-                val parser = BPList15()
-                val prefix = data.untilIndex(headerPos)
-                val parse = parser.parse(data.fromIndex(headerPos), headerPos)
-                val endPos = parse.rootByteRange!!.second
-                val parts = listOf(
-                    Pair(null, BWRangeTaggedData(prefix, 0)),
-                    Pair(parse, null),
-                    Pair(null, BWRangeTaggedData(data.fromIndex(endPos), endPos))
-                )
-                MultiPartialDecode(parts, Pair(0, data.size))
+                return if (headerPos >= 0) {
+                    val parser = BPList15()
+                    val prefix = data.untilIndex(headerPos)
+                    val parse = parser.parse(data.fromIndex(headerPos), headerPos)
+                    val endPos = parse.rootByteRange!!.second
+                    val parts = listOf(
+                        Pair(null, BWRangeTaggedData(prefix, 0)),
+                        Pair(parse, null),
+                        Pair(null, BWRangeTaggedData(data.fromIndex(endPos), endPos))
+                    )
+                    MultiPartialDecode(parts, Pair(0, data.size))
+                } else
+                    null
+
+            } catch(e: Exception) {
+                Logger.log(e.toString())
+                return null
             }
-            else
-                null
-
         }
     }
 
@@ -56,7 +62,7 @@ class BPList15 {
         val rootObject = parseCodable(rest, sourceOffset+8)
         rootObject.rootByteRange = Pair(sourceOffset, sourceOffset+lastObjectEndOffset+8)
 
-        return if(KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
+        return if(decodeKeyedArchives && KeyedArchiveDecoder.isKeyedArchive(rootObject)) {
             val archive = KeyedArchiveDecoder.decode(rootObject as BPDict)
             archive.rootByteRange = Pair(sourceOffset, sourceOffset+bytes.size)
             archive
@@ -104,7 +110,22 @@ class BPList15 {
                 // some bplists contain crazy long integers for tiny numbers
                 // we'll just hope they're never used beyond actual long range
                 if(byteLen in 9..16) {
-                    throw Exception("Overlong BPInt")
+                    val lowerBytes = bytes.sliceArray(offset+1 until offset+1+8)
+                    val lowerValue = ULong.fromBytes(lowerBytes, ByteOrder.LITTLE)
+                    val upperBytes = bytes.sliceArray(offset+1+8 until offset+1+byteLen)
+                    val upperValue = Long.fromBytes(upperBytes, ByteOrder.LITTLE)
+
+                    // Create a mask that clears the first bit.
+                    val mask = (1UL shl ((byteLen-8) * 8 - 1)) - 1UL
+                    val unsignedUpperValue = (upperValue and mask.toLong())
+                    val sign = if((upperValue shr ((byteLen-8) * 8 - 1)) == 0L) -1 else 1
+
+                    if(unsignedUpperValue != 0L)
+                        throw Exception("very long int cannot be represented as long: ${lowerBytes.hex()}${upperBytes.hex()}")
+
+                    // known bug: some bplists encode 64bit bitfields as ints. these are still encoded with a sign bit, pushing them to 128bit
+                    // there's no great way for us to display those correctly, so we'll accept negative-signed display values in some cases
+                    BPInt(sign * lowerValue.toLong(), Pair(sourceOffset + offset, sourceOffset + lastObjectEndOffset))
                 }
                 else {
                     val intBytes = bytes.sliceArray(offset+1 until offset+1+byteLen)
