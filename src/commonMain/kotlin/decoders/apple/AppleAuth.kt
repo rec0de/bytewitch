@@ -5,8 +5,8 @@ import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromIndex
 import bitmage.hex
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import ByteWitchDecoder
+import ByteWitchResult
 
 object AppleAuth : ByteWitchDecoder, ParseCompanion() {
     override val name = "Apple Auth"

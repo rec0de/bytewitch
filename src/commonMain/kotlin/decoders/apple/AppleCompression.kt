@@ -3,11 +3,11 @@ package decoders.apple
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.untilIndex
-import decoders.BWAnnotatedData
-import decoders.BWGenericSequence
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.bwvalue
+import BWAnnotatedData
+import BWGenericSequence
+import ByteWitchDecoder
+import ByteWitchResult
+import bwvalue
 
 
 object AppleCompression : ByteWitchDecoder, ParseCompanion() {

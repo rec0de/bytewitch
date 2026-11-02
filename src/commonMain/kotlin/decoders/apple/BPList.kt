@@ -5,8 +5,8 @@ import Date
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import ByteWitchDecoder
+import ByteWitchResult
 import htmlEscape
 import kotlin.math.absoluteValue
 

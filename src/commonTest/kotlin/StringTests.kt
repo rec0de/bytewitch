@@ -1,6 +1,5 @@
 import bitmage.decodeAsUTF16BE
 import bitmage.fromHex
-import decoders.BWString
 import kotlin.test.Test
 
 class StringTests {

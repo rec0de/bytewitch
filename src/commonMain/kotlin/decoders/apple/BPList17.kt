@@ -3,10 +3,10 @@ package decoders.apple
 
 import ParseCompanion
 import bitmage.*
-import decoders.BWRangeTaggedData
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.MultiPartialDecode
+import BWRangeTaggedData
+import ByteWitchDecoder
+import ByteWitchResult
+import MultiPartialDecode
 
 class BPList17: ParseCompanion() {
     private val objectMap = mutableMapOf<Int, BPListObject>()

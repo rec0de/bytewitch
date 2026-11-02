@@ -1,5 +1,7 @@
 package decoders
 
+import ByteWitchDecoder
+import ByteWitchResult
 import Date
 import ParseCompanion
 import bitmage.ByteOrder
@@ -133,7 +135,8 @@ object ModernPGP: ByteWitchDecoder, ParseCompanion() {
     }
 }
 
-class PGPnewblock(val type: Int, val length: Int, val lengthSize: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class PGPnewblock(val type: Int, val length: Int, val lengthSize: Int, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>):
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     private val typeLookup = mapOf(
         1 to "Public-Key Encrypted Session Key Packet",
@@ -164,7 +167,8 @@ class PGPnewblock(val type: Int, val length: Int, val lengthSize: Int, val data:
     }
 }
 
-class PGPuserid(val length: Int, val lengthSize: Int, val id: String, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class PGPuserid(val length: Int, val lengthSize: Int, val id: String, override val sourceByteRange: Pair<Int, Int>):
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         return "<div class=\"roundbox generic\" $byteRangeDataTags><div class=\"bpvalue\" ${relativeRangeTags(0, 1)}>User ID Packet</div><div class=\"bpvalue\" ${relativeRangeTags(1, lengthSize)}>Length $length B</div><div class=\"bpvalue stringlit\" ${rangeTagsFor(sourceByteRange.first+lengthSize+1, sourceByteRange.second)}>${htmlEscape(id)}</div></div>"

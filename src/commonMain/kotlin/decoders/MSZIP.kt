@@ -1,5 +1,7 @@
 package decoders
 
+import ByteWitchDecoder
+import ByteWitchResult
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromHex
@@ -95,7 +97,8 @@ class MSZIPHeader(
     }
 }
 
-class MSZIPChunk(val size: Int, val compressedData: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+class MSZIPChunk(val size: Int, val compressedData: ByteArray, override val sourceByteRange: Pair<Int, Int>) :
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val sizeHTML = "<div class=\"bpvalue\" ${relativeRangeTags(0, 4)}>$size B</div>"

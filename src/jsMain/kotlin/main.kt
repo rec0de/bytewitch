@@ -1,12 +1,10 @@
 import SequenceAlignment.SegmentWiseSequenceAlignment
 import SequenceAlignment.ByteWiseSequenceAlignment
-import decoders.ByteWitchResult
 import decoders.SwiftSegFinder.*
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.*
 import org.w3c.dom.HTMLTextAreaElement
-import org.w3c.dom.events.Event
 import kotlin.js.Date
 import kotlin.time.measureTime
 

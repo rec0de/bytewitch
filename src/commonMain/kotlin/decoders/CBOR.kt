@@ -1,6 +1,10 @@
 package decoders
 
+import BWRangeTaggedData
+import ByteWitchDecoder
+import ByteWitchResult
 import Logger
+import MultiPartialDecode
 import ParseCompanion
 import bitmage.*
 import decoders.apple.CborEndMarker

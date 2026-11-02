@@ -7,12 +7,12 @@ import bitmage.fromIndex
 import bitmage.hex
 import bitmage.indicesOfAllSubsequences
 import bitmage.readShortAtOffset
-import decoders.BWGenericSequence
-import decoders.BWRangeTaggedData
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.MultiPartialDecode
-import decoders.bwvalue
+import BWGenericSequence
+import BWRangeTaggedData
+import ByteWitchDecoder
+import ByteWitchResult
+import MultiPartialDecode
+import bwvalue
 
 object AppleArchive : ByteWitchDecoder, ParseCompanion() {
     override val name = "Apple Archive"

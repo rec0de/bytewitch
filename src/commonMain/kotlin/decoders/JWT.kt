@@ -1,7 +1,9 @@
 package decoders
 
-import bitmage.hex
-import htmlEscape
+import BWAnnotatedData
+import BWString
+import ByteWitchDecoder
+import ByteWitchResult
 import veryLargeDataFieldThreshold
 
 object JWT: ByteWitchDecoder {

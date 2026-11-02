@@ -3,8 +3,8 @@ package decoders.apple
 import Date
 import bitmage.ByteOrder
 import bitmage.fromBytes
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import ByteWitchDecoder
+import ByteWitchResult
 
 object KeyedArchiveDecoder : ByteWitchDecoder {
 

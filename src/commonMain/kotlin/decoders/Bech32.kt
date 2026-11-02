@@ -1,5 +1,7 @@
 package decoders
 
+import ByteWitchDecoder
+import ByteWitchResult
 import bitmage.decodeBase32
 import veryLargeDataFieldThreshold
 

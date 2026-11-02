@@ -6,11 +6,11 @@ import ParseCompanion
 import bitmage.*
 import currentTimestamp
 import dateFromAppleTimestamp
-import decoders.BWRangeTaggedData
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.MultiPartialDecode
-import decoders.bwvalue
+import BWRangeTaggedData
+import ByteWitchDecoder
+import ByteWitchResult
+import MultiPartialDecode
+import bwvalue
 import htmlEscape
 import looksLikeUtf8String
 import kotlin.math.absoluteValue

@@ -2,9 +2,9 @@ package decoders.web
 
 import ParseCompanion
 import bitmage.ByteOrder
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.bwvalue
+import ByteWitchDecoder
+import ByteWitchResult
+import bwvalue
 
 object HTTP2: ByteWitchDecoder, ParseCompanion() {
     override val name = "HTTP/2"

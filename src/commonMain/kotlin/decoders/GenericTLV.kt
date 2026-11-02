@@ -1,6 +1,8 @@
 package decoders
 
 import ByteWitch
+import ByteWitchDecoder
+import ByteWitchResult
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex

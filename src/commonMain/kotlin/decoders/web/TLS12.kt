@@ -6,12 +6,12 @@ import bitmage.fromHex
 import bitmage.hex
 import bitmage.indicesOfAllSubsequences
 import bitmage.readShortAtOffset
-import decoders.BWAnnotatedData
-import decoders.BWGenericData
-import decoders.BWGenericSequence
-import decoders.BWString
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import BWAnnotatedData
+import BWGenericData
+import BWGenericSequence
+import BWString
+import ByteWitchDecoder
+import ByteWitchResult
 
 object TLS12: ByteWitchDecoder, ParseCompanion() {
     override val name = "TLS (stub)"

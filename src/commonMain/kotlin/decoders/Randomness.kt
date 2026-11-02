@@ -1,8 +1,10 @@
 package decoders
 
+import BWAnnotatedData
+import ByteWitchDecoder
+import ByteWitchResult
 import veryLargeMessageThreshold
 import kotlin.math.*
-import kotlin.random.Random
 
 object Randomness : ByteWitchDecoder {
     override val name = "randomness"

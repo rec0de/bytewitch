@@ -1,6 +1,3 @@
-package decoders
-
-import bitmage.hex
 import decoders.apple.BPListObject
 import kotlin.math.max
 

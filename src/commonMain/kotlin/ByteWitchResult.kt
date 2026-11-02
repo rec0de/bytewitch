@@ -1,9 +1,5 @@
-package decoders
-
 import bitmage.hex
 import bitmage.untilIndex
-import htmlEscape
-import veryLargeDataFieldThreshold
 
 interface ByteWitchResult {
 
@@ -11,7 +7,7 @@ interface ByteWitchResult {
         BPLIST, PROTOBUF, OPACK, NSARCHIVE, ASN1, GENERIC, NEUTRAL, PLAIN
     }
 
-    val colour: ByteWitchResult.Colour
+    val colour: Colour
 
     fun renderHTML(): String
 
@@ -31,7 +27,11 @@ interface ByteWitchResult {
     }
 
     fun wrapIfSameColour(subresult: ByteWitchResult?, data: ByteArray, rangeTags: String): String {
-        val fallback = if(data.size < veryLargeDataFieldThreshold) "0x${data.hex()}" else "long data (${humanReadableByteCount(data.size)}), first 32B: 0x${data.untilIndex(32).hex()}"
+        val fallback = when {
+            data.isEmpty() -> "∅"
+            data.size < veryLargeDataFieldThreshold -> "0x${data.hex()}"
+            else -> "long data (${humanReadableByteCount(data.size)}), first 32B: 0x${data.untilIndex(32).hex()}"
+        }
         return wrapIfSameColour(subresult, fallback, rangeTags)
     }
 

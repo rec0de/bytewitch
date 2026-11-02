@@ -3,11 +3,11 @@ package decoders.web
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.hex
-import decoders.BWGenericData
-import decoders.BWGenericSequence
-import decoders.BWString
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import BWGenericData
+import BWGenericSequence
+import BWString
+import ByteWitchDecoder
+import ByteWitchResult
 import kotlin.experimental.xor
 
 object WebSocket: ByteWitchDecoder, ParseCompanion() {

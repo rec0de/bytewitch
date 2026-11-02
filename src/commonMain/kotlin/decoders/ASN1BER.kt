@@ -1,6 +1,10 @@
 package decoders
 
+import BWRangeTaggedData
 import ByteWitch
+import ByteWitchDecoder
+import ByteWitchResult
+import MultiPartialDecode
 import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.fromBytes
@@ -8,6 +12,7 @@ import bitmage.fromHex
 import bitmage.fromIndex
 import bitmage.hex
 import bitmage.indicesOfAllSubsequences
+import bwvalue
 import dateFromUTCString
 import htmlEscape
 import looksLikeUtf8String
@@ -280,7 +285,8 @@ class ASN1BER(private val allowTLVChaining: Boolean = true) : ParseCompanion() {
     }
 }
 
-abstract class ASN1Result(val tag: ASN1BER.ASN1Tag, val length: Int, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+abstract class ASN1Result(val tag: ASN1BER.ASN1Tag, val length: Int, override val sourceByteRange: Pair<Int, Int>) :
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.ASN1
     override fun renderHTML(): String {
         return "<div class=\"roundbox asn1\" $byteRangeDataTags>${renderHtmlValue()}</div>"
@@ -408,7 +414,8 @@ class ASN1Sequence(tag: ASN1BER.ASN1Tag, length: Int, val elements: List<ASN1Res
     }
 }
 
-class ASN1InformalChain(val elements: List<ASN1Result>, override var sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+class ASN1InformalChain(val elements: List<ASN1Result>, override var sourceByteRange: Pair<Int, Int>) :
+    ByteWitchResult {
 
     override val colour = ByteWitchResult.Colour.ASN1
     override fun renderHTML(): String {

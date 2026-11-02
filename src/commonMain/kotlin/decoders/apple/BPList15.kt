@@ -2,10 +2,10 @@ package decoders.apple
 
 
 import bitmage.*
-import decoders.BWRangeTaggedData
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.MultiPartialDecode
+import BWRangeTaggedData
+import ByteWitchDecoder
+import ByteWitchResult
+import MultiPartialDecode
 
 class BPList15 {
     private val objectMap = mutableMapOf<Int, BPListObject>()

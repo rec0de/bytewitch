@@ -1,7 +1,13 @@
 package decoders
 
+import BWGenericData
+import BWGenericSequence
+import BWLinkedString
+import BWString
+import BWStringCollection
+import ByteWitchDecoder
+import ByteWitchResult
 import bitmage.*
-import htmlEscape
 import looksLikeUtf16String
 import looksLikeUtf8String
 import veryLargeDataFieldThreshold
@@ -39,7 +45,7 @@ object LengthPrefixDecoder : ByteWitchDecoder {
 object Utf8Decoder : ByteWitchDecoder {
     override val name = "utf8"
 
-    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double,ByteWitchResult?> {
+    override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
         if(data.size > veryLargeDataFieldThreshold)
             return confidence(data.untilIndex(veryLargeDataFieldThreshold), 0)
 
@@ -56,7 +62,11 @@ object Utf8Decoder : ByteWitchDecoder {
     }
 
     override fun decode(data: ByteArray, sourceOffset: Int, inlineDisplay: Boolean): ByteWitchResult {
-        return BWString(stripNullTerminator(data).decodeToString(), Pair(sourceOffset, sourceOffset+data.size))
+        // since confidence may not run on the entire string for large payloads, we still check for decoding errors here
+        val stringContent = stripNullTerminator(data).decodeToString()
+        if(stringContent.any { it.code == 0xFFFD || it.code in 0..8})
+            throw Exception("UTF8 decode error (post-confidence)")
+        return BWString(stringContent, Pair(sourceOffset, sourceOffset+data.size))
     }
 
     override fun tryhardDecode(data: ByteArray): ByteWitchResult? {

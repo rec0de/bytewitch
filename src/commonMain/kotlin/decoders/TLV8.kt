@@ -1,6 +1,9 @@
 package decoders
 
+import BWGenericSequence
 import ByteWitch
+import ByteWitchDecoder
+import ByteWitchResult
 import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
@@ -136,7 +139,8 @@ object TLV16 : ByteWitchDecoder {
 
 class TlvChainResult(tlvs: List<TlvChainEntry>, sourceByteRange: Pair<Int, Int>): BWGenericSequence(tlvs, sourceByteRange)
 
-class TlvChainEntry(val type: Int, val length: Int, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>, private val typeLength: Int = 1, private val lengthLength: Int = 1) : ByteWitchResult {
+class TlvChainEntry(val type: Int, val length: Int, val value: ByteArray, override val sourceByteRange: Pair<Int, Int>, private val typeLength: Int = 1, private val lengthLength: Int = 1) :
+    ByteWitchResult {
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val parseAttempt = ByteWitch.quickDecode(value, sourceByteRange.second - value.size)

@@ -3,8 +3,7 @@ package decoders.SwiftSegFinder
 import bitmage.ByteOrder
 import bitmage.hex
 import bitmage.toHex
-import decoders.BWAnnotatedData
-import decoders.BWString
+import BWString
 import htmlEscape
 
 object SSFRenderer {

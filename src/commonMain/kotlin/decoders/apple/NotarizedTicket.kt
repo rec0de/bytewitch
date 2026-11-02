@@ -5,9 +5,9 @@ import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.hex
 import decoders.ASN1BER
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
-import decoders.bwvalue
+import ByteWitchDecoder
+import ByteWitchResult
+import bwvalue
 
 object NotarizedTicket: ByteWitchDecoder, ParseCompanion() {
     override val name = "NotarizedTicket"

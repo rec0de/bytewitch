@@ -1,5 +1,9 @@
 package decoders
 
+import BWGenericSequence
+import BWString
+import ByteWitchDecoder
+import ByteWitchResult
 import ParseCompanion
 
 object Argo: ByteWitchDecoder, ParseCompanion() {

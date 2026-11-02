@@ -4,8 +4,8 @@ import ParseCompanion
 import bitmage.ByteOrder
 import bitmage.hex
 import bitmage.readInt
-import decoders.ByteWitchDecoder
-import decoders.ByteWitchResult
+import ByteWitchDecoder
+import ByteWitchResult
 
 object DMAP : ByteWitchDecoder, ParseCompanion() {
     override val name = "DMAP / KeyBag"

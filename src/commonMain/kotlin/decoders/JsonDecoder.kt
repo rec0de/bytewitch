@@ -1,5 +1,7 @@
 package decoders
 
+import ByteWitchDecoder
+import ByteWitchResult
 import decoders.apple.OPArray
 import decoders.apple.OPDict
 import decoders.apple.OPFalse
@@ -30,6 +32,11 @@ object JsonDecoder : ByteWitchDecoder {
     override val name = "Json"
 
     override fun confidence(data: ByteArray, sourceOffset: Int): Pair<Double, ByteWitchResult?> {
+        // speculative string decoding takes a long time for large payloads, introduce a faster short-circuit for obviously non-json data
+        val firstByte = data[0].toInt().toChar()
+        if(!firstByte.isWhitespace() && !(firstByte == '{' || firstByte == '['))
+            return Pair(0.0, null)
+
         val string = data.decodeToString().trim()
         val startValid = string.startsWith("[") || string.startsWith("{")
         val endValid = string.endsWith("]") || string.endsWith("}")
