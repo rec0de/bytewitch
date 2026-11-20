@@ -5,19 +5,23 @@ import BWGenericSequence
 import BWString
 import ByteWitchResult
 import ParseCompanion
+import AnnotatedResult
+import AnnotatedResult.Type
 import bitmage.ByteOrder
 import htmlEscape
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 abstract class QuickDirtyDecoder: ParseCompanion() {
     protected var data: ByteArray = byteArrayOf()
     protected var sourceOffset: Int = 0
+    protected var decoderName: String = "unknown"
 
-    private val structs = mutableListOf<MutableList<ByteWitchResult>>()
+    private val structs = mutableListOf<MutableList<AnnotatedResult>>()
     private val structStartOffsets = mutableListOf<Int>()
 
-    private val currentStruct: MutableList<ByteWitchResult>
+    private val currentStruct: MutableList<AnnotatedResult>
         get() = structs.last()
 
     protected val effectiveParsePosition: Int
@@ -44,11 +48,12 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
     private var isInParse = AtomicBoolean(false)
 
     @OptIn(ExperimentalAtomicApi::class)
-    protected fun start(bytes: ByteArray, sourceOffset: Int) {
+    protected fun start(bytes: ByteArray, sourceOffset: Int, decoderName: String) {
         check(isInParse.compareAndSet(expectedValue = false, newValue = true)) { "QuickDirtyParser reentry while parsing"}
         parseOffset = 0
         structs.clear()
         data = bytes
+        this.decoderName = decoderName
         this.sourceOffset = sourceOffset
 
         // create root structure
@@ -60,7 +65,9 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
         isInParse.store(false)
         check(structs.size == 1) { "finish() called with open substruct" }
 
-        return BWGenericSequence(currentStruct, Pair(structStartOffsets.last(), effectiveParsePosition))
+        val result = BWGenericSequence(currentStruct, Pair(structStartOffsets.last(), effectiveParsePosition))
+        result.annotate(decoderName, Type.STRUCTURE)
+        return result
     }
 
     protected fun enterSubstruct() {
@@ -70,6 +77,8 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
 
     protected fun leaveSubstruct(): BWGenericSequence {
         val subresult = BWGenericSequence(currentStruct, Pair(structStartOffsets.last(), effectiveParsePosition))
+        subresult.annotate(decoderName, AnnotatedResult.Type.STRUCTURE)
+
         structs.removeAt(structs.lastIndex)
         structStartOffsets.removeAt(structStartOffsets.lastIndex)
 
@@ -77,7 +86,8 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
         return subresult
     }
 
-    protected fun addForeignParsedField(result: ByteWitchResult) {
+    protected fun addForeignParsedField(result: AnnotatedResult) {
+        result.source = decoderName
         currentStruct.add(result)
     }
 
@@ -86,26 +96,45 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
     protected fun processString(size: Int, label: String): String {
         val start = effectiveParsePosition
         val value = readString(data, size)
-        currentStruct.add(BWString("$label ${htmlEscape(value)}".trim(), Pair(start, effectiveParsePosition)))
+        val subresult = BWString("$label ${htmlEscape(value)}".trim(), Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, Type.UTF8)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processBytes(size: Int, label: String): ByteArray {
+    protected fun processLengthPrefixedString(sizePrefixLen: Int, byteOrder: ByteOrder, label: String): String {
+        val prefixInterpretation = if(byteOrder == ByteOrder.BIG) Type.LENGTH_FLAG_BE else Type.LENGTH_FLAG_LE
+        val stringLength = processUInt(sizePrefixLen, byteOrder, "Length", Format.BYTES, interpretation = prefixInterpretation)
+
+        return if(stringLength > 0U)
+            processString(stringLength.toInt(), label)
+        else
+            ""
+    }
+
+    protected fun processBytes(size: Int, label: String, interpretation: Type = Type.UNKNOWN): ByteArray {
         val start = effectiveParsePosition
         val value = readBytes(data, size)
-        currentStruct.add(BWAnnotatedData(label, value, Pair(start, effectiveParsePosition)))
+        val subresult = BWAnnotatedData(label, value, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, interpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processBytes(size: Int, content: (bytes: ByteArray) -> String): ByteArray {
+    protected fun processBytes(size: Int, interpretation: Type = Type.UNKNOWN, content: (bytes: ByteArray) -> String): ByteArray {
         val start = effectiveParsePosition
         val value = readBytes(data, size)
         val rendering = content(value)
-        currentStruct.add(BWString(rendering, Pair(start, effectiveParsePosition)))
+        val subresult = BWString(rendering, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, interpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processInt(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, explicitlySigned: Boolean = false, lookupMap: Map<Int, String>? = null): Int {
+    protected fun processInt(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, explicitlySigned: Boolean = false, lookupMap: Map<Int, String>? = null, interpretation: Type? = null): Int {
         val start = effectiveParsePosition
         val value = readInt(data, size, explicitlySigned, byteOrder)
         val renderedValue = when(format) {
@@ -115,12 +144,17 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
             Format.LOOKUP -> lookupMap!!.getOrElse(value){ "Unknown($value)" }
         }
 
+        val effectiveInterpretation = interpretation ?: Type.getIntType(signed = true, size, byteOrder)
+
         val fullLabel = "$label: $renderedValue"
-        currentStruct.add(BWString(fullLabel, Pair(start, effectiveParsePosition)))
+        val subresult = BWString(fullLabel, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, effectiveInterpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processUInt(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, lookupMap: Map<UInt, String>? = null): UInt {
+    protected fun processUInt(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, lookupMap: Map<UInt, String>? = null, interpretation: Type? = null): UInt {
         val start = effectiveParsePosition
         val value = readUInt(data, size, byteOrder)
         val renderedValue = when(format) {
@@ -130,20 +164,31 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
             Format.LOOKUP -> lookupMap!!.getOrElse(value){ "Unknown($value)" }
         }
 
+        val effectiveInterpretation = interpretation ?: Type.getIntType(signed = false, size, byteOrder)
+
         val fullLabel = "$label: $renderedValue"
-        currentStruct.add(BWString(fullLabel, Pair(start, effectiveParsePosition)))
+        val subresult = BWString(fullLabel, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, effectiveInterpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processUInt(size: Int, byteOrder: ByteOrder, renderer: (UInt) -> String): UInt {
+    protected fun processUInt(size: Int, byteOrder: ByteOrder, interpretation: Type? = null, renderer: (UInt) -> String,): UInt {
         val start = effectiveParsePosition
         val value = readUInt(data, size, byteOrder)
         val renderedValue = renderer(value)
-        currentStruct.add(BWString(renderedValue, Pair(start, effectiveParsePosition)))
+
+        val effectiveInterpretation = interpretation ?: Type.getIntType(signed = false, size, byteOrder)
+
+        val subresult = BWString(renderedValue, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, effectiveInterpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 
-    protected fun processULong(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, lookupMap: Map<Int, String>? = null): ULong {
+    protected fun processULong(size: Int, byteOrder: ByteOrder, label: String, format: Format = Format.DECIMAL, lookupMap: Map<Int, String>? = null,  interpretation: Type? = null): ULong {
         val start = effectiveParsePosition
         val value = readULong(data, size, byteOrder)
         val renderedValue = when(format) {
@@ -153,8 +198,13 @@ abstract class QuickDirtyDecoder: ParseCompanion() {
             Format.LOOKUP -> lookupMap!!.getOrElse(value.toInt()){ "Unknown($value)" }
         }
 
+        val effectiveInterpretation = interpretation ?: Type.getIntType(signed = false, size, byteOrder)
+
         val fullLabel = "$label: $renderedValue"
-        currentStruct.add(BWString(fullLabel, Pair(start, effectiveParsePosition)))
+        val subresult = BWString(fullLabel, Pair(start, effectiveParsePosition))
+        subresult.annotate(decoderName, effectiveInterpretation)
+
+        currentStruct.add(subresult)
         return value
     }
 }

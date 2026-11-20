@@ -26,7 +26,7 @@ class AppleBundle : QuickDirtyDecoder() {
     fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
         check(data.size >= MIN_SIZE) { "BUND: data too short" }
         rangeMap.clear()
-        start(data, sourceOffset)
+        start(data, sourceOffset, name)
 
         // skip over unknown1, unknown2, pad
         parseOffset += 8

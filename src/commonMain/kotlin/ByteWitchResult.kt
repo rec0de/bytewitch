@@ -1,5 +1,7 @@
+import bitmage.ByteOrder
 import bitmage.hex
 import bitmage.untilIndex
+import decoders.QuickDirtyDecoder
 
 interface ByteWitchResult {
 
@@ -59,6 +61,52 @@ interface ByteWitchResult {
         get() = if(sourceByteRange == null || sourceByteRange!!.first < 0) "" else rangeTagsFor(sourceByteRange!!.first, sourceByteRange!!.second)
 }
 
+abstract class AnnotatedResult : ByteWitchResult {
+    enum class Type {
+        STRUCTURE,
+        LENGTH_FLAG, LENGTH_FLAG_LE, LENGTH_FLAG_BE, TYPE_FLAG, TYPE_LENGTH_FLAG,
+        STRING, UTF8, UTF16, ASCII,
+        INT, INT_8, INT_16_LE, INT_16_BE, INT_24_LE, INT_24_BE, INT_32_LE, INT_32_BE, INT_64_BE, INT_64_LE,
+        UINT, UINT_8, UINT_16_LE, UINT_16_BE, UINT_24_LE, UINT_24_BE, UINT_32_LE, UINT_32_BE, UINT_64_BE, UINT_64_LE,
+        REAL, DATE, MAGIC_BYTES, BYTES, BYTES_HIGH_ENTROPY, BOOL, NULL, FILL, OID, UID, FLAGS, POINTER_BE, POINTER_LE,
+        UNKNOWN;
+
+        companion object {
+            fun getIntType(signed: Boolean, length: Int, endianness: ByteOrder): Type {
+                return when {
+                    signed && length == 1 -> INT_8
+                    signed && length == 2 && endianness == ByteOrder.BIG -> INT_16_BE
+                    signed && length == 2 && endianness == ByteOrder.LITTLE -> INT_16_LE
+                    signed && length == 3 && endianness == ByteOrder.BIG -> INT_24_BE
+                    signed && length == 3 && endianness == ByteOrder.LITTLE -> INT_24_LE
+                    signed && length == 4 && endianness == ByteOrder.BIG -> INT_32_BE
+                    signed && length == 4 && endianness == ByteOrder.LITTLE -> INT_32_LE
+                    signed && length == 8 && endianness == ByteOrder.BIG -> INT_64_BE
+                    signed && length == 8 && endianness == ByteOrder.LITTLE -> INT_64_LE
+                    !signed && length == 1 -> INT_8
+                    !signed && length == 2 && endianness == ByteOrder.BIG -> UINT_16_BE
+                    !signed && length == 2 && endianness == ByteOrder.LITTLE -> UINT_16_LE
+                    !signed && length == 3 && endianness == ByteOrder.BIG -> UINT_24_BE
+                    !signed && length == 3 && endianness == ByteOrder.LITTLE -> UINT_24_LE
+                    !signed && length == 4 && endianness == ByteOrder.BIG -> UINT_32_BE
+                    !signed && length == 4 && endianness == ByteOrder.LITTLE -> UINT_32_LE
+                    !signed && length == 8 && endianness == ByteOrder.BIG -> UINT_64_BE
+                    !signed && length == 8 && endianness == ByteOrder.LITTLE -> UINT_64_LE
+                    else -> throw Exception("unsupported int type: signed? $signed size $length endianness $endianness")
+                }
+            }
+        }
+    }
+
+    var source: String? = null
+    var interpretation: Type? = null
+
+    fun annotate(source: String, interpretation: Type) {
+        this.source = source
+        this.interpretation = interpretation
+    }
+}
+
 class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedData?>>, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
     override val colour = ByteWitchResult.Colour.NEUTRAL
 
@@ -75,7 +123,7 @@ class MultiPartialDecode(val parts: List<Pair<ByteWitchResult?, BWRangeTaggedDat
     }
 }
 
-open class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>, val vertical: Boolean = false) : ByteWitchResult {
+open class BWGenericSequence(val elements: List<ByteWitchResult>, override val sourceByteRange: Pair<Int, Int>, val vertical: Boolean = false) : AnnotatedResult() {
     override val colour = ByteWitchResult.Colour.GENERIC
     override fun renderHTML(): String {
         val large = if(vertical) " largecollection" else ""
@@ -86,7 +134,7 @@ open class BWGenericSequence(val elements: List<ByteWitchResult>, override val s
     }
 }
 
-class BWGenericData(val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): ByteWitchResult {
+class BWGenericData(val data: ByteArray, override val sourceByteRange: Pair<Int, Int>): AnnotatedResult() {
     override val colour = ByteWitchResult.Colour.PLAIN
     override fun renderHTML(): String {
         val quickDecode = ByteWitch.quickDecode(data, sourceByteRange.first)
@@ -99,7 +147,7 @@ class BWStringCollection(val elements: List<BWString>, override val sourceByteRa
     override fun renderHTML() = "<div class=\"roundbox neutral\">" + elements.joinToString(" ") { it.renderHTML() } + "</div>"
 }
 
-open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+open class BWString(val string: String, override val sourceByteRange: Pair<Int, Int>) : AnnotatedResult() {
     override val colour = ByteWitchResult.Colour.PLAIN
     override fun renderHTML() = "<div class=\"bwvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)}</div>"
 }
@@ -109,7 +157,7 @@ class BWLinkedString(string: String, private val url: String, sourceByteRange: P
     override fun renderHTML() = "<div class=\"bwvalue stringlit\" $byteRangeDataTags>${htmlEscape(string)} <a href=\"${url}\" target=\"_blank\">(info)</a></div>"
 }
 
-class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : ByteWitchResult {
+class BWAnnotatedData(val annotationHTML: String, val data: ByteArray, override val sourceByteRange: Pair<Int, Int>) : AnnotatedResult() {
     override val colour = ByteWitchResult.Colour.PLAIN
     override fun renderHTML(): String {
         val dataRendering = if(data.size > veryLargeDataFieldThreshold)

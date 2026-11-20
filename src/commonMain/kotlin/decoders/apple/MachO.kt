@@ -164,7 +164,7 @@ class MachO : QuickDirtyDecoder() {
     private var byteOrder = ByteOrder.LITTLE
 
     fun decode(data: ByteArray, sourceOffset: Int): ByteWitchResult {
-        start(data, sourceOffset)
+        start(data, sourceOffset, name)
 
         var is64b: Boolean = false
         processBytes(4){ magic ->

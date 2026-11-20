@@ -24,6 +24,7 @@ object ByteWitch {
         OpackParser, MsgPackParser, CborParser, BsonParser, UbjsonParser, JsonDecoder,
         ProtobufParser, ASN1BER, Sec1Ec, TLS12, LengthPrefixDecoder, TLV8, TLV16, TLV816, IEEE754, MSZIP, Bech32,
         DMAP, NotarizedTicket, AppleAuth, HTTP2, Argo, WebSocket,
+        AlloyControl, Alloy,
         GenericTLV, EdDSA, ECCurves, Randomness, HeuristicSignatureDetector,
         /* PGP, ModernPGP */
     )
