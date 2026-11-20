@@ -99,7 +99,9 @@ class Alloy : QuickDirtyDecoder() {
 
         when(type) {
             // Ack, KeepAlive, Handshake
-            0x01, 0x02, 0x04 -> {}
+            0x01, 0x02, 0x04 -> {
+                check(parseOffset == data.size)
+            }
             // AppAck
             0x07 -> {
                 processUInt(2, ByteOrder.BIG, "Stream ID")
