@@ -167,7 +167,7 @@ object ByteWitch {
                     val elapsed = measureTime {
                         result = Pair(it, it.confidence(data, 0))
                     }
-                    Logger.tag("Performance", "confidence check of ${it.name} took $elapsed")
+                    //Logger.tag("Performance", "confidence check of ${it.name} took $elapsed")
                     result
                 }.filter { it.second.first > 0.45 }
             }
