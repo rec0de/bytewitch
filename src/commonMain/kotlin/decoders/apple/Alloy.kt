@@ -100,8 +100,8 @@ class Alloy : QuickDirtyDecoder() {
         // Special cases: Ack, KeepAlive, Handshake, AppAck, Fragmented, ServiceMap
 
         when(type) {
-            // Ack, KeepAlive, Handshake
-            0x01, 0x02, 0x04 -> {
+            // Ack, KeepAlive, Handshake, ExpiredAck
+            0x01, 0x02, 0x04, 0x25 -> {
                 check(parseOffset == data.size)
             }
             // AppAck
@@ -118,7 +118,7 @@ class Alloy : QuickDirtyDecoder() {
                 processBytes(data.size-parseOffset, "Payload")
             }
             // Data and Dict messages
-            0x00, 0x06 -> {
+            0x00, 0x06, 0x16 -> {
                 processUInt(2, ByteOrder.BIG, "Stream ID")
                 val flags = processUInt(1, ByteOrder.BIG, "Flags", interpretation = Type.FLAGS).toInt()
                 processLengthPrefixedString(4, ByteOrder.BIG, "Response ID")
@@ -131,7 +131,20 @@ class Alloy : QuickDirtyDecoder() {
                     processLengthPrefixedString(4, ByteOrder.BIG, "Topic:")
 
                 val payloadLength = if(hasExpiryDate) data.size - parseOffset - 4 else data.size - parseOffset
-                processBytes(payloadLength, "Payload", Type.BYTES)
+
+                // resource transfer message
+                if(type == 0x16) {
+                    if(data[parseOffset].toInt() == 1) {
+                        processUInt(1, ByteOrder.BIG, "first data chunk")
+                        processBytes(payloadLength - 1, "Data chunk", Type.BYTES)
+                    }
+                    else {
+                        processULong(8, ByteOrder.BIG, "Offset")
+                        processBytes(payloadLength - 8, "Data chunk", Type.BYTES)
+                    }
+                }
+                else
+                    processBytes(payloadLength, "Payload", Type.BYTES)
 
                 if(hasExpiryDate)
                     processUInt(4, ByteOrder.BIG, "Expiry Date", interpretation = Type.DATE)
