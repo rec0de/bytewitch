@@ -8,6 +8,7 @@ import bitmage.ByteOrder
 import bitmage.fromBytes
 import bitmage.fromIndex
 import bitmage.untilIndex
+import kotlin.math.min
 import veryLargeDataFieldThreshold
 
 object TLV8 : ByteWitchDecoder {
@@ -47,7 +48,10 @@ object TLV8 : ByteWitchDecoder {
             val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
             val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
 
-            return Pair(1.0 - zeroLengthPenalty, res)
+            val largeTypes = res.elements.count { (it as TlvChainEntry).type > 0x80 }
+            val largeTypePenalty = min(0.5, largeTypes.toDouble() / res.elements.size)
+
+            return Pair(1.0 - zeroLengthPenalty - largeTypePenalty, res)
         } catch (e: Exception) {
             return Pair(0.0, null)
         }
@@ -88,7 +92,10 @@ object TLV816 : ByteWitchDecoder {
             val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
             val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
 
-            return Pair(1.0 - zeroLengthPenalty, res)
+            val largeTypes = res.elements.count { (it as TlvChainEntry).type > 0x80 }
+            val largeTypePenalty = min(0.5, largeTypes.toDouble() / res.elements.size)
+
+            return Pair(1.0 - zeroLengthPenalty - largeTypePenalty, res)
         } catch (e: Exception) {
             return Pair(0.0, null)
         }
@@ -128,9 +135,12 @@ object TLV16 : ByteWitchDecoder {
             val res = decode(data, sourceOffset) as TlvChainResult
 
             val zeroLengthTLVs = res.elements.count { (it as TlvChainEntry).length == 0 }
-            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size) * 0.8
+            val zeroLengthPenalty = (zeroLengthTLVs.toDouble() / res.elements.size)
 
-            return Pair(1.0 - zeroLengthPenalty, res)
+            val largeTypes = res.elements.count { (it as TlvChainEntry).type > 0x80 }
+            val largeTypePenalty = min(0.5, largeTypes.toDouble() / res.elements.size)
+
+            return Pair(1.0 - zeroLengthPenalty - largeTypePenalty, res)
         } catch (e: Exception) {
             return Pair(0.0, null)
         }
