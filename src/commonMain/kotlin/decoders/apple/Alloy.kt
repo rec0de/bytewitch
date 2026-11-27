@@ -95,6 +95,7 @@ class Alloy : QuickDirtyDecoder() {
         val length = processUInt(4, ByteOrder.BIG, "Length", Format.BYTES, interpretation = Type.LENGTH_FLAG_BE)
         val sequence = processUInt(4, ByteOrder.BIG, "Sequence")
 
+        check(length < data.size.toUInt()) { "Alloy: implausible message length" }
         check(length > 0u || sequence > 0u) { "Alloy: rejecting all-zero payload" }
 
         // Special cases: Ack, KeepAlive, Handshake, AppAck, Fragmented, ServiceMap
